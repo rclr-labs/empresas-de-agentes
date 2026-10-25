@@ -48,12 +48,16 @@ if (todosErros.length) {
 
 mkdirSync(out, { recursive: true });
 const perdas = [];
+const preservadas = [];
+const avisos = [];
 const aplicados = [];
 
 for (const agente of pkg.agents) {
   const applied = applyBinding(agente, binding, pkg);
   aplicados.push({ agente, applied });
   for (const l of applied.lost) perdas.push({ slug: agente.slug, ...l });
+  for (const p of applied.preserved) preservadas.push({ slug: agente.slug, ...p });
+  for (const w of applied.warnings) avisos.push({ slug: agente.slug, ...w });
 }
 
 if (binding.format === 'portable') {
@@ -94,10 +98,30 @@ if (binding.format === 'portable') {
 
 console.log(`${pkg.slug} → ${runtime}: ${pkg.agents.length} agente(s) em ${out}`);
 
+// Três saídas distintas, de propósito: PRESERVADA não é perdida (o dado
+// sobrevive no arquivo, só não é agido pelo runtime) e PERDIDA não é
+// preservada (nem sobrevive, nem é honrada) — tratar as duas como a
+// mesma coisa é exatamente o "no loss" que a tarefa 27 existe para
+// corrigir, porque "paperclip copia byte a byte" e "claude-code aplica a
+// permissão" não são a mesma garantia.
+if (preservadas.length) {
+  console.log(`\nAVISO — ${preservadas.length} capacidade(s) PRESERVADA(S) mas não aplicada(s):`);
+  for (const p of preservadas) {
+    console.log(`  ${p.slug}: ${p.capability} — ${p.reason}`);
+  }
+}
+
 if (perdas.length) {
-  console.log(`\nAVISO — ${perdas.length} capacidade(s) perdida(s) nesta emissão:`);
+  console.log(`\nAVISO — ${perdas.length} capacidade(s) PERDIDA(S):`);
   for (const p of perdas) {
     console.log(`  ${p.slug}: ${p.capability} — ${p.reason}`);
   }
   console.log('\nA fronteira perdida continua escrita no pacote e precisa ser aplicada fora do runtime.');
+}
+
+if (avisos.length) {
+  console.log(`\nAVISO — ${avisos.length} ressalva(s) de fronteira:`);
+  for (const a of avisos) {
+    console.log(`  ${a.slug}: ${a.message}`);
+  }
 }

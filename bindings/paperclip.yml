@@ -25,5 +25,12 @@ map:
   delegate: []
   budget: []
   approve: []
+  # skills, memory, context: ponte mínima da tarefa 27 — agora são chave
+  # endereçável por capabilityKeys (ver tools/bindings.mjs), e identidade
+  # os preserva do mesmo jeito que preserva tudo o mais: cópia byte a
+  # byte. []  porque o formato "identity" não usa a lista `tools`.
+  skills: []
+  memory: []
+  context: []
 unsupported: []
 unsupported_metadata: []

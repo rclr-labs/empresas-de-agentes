@@ -15,13 +15,64 @@ Cada binding é um arquivo `.yml` nesta pasta, carregado por
 pelo Studio (que importa o mesmo módulo puro no browser para o preview de
 emissão).
 
-## 2. A regra de cobertura total
+## 2. Três estados, não dois
+
+Até esta versão, uma capacidade só podia estar `map`eada (traduzida para
+ferramenta do runtime) ou `unsupported` (perdida). Isso é binário, e o
+binário não consegue expressar o meio do caminho: um arquivo que **sobrevive
+intacto** na emissão, mas que o runtime **não age** sobre — Paperclip copia
+o pacote byte a byte, logo `budget` sobrevive no arquivo, mas a spec base
+`agentcompanies/v1` não define orçamento (§15 — é extensão de fornecedor),
+logo o runtime não aplica teto nenhum. Chamar isso de "sem perda" é mentira
+por omissão: tão governança quanto dizer que o runtime enforce o que ele só
+guarda.
+
+Por isso todo binding desta pasta declara `translates`, `preserves` e
+`loses`:
+
+| Estado | Significa |
+|---|---|
+| `translates` | O runtime **honra** a capacidade; a chave nomeia o mecanismo concreto |
+| `preserves` | O dado **sobrevive** no arquivo emitido; o runtime **não age** sobre ele |
+| `loses` | Nem sobrevive, nem é honrado |
+
+`map` e `unsupported` continuam funcionando como **alias de leitura** de
+`translates`/`loses` — um binding de terceiro escrito no formato antigo
+ainda carrega, com o mesmo texto de motivo ("declarado em unsupported") que
+sempre teve. Todo binding novo, e toda revisão de um existente, usa os três
+nomes novos.
+
+## 3. `rule_order` e `allowlist_scope`
+
+Duas propriedades a mais, porque a tradução de capacidade para regra de
+runtime pode estar **sintaticamente completa e logicamente invertida**:
+
+- **`rule_order`** (`first-match` | `last-match`): a ordem em que o runtime
+  resolve uma lista de regras de permissão. O OpenCode V2 avalia
+  **última-regra-vence** — emitir uma lista pensada para primeira-vence
+  inverte a fronteira em silêncio, o tipo de erro mais perigoso porque o
+  arquivo parece certo até o caso que importa.
+- **`allowlist_scope`** (`os` | `fetch-only`): o que uma allowlist de
+  domínio realmente cobre. `os` significa que o sandbox do sistema
+  operacional intercepta toda rede do processo, shell cru incluído.
+  `fetch-only` significa que a allowlist só vale para a chamada de busca da
+  ferramenta — um papel com shell cru liberado (`curl`, `wget`) escapa
+  dela por completo. `applyBinding` avisa quando os dois — allowlist e
+  shell cru — coexistem num binding `fetch-only`; não tenta reconhecer todo
+  comando perigoso, porque qualquer shell liberado já anula a lista.
+
+Todo binding que emite uma lista de regra declara `rule_order`. Todo
+binding que traduz `network.allowlist` declara `allowlist_scope`.
+
+## 4. A regra de cobertura total
 
 Toda capacidade que o acervo realmente usa — cada `capabilities.read`,
 `capabilities.write`, `execute.allow`/`deny`, `network`,
-`network.allowlist`, `delegate`, `budget`, `approve` que aparece em algum
-`AGENTS.md` dos três pacotes publicados — tem de aparecer em `map` **ou**
-em `unsupported` de todo binding desta pasta. Não existe terceira opção.
+`network.allowlist`, `delegate`, `budget`, `approve`, e também os campos de
+topo `skills`, `memory`, `context` (ver §5) — tem de aparecer em
+`translates`, `preserves` **ou** `loses` de todo binding desta pasta. Não
+existe quarta opção, e "esqueci de declarar" é o próprio defeito que este
+mecanismo existe para impedir.
 
 A razão é a mesma que justifica a existência do `lost` em `applyBinding`:
 perda silenciosa de fronteira é pior que fronteira ausente, porque cria a
@@ -35,6 +86,28 @@ CENTRAL" que varre os três pacotes, calcula toda capacidade em uso via
 `capabilityKeys`, e falha nomeando a capacidade que qualquer binding deixou
 descoberta. Esse teste é o portão: nenhum binding novo, e nenhuma mudança a
 um existente, entra sem passar por ele.
+
+## 5. `skills`, `memory` e `context` são capacidade endereçável
+
+Até esta versão, `skills` (campo de topo do frontmatter) e `memory`/
+`context` (dentro de `metadata`, ao lado de `capabilities`) viviam fora de
+`capabilityKeys` — a enumeração só varria `metadata.capabilities`. Isso foi
+exatamente o que deixou `skills` sem casa: nenhum binding tinha a chave em
+`map` nem em `unsupported`, e como `capabilityKeys` nunca a produzia, nenhum
+teste de cobertura reclamava. O defeito não tinha alarme porque o mecanismo
+de alarme não enxergava a chave.
+
+A correção generaliza o mecanismo, não só o caso: `capabilityKeys` agora
+também enumera `skills`, `memory` e `context` quando declarados, e a regra
+de cobertura total (§4) os varre do mesmo jeito que varre `read`/`write`.
+Um campo de topo novo que o acervo passe a usar cai sob a mesma verificação
+sem precisar de um segundo mecanismo paralelo — era esse segundo mecanismo
+(a antiga `unsupported_metadata`, restrita por lista fixa a
+`['memory', 'context']`) que não tinha onde crescer.
+
+`unsupported_metadata` continua existindo como alias de leitura de `loses`
+para esses três campos, pela mesma razão que `map`/`unsupported` continuam:
+compatibilidade com binding de terceiro.
 
 ## 3. Procedência
 
@@ -63,17 +136,30 @@ Cinco campos são obrigatórios em todo arquivo desta pasta:
 | `format` | A chave que `tools/writers.mjs` usa para escolher o escritor (`claude-code`, `opencode`, `identity`, `portable`) |
 | `map` | O dicionário capacidade → ferramenta(s) do runtime. Chave ausente de `map` e de `unsupported` é defeito do binding, detectado em `applyBinding` como perda "não declarada" |
 
-Dois campos adicionais, opcionais mas recomendados:
+Campos adicionais do esquema de três estados:
 
-- `unsupported` — lista de chaves de capacidade (no formato de
-  `capabilityKeys`, ex.: `read.database`, `network.allowlist`) que o
-  runtime não tem como expressar. Toda capacidade aqui vira perda
-  explicada, não silenciosa.
-- `unsupported_metadata` — subconjunto de `['memory', 'context']`: o que o
-  binding não preserva fora de `capabilities`. `memory` e `context` não
-  são capacidade — vivem em `metadata.memory` e `metadata.context` — e por
-  isso não entram em `unsupported`, mas ainda precisam de declaração
-  própria para não se perderem em silêncio.
+- `preserves` — lista de chaves de capacidade cujo dado sobrevive no
+  arquivo emitido, mas que o runtime não aplica.
+- `loses` — lista de chaves cuja capacidade nem sobrevive nem é honrada.
+  Substitui `unsupported` nos bindings novos; `unsupported` continua
+  funcionando como alias de leitura.
+- `rule_order` — obrigatório quando o binding emite lista de regra
+  (`first-match` ou `last-match`).
+- `allowlist_scope` — obrigatório quando o binding traduz
+  `network.allowlist` (`os` ou `fetch-only`).
+- `citations` — mapa opcional `chave → texto`, citando a página ou o
+  arquivo lido que sustenta a célula. Uma citação pode ser string (fonte
+  direta) ou `{ inferido: true, source: "razão" }` quando não há onde
+  apontar — mas toda célula de um binding publicado tem de ter uma das
+  duas, nunca nenhuma.
+
+Campos anteriores, mantidos como alias de leitura:
+
+- `map` — alias de `translates`.
+- `unsupported` — alias de `loses`.
+- `unsupported_metadata` — subconjunto de `['memory', 'context', 'skills']`,
+  alias de `loses` para os três campos de topo que não vivem dentro de
+  `capabilities` (ver §5).
 
 Ao escrever um binding novo, rode `node --test test/bindings-arquivos.test.mjs`
 antes de qualquer commit: a regra de cobertura total e a prova de que nenhum

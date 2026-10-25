@@ -6,6 +6,13 @@ source: >-
   (model, color, memory).
 emits: .claude/agents/<slug>.md
 format: claude-code
+# first-match: a precedência real do Claude Code é "deny vence allow
+# independente de posição na lista" — mais perto de first-match (deny
+# checado antes, não importa onde foi escrito) do que do last-match do
+# OpenCode V2. Rewrite completo de source e mecanismo chega na tarefa 28,
+# a partir da medição; este campo é adicionado agora porque o esquema de
+# três estados já exige a declaração.
+rule_order: first-match
 map:
   read.repository: [Read, Grep, Glob]
   read.documentation: [Read, Grep, Glob]
@@ -43,3 +50,10 @@ unsupported_metadata:
   # perda é mais honesto que inventar a tradução.
   - memory
   - context
+  # skills: ponte mínima da tarefa 27 — skills agora é chave endereçável
+  # (ver tools/bindings.mjs capabilityKeys) e precisa de estado declarado
+  # em todo binding, sob pena de "perda não declarada". A tarefa 28
+  # reescreve esta célula a partir da medição: Claude Code TEM campo
+  # `skills:` no frontmatter (confirmado em doc), então o estado real é
+  # `translates`, não perda — fica registrado aqui como perda só até lá.
+  - skills

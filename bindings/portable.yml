@@ -25,5 +25,12 @@ map:
   delegate: [delegate]
   budget: [budget]
   approve: [approve]
+  # skills, memory, context: ponte mínima da tarefa 27 — ver nota
+  # equivalente em paperclip.yml. O manifesto portable já escreve os três
+  # (ver tools/writers.mjs portableManifest), então o mapa apenas declara
+  # o que já era verdade.
+  skills: [skills]
+  memory: [memory]
+  context: [context]
 unsupported: []
 unsupported_metadata: []

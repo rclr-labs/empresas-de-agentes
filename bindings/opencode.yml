@@ -7,6 +7,12 @@ source: >-
   verificado.
 emits: agents/<slug>.md
 format: opencode
+# last-match: medido em anomalyco/opencode — packages/schema/src/permission.ts
+# e permissions.mdx ("Matching"/"Agents"): regras combinam última-vence, não
+# mais-específica-vence. Reescrita completa de source e mecanismo chega na
+# tarefa 28; este campo é adicionado agora porque o esquema de três estados
+# já exige a declaração.
+rule_order: last-match
 permissions:
   defaults:
     edit: deny
@@ -37,3 +43,8 @@ unsupported:
 unsupported_metadata:
   - memory
   - context
+  # skills: ponte mínima da tarefa 27 — ver nota equivalente em
+  # claude-code.yml. A tarefa 28 confirma que skills NÃO é campo de
+  # ConfigAgent.Info em opencode V2 (ausente de agent.ts e de agents.mdx),
+  # então aqui o estado real após a medição continua `loses`, não muda.
+  - skills

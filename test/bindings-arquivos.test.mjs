@@ -33,14 +33,23 @@ test('REGRA CENTRAL: todo binding cobre toda capacidade do acervo, em map ou uns
   const usadas = new Set();
   for (const nome of listPackages(RAIZ)) {
     for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      for (const k of capabilityKeys(a.frontmatter.metadata.capabilities)) usadas.add(k);
+      for (const k of capabilityKeys(a)) usadas.add(k);
     }
   }
   assert.ok(usadas.size > 0, 'o acervo declara capacidades');
 
   for (const f of nomes()) {
     const b = carregar(f);
-    const cobertas = new Set([...Object.keys(b.map ?? {}), ...(b.unsupported ?? [])]);
+    // skills/memory/context agora são chave endereçável de capabilityKeys
+    // (tarefa 27), e viviam só em `unsupported_metadata`, fora do
+    // vocabulário de `map`/`unsupported` que esta regra varre — unir os
+    // dois é o que impede a classe de defeito 2 (skills sem casa) de
+    // voltar: toda chave nova em capabilityKeys cai automaticamente sob
+    // esta mesma verificação, sem precisar de um segundo mecanismo.
+    const cobertas = new Set([
+      ...Object.keys(b.map ?? {}), ...(b.unsupported ?? []), ...(b.unsupported_metadata ?? []),
+      ...Object.keys(b.translates ?? {}), ...(b.preserves ?? []), ...(b.loses ?? []),
+    ]);
     const descobertas = [...usadas].filter((k) => !cobertas.has(k));
     assert.deepEqual(descobertas, [],
       `${f} não cobre: ${descobertas.join(', ')}. Toda capacidade entra em map ou em unsupported — perda silenciosa não é opção`);
@@ -55,13 +64,13 @@ test('portable não perde nada — é o alvo sem perda por desenho', () => {
     'nem memory nem context se perdem no portable');
 });
 
-test('memory e context: todo binding declara se os preserva ou os perde', () => {
+test('memory, context e skills: todo binding declara se os preserva ou os perde', () => {
   for (const f of nomes()) {
     const b = carregar(f);
     assert.ok(Array.isArray(b.unsupported_metadata),
-      `${f} sem unsupported_metadata — memory e context não podem se perder em silêncio`);
+      `${f} sem unsupported_metadata — memory, context e skills não podem se perder em silêncio`);
     for (const k of b.unsupported_metadata) {
-      assert.ok(['memory', 'context'].includes(k), `${f}: "${k}" não é metadata conhecido`);
+      assert.ok(['memory', 'context', 'skills'].includes(k), `${f}: "${k}" não é metadata conhecido`);
     }
   }
 });
