@@ -132,6 +132,38 @@ test('--fix NÃO reescreve pacote que tem erro', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('--fix não se contradiz: recusou, então não diz que aplicou', () => {
+  // Medido antes: a mesma execução imprimia "--fix NÃO aplicado" e depois
+  // "--fix aplicado", porque o resumo era condicionado na flag e não na
+  // escrita. Ferramenta que mente sobre o que fez é pior que a que não faz.
+  const dir = mkdtempSync(join(tmpdir(), 'pkg-'));
+  mkdirSync(join(dir, 'agents', 'a'), { recursive: true });
+  writeFileSync(join(dir, 'COMPANY.md'),
+    '---\nname: X\nslug: x\nschema: agentcompanies/v1\nkind: company\n---\n\n# x\n');
+  writeFileSync(join(dir, 'agents', 'a', 'AGENTS.md'),
+    '---\nname: A\nslug: a\nreportsTo: null\nmetadata:\n  fronteira:\n    pode: [ler]\n    nao_pode: []\n---\n\n# A\n');
+
+  const { stdout, stderr } = rodar([dir, '--fix']);
+  const saida = stdout + stderr;
+  assert.match(saida, /N[ÃA]O aplicado/i, 'a recusa aparece');
+  assert.ok(!/--fix aplicado/.test(saida), 'e o resumo NÃO diz que aplicou');
+  assert.match(saida, /n[ãa]o reescreveu nenhum arquivo/i);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('--fix relata a contagem real de arquivos reescritos', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pkg-'));
+  mkdirSync(join(dir, 'agents', 'a'), { recursive: true });
+  writeFileSync(join(dir, 'COMPANY.md'),
+    '---\nname: X\nslug: x\nschema: agentcompanies/v1\nkind: company\nlicense: MIT\n---\n\n# x\n');
+  writeFileSync(join(dir, 'agents', 'a', 'AGENTS.md'),
+    '---\nname: A\nslug: a\nreportsTo: null\nskills: [x]\nmetadata:\n  persona: {display_name: N, icon: Z}\n  fronteira:\n    pode: [ler]\n    nao_pode: []\n---\n\n# A\n');
+
+  const { stdout } = rodar([dir, '--fix']);
+  assert.match(stdout, /--fix aplicado: \d+ arquivo/, 'diz quantos');
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('--json devolve saída parseável', () => {
   const { stdout } = rodar(['--json']);
   const dados = JSON.parse(stdout);

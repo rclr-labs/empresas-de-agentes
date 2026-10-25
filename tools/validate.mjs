@@ -28,6 +28,11 @@ const dirs = alvos.length
   : listPackages(RAIZ).map((n) => join(RAIZ, n));
 
 const relatorio = { packages: [], errors: 0, warnings: 0 };
+// Conta ESCRITA de fato, não a intenção: a linha de resumo tem de dizer o
+// que aconteceu. Condicionada só na flag, ela imprimia "--fix aplicado" na
+// mesma execução em que imprimira "--fix NÃO aplicado". Ferramenta que
+// mente sobre o que fez é pior que ferramenta que não faz.
+let reescritos = 0;
 
 for (const dir of dirs) {
   let pkg;
@@ -64,12 +69,16 @@ for (const dir of dirs) {
     // a partir dele é o próprio fix.
     for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
       writeFileSync(join(dir, arquivo.path), toMarkdown(arquivo), 'utf8');
+      reescritos += 1;
     }
   }
 }
 
 if (json) {
-  console.log(JSON.stringify(relatorio, null, 2));
+  // `rewritten`: mesma verdade que a saída humana — contagem real de
+  // escrita, não a intenção de --fix. Um script que só lê o JSON merece
+  // ver o que de fato aconteceu, não a flag que foi passada.
+  console.log(JSON.stringify({ ...relatorio, rewritten: reescritos }, null, 2));
 } else {
   for (const p of relatorio.packages) {
     const status = p.errors.length ? 'FALHOU' : 'ok';
@@ -78,7 +87,11 @@ if (json) {
     for (const w of p.warnings) console.log(`  ${w.code} ${w.file ?? w.path}\n       ${w.message}`);
   }
   console.log(`\ntotal: ${relatorio.errors} erro, ${relatorio.warnings} aviso`);
-  if (fix) console.log('--fix aplicado: alias reescritos para canônico');
+  if (fix) {
+    console.log(reescritos > 0
+      ? `--fix aplicado: ${reescritos} arquivo(s) reescrito(s) para canônico`
+      : '--fix não reescreveu nenhum arquivo');
+  }
 }
 
 process.exit(relatorio.errors > 0 ? 1 : 0);
