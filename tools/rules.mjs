@@ -157,3 +157,122 @@ export function validateStructure(pkg) {
 
   return erros;
 }
+
+// Padrões de segredo literal. Nome de variável de ambiente é permitido —
+// o que não pode é o valor.
+const SEGREDOS = [
+  { re: /\bsk-[A-Za-z0-9_-]{20,}/, nome: 'chave de API no formato sk-*' },
+  { re: /\bgh[pousr]_[A-Za-z0-9]{20,}/, nome: 'token do GitHub' },
+  { re: /\bAKIA[0-9A-Z]{16}\b/, nome: 'access key da AWS' },
+  { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, nome: 'chave privada' },
+  { re: /\/(Users|home)\/[a-z][a-z0-9_.-]*\//i, nome: 'caminho absoluto de máquina' },
+];
+
+// Verbo de prosa → padrão de comando que o contradiz. Deliberadamente
+// grosseiro: só acusa contradição óbvia, para não virar linter de estilo.
+const CONTRADICOES = [
+  { prosa: /\bdeploy\b/i, comandos: [/^kubectl\s+apply/i, /^helm\s+upgrade/i, /^terraform\s+apply/i, /^gcloud\s+run\s+deploy/i] },
+  { prosa: /\bmerge\b/i, comandos: [/^git\s+merge/i, /^gh\s+pr\s+merge/i] },
+  { prosa: /\bpush\b/i, comandos: [/^git\s+push/i] },
+  { prosa: /\bescrever c[óo]digo\b/i, comandos: [/^(npm|yarn|pnpm)\s+run\s+build/i] },
+];
+
+function orcamentoDe(agente, pkg) {
+  return agente.frontmatter?.metadata?.capabilities?.budget
+      ?? pkg.company.frontmatter?.metadata?.budget
+      ?? null;
+}
+
+function escreveOuExecuta(cap) {
+  const escreve = (cap.write ?? []).length > 0;
+  const executa = (cap.execute?.allow ?? []).length > 0;
+  return escreve || executa;
+}
+
+export function validateGovernance(pkg) {
+  const erros = [];
+  const slugs = new Set(pkg.agents.map((a) => a.slug));
+
+  for (const agente of pkg.agents) {
+    const where = agente.path;
+    const meta = agente.frontmatter?.metadata ?? {};
+    const cap = meta.capabilities ?? {};
+
+    // E06 — fronteira obrigatória
+    if (!meta.boundary || (!meta.boundary.can && !meta.boundary.cannot)) {
+      erros.push(erro('E06', 'fronteira-ausente', where,
+        'papel sem metadata.boundary. Papel sem fronteira declarada é papel que pode tudo, e isso não é padrão aceitável'));
+    }
+
+    // E07 — quem escreve ou executa precisa de teto
+    if (escreveOuExecuta(cap) && !orcamentoDe(agente, pkg)) {
+      erros.push(erro('E07', 'orcamento-ausente', where,
+        'papel escreve ou executa comando e não tem orçamento, próprio nem herdado da empresa. Agente sem teto é risco financeiro'));
+    }
+
+    // E08 — teto precisa de destinatário resolvível
+    const orc = cap.budget;
+    if (orc) {
+      if (!orc.alert_to) {
+        erros.push(erro('E08', 'alerta-sem-destinatario', where,
+          'orçamento com teto e sem alert_to. Teto sem quem-é-avisado é teto que ninguém aplica'));
+      } else if (!slugs.has(orc.alert_to)) {
+        erros.push(erro('E08', 'alerta-sem-destinatario', where,
+          `alert_to "${orc.alert_to}" não é papel deste pacote`));
+      }
+    }
+
+    // E09 — segredo e caminho absoluto
+    const texto = `${JSON.stringify(agente.frontmatter)}\n${agente.body}`;
+    for (const { re, nome } of SEGREDOS) {
+      if (re.test(texto)) {
+        erros.push(erro('E09', 'segredo-literal', where,
+          `${nome} encontrado. Valor de segredo e caminho de máquina nunca são dados canônicos de pacote; declare apenas o nome da variável`));
+      }
+    }
+
+    // E10 — divergência prosa × capacidade
+    const naoPode = (meta.boundary?.cannot ?? []).join(' | ');
+    for (const { prosa, comandos } of CONTRADICOES) {
+      if (!prosa.test(naoPode)) continue;
+      for (const permitido of cap.execute?.allow ?? []) {
+        if (comandos.some((c) => c.test(permitido))) {
+          erros.push(erro('E10', 'prosa-contradiz-capacidade', where,
+            `boundary.cannot nega "${naoPode}" mas execute.allow permite "${permitido}". A prosa e a capacidade descrevem a mesma fronteira e discordam`));
+        }
+      }
+    }
+
+    // E11 — quem implementa não aprova
+    if ((cap.write ?? []).includes('code') && (cap.approve ?? []).length > 0) {
+      erros.push(erro('E11', 'segregacao-violada', where,
+        'o mesmo papel escreve código e assina portão humano. Segregação de função: quem implementa não aprova, e quem aprova não implementa'));
+    }
+  }
+
+  return erros;
+}
+
+export function validateWarnings(pkg) {
+  const avisos = [...(pkg.warnings ?? [])];
+  for (const agente of pkg.agents) {
+    const meta = agente.frontmatter?.metadata ?? {};
+    if (!meta.persona?.display_name) {
+      avisos.push({ code: 'W03', path: agente.path,
+        message: 'papel sem metadata.persona.display_name; o Studio vai mostrar o slug' });
+    }
+    if (!(agente.frontmatter?.skills ?? []).length) {
+      avisos.push({ code: 'W04', path: agente.path,
+        message: 'papel sem skills declaradas' });
+    }
+  }
+  return avisos;
+}
+
+/** Ponto de entrada único — usado pelo CLI e pelo Studio. */
+export function validatePackage(pkg) {
+  return {
+    errors: [...validateStructure(pkg), ...validateGovernance(pkg)],
+    warnings: validateWarnings(pkg),
+  };
+}
