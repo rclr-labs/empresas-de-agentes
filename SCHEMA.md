@@ -40,8 +40,21 @@ Sete chaves, todas dentro de `metadata`:
 | `capabilities` | `AGENTS.md` | A mesma fronteira, em forma validável: leitura, escrita, execução, rede, delegação, aprovação — ver `capabilities/v1.md` |
 | `memory` | `AGENTS.md` | Escopo e retenção de memória do agente |
 | `context` | `AGENTS.md` | De onde o agente lê contexto antes de agir, e o que fica fora |
-| `budget` | `COMPANY.md` | Teto de gasto, moeda, limiar de alerta e destinatário |
+| `budget` | `COMPANY.md` **e** `AGENTS.md` (sob `capabilities.budget`) | Teto de gasto, moeda, limiar de alerta e destinatário — a empresa inteira em `COMPANY.md`, o papel individual em `AGENTS.md` |
 | `human_gates` | `COMPANY.md` | A lista de ações que não acontecem sem assinatura humana nomeada |
+
+`budget` aparece duas vezes porque os dois tetos respondem perguntas
+diferentes: `metadata.budget` em `COMPANY.md` é o que a empresa inteira pode
+gastar por mês; `metadata.capabilities.budget` em `AGENTS.md` é o que **esse
+papel** pode gastar. O validador resolve a ambiguidade lendo primeiro o teto
+do papel e só caindo para o da empresa quando o papel não declara o
+próprio — por isso a regra de validação 7 (um papel com `write` ou `execute`
+precisa de `budget`, próprio ou herdado da empresa) não falha num papel que
+não tem `capabilities.budget` mas pertence a uma empresa que tem. O
+`software-house/COMPANY.md` já declara o portão "gasto acima do teto **do
+papel**" (linha 31) — teto por papel não é novidade desta extensão, é algo
+que o pacote shipado já pressupõe e que `SCHEMA.md` estava deixando de
+documentar.
 
 `capability_vocabulary` também vive em `metadata` (normalmente em
 `COMPANY.md`) e declara qual versão do vocabulário de capacidades o pacote
@@ -81,6 +94,26 @@ Pacote novo escrito a partir deste acervo usa sempre a forma canônica. O
 alias existe para não quebrar um pacote escrito antes desta convenção, não
 para dar duas formas igualmente válidas de escrever pacote novo.
 
+### Alias de forma, não só de chave: `human_gates` como lista de string
+
+Além do alias de nome (`portoes_humanos` → `human_gates`), `human_gates`
+tem um segundo alias — de **forma do valor**, não de chave. A forma antiga
+é uma lista de string crua, como em `software-house/COMPANY.md`:
+
+```yaml
+human_gates:
+  - deploy em produção
+  - gasto acima do teto do papel
+```
+
+Essa forma é aceita e normalizada para `{ id: <slug derivado da string> }`,
+porque `capabilities.approve` referencia `human_gates[].id`, e sem `id` não
+há o que referenciar. `software-house/COMPANY.md` não é um pacote
+desatualizado que a extensão superou — é a forma que a normalização existe
+justamente para continuar aceitando. Escrever `id` explícito (como no
+exemplo da seção 5) é o que um pacote novo faz; a lista de string crua
+continua válida para o que já existe.
+
 ## 4. Exemplo completo de `AGENTS.md`
 
 ```markdown
@@ -109,9 +142,23 @@ metadata:
     execute: { allow: [], deny: [] }
     network: false
     delegate: []
+    budget:
+      currency: BRL
+      monthly_cap: 400.00
+      alert_at: 0.7
+      alert_to: coordenacao
     approve: [deploy-producao]
   memory: { scope: project, retention: project, writes: [] }
-  context: { sources: [], excludes: [] }
+  context:
+    sources:
+      - kind: repo_file
+        path: CLAUDE.md
+        required: false
+      - kind: package_doc
+        ref: ../../COMPANY.md
+    excludes:
+      - kind: path
+        glob: "secrets/**"
 ---
 
 # Gerente
@@ -124,6 +171,21 @@ Corpo do agente.
 amarra "o que este papel pode aprovar" a "o que exige assinatura humana":
 sem o `id`, não há como o validador confirmar que o portão referenciado
 existe.
+
+`capabilities.budget` é o teto **deste papel** — `monthly_cap: 400.00` —
+que convive com o teto da empresa em `COMPANY.md` (seção 5). São dois
+números porque respondem a perguntas diferentes: quanto a empresa gasta no
+total, e quanto este papel especificamente pode gastar antes de parar.
+
+`context.sources[].kind` usa o vocabulário fechado de `context_kind`:
+`repo_file` lê um arquivo do repositório pelo caminho (`path`); `package_doc`
+lê outro arquivo do próprio pacote por referência relativa (`ref`);
+`url` e `path` cobrem, respectivamente, uma fonte externa por endereço e uma
+fonte local por caminho fora do repositório. `required: false` em
+`repo_file` declara que a ausência do arquivo não é erro — o agente segue
+sem ele. `excludes` usa a mesma forma para o que nunca entra no contexto,
+mesmo que esteja dentro do que `sources` apontaria: aqui, todo caminho sob
+`secrets/`.
 
 ## 5. Exemplo completo de `COMPANY.md`
 
@@ -154,11 +216,12 @@ metadata:
 Corpo do pacote.
 ```
 
-Note o `id` em cada entrada de `human_gates` — é a diferença entre um
-portão que só um humano lê (a lista de frases do `software-house/COMPANY.md`
-anterior a esta extensão) e um portão que um papel pode referenciar de
-dentro de `capabilities.approve`. Sem `id`, a referência não tem o que
-apontar.
+Note o `id` em cada entrada de `human_gates`. `software-house/COMPANY.md`
+usa a forma de lista de string crua (ver seção 3) — as duas formas são
+válidas, mas só a com `id` dá a `capabilities.approve` o que referenciar.
+Um pacote que precisa de um papel aprovando um portão específico escreve
+`id` explícito; um pacote em que ninguém aprova nada por `capabilities.approve`
+pode seguir com a lista de string, que a normalização resolve.
 
 ## 6. A persona não entra no prompt
 
@@ -170,8 +233,8 @@ A razão é custo sem retorno: `background` e `strengths` são texto que seria
 enviado em **toda chamada** ao modelo, e não mudam nenhum comportamento —
 o agente não age diferente por saber que a própria persona tem três linhas
 de histórico. Pagar esse custo em cada chamada, para um benefício que existe
-só na tela, é o tipo de gasto que confirma por que `budget` e `alert_to`
-precisam existir no primeiro lugar.
+só na tela, é exatamente o tipo de gasto que `budget` e `alert_to`
+existem para conter.
 
 A única parte da persona que chega a um emissor de runtime é
 `persona.headline` — e só como a `description` do agente, o resumo de uma
