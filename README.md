@@ -35,6 +35,7 @@ começar de uma folha em branco.
 |---|---|
 | [`software-house/`](software-house/) | Casa de software: coordenação, tech lead, desenvolvimento, revisão e portão de qualidade |
 | [`fabrica-de-testes/`](fabrica-de-testes/) | Fábrica de testes governada: gerente de teste, especialistas por tipo, evidência verificável e veredito de release |
+| [`operacao-de-conhecimento/`](operacao-de-conhecimento/) | Operação de pesquisa, redação e triagem: curadoria, pesquisa com fonte citável, redação com público declarado e triagem de entrada |
 
 ## Como usar
 

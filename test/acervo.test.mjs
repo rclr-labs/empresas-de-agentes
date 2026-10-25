@@ -164,3 +164,37 @@ test('fabrica-de-testes: nenhum especialista lê database sem portão humano dec
   assert.ok(integridade.frontmatter.metadata.boundary.cannot.some((t) => /produ[çc][ãa]o/i.test(t)),
     'e a prosa precisa negar produção explicitamente');
 });
+
+test('operacao-de-conhecimento: zero erro e zero aviso', () => {
+  const { errors, warnings } = relatorio('operacao-de-conhecimento');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('operacao-de-conhecimento: os quatro papéis, curadoria na raiz', () => {
+  const { pkg } = relatorio('operacao-de-conhecimento');
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(),
+    ['curadoria', 'pesquisa', 'redacao', 'triagem']);
+  const raizes = pkg.agents.filter((a) => a.frontmatter.reportsTo == null);
+  assert.deepEqual(raizes.map((a) => a.slug), ['curadoria']);
+});
+
+test('operacao-de-conhecimento: pesquisa é o único papel com acesso à web', () => {
+  const { pkg } = relatorio('operacao-de-conhecimento');
+  const comWeb = pkg.agents.filter((a) => (a.frontmatter.metadata.capabilities.read ?? []).includes('web'));
+  assert.deepEqual(comWeb.map((a) => a.slug), ['pesquisa'],
+    'só pesquisa lê a web; concentrar a saída externa num papel é o que torna a fronteira auditável');
+});
+
+test('operacao-de-conhecimento: nenhum papel escreve código', () => {
+  const { pkg } = relatorio('operacao-de-conhecimento');
+  for (const a of pkg.agents) {
+    assert.ok(!(a.frontmatter.metadata.capabilities.write ?? []).includes('code'),
+      `${a.slug} não escreve código — este arquétipo é operação de conhecimento`);
+  }
+});
+
+test('o acervo publica os três arquétipos', () => {
+  assert.deepEqual(listPackages(RAIZ).sort(),
+    ['fabrica-de-testes', 'operacao-de-conhecimento', 'software-house']);
+});
