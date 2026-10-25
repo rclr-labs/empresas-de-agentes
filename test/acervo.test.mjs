@@ -84,3 +84,37 @@ test('software-house: a persona não vaza para o corpo do agente', () => {
       `${a.slug}: "${nome}" aparece no corpo. A persona não entra no prompt — custa token em toda chamada`);
   }
 });
+
+test('nenhum papel assina o portão sobre os próprios limites', () => {
+  for (const nome of listPackages(RAIZ)) {
+    const pkg = loadPackage(join(RAIZ, nome));
+    const slugs = new Set(pkg.agents.map((a) => a.slug));
+    for (const g of pkg.company.frontmatter.metadata?.human_gates ?? []) {
+      const id = typeof g === 'string' ? g : g.id;
+      if (!/gasto|teto|or[çc]amento/i.test(id)) continue;
+      const signer = typeof g === 'string' ? null : g.signer;
+      assert.ok(!slugs.has(signer),
+        `${nome}: o portão "${id}" é assinado pelo papel "${signer}". Alertar a si mesmo é notificação; autorizar o próprio estouro é conflito — o signer tem de ser pessoa nomeada`);
+    }
+    for (const a of pkg.agents) {
+      const aprova = a.frontmatter.metadata?.capabilities?.approve ?? [];
+      const propria = aprova.find((x) => /gasto|teto/i.test(x));
+      assert.ok(!propria,
+        `${nome}/${a.slug} lista "${propria}" em approve — nenhum papel aprova o portão do próprio teto`);
+    }
+  }
+});
+
+test('todo papel que abre pull request consegue dar push', () => {
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const cap = a.frontmatter.metadata?.capabilities ?? {};
+      if (!(cap.write ?? []).includes('pull_request')) continue;
+      const allow = cap.execute?.allow ?? [];
+      assert.ok(allow.some((g) => /^git push/.test(g)),
+        `${nome}/${a.slug} declara write: [pull_request] mas não tem git push em execute.allow — capacidade inalcançável`);
+      assert.ok((cap.execute?.deny ?? []).some((g) => /force/.test(g)),
+        `${nome}/${a.slug} pode dar push e tem de negar push --force explicitamente`);
+    }
+  }
+});

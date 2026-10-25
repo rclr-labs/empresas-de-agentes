@@ -52,7 +52,7 @@ próprio — por isso a regra de validação 7 (um papel com `write` ou `execute
 precisa de `budget`, próprio ou herdado da empresa) não falha num papel que
 não tem `capabilities.budget` mas pertence a uma empresa que tem. O
 `software-house/COMPANY.md` já declara o portão "gasto acima do teto **do
-papel**" (linha 31) — teto por papel não é novidade desta extensão, é algo
+papel**" — teto por papel não é novidade desta extensão, é algo
 que o pacote shipado já pressupõe e que `SCHEMA.md` estava deixando de
 documentar.
 
@@ -98,7 +98,7 @@ para dar duas formas igualmente válidas de escrever pacote novo.
 
 Além do alias de nome (`portoes_humanos` → `human_gates`), `human_gates`
 tem um segundo alias — de **forma do valor**, não de chave. A forma antiga
-é uma lista de string crua, como em `software-house/COMPANY.md`:
+é uma lista de string crua:
 
 ```yaml
 human_gates:
@@ -108,11 +108,13 @@ human_gates:
 
 Essa forma é aceita e normalizada para `{ id: <slug derivado da string> }`,
 porque `capabilities.approve` referencia `human_gates[].id`, e sem `id` não
-há o que referenciar. `software-house/COMPANY.md` não é um pacote
-desatualizado que a extensão superou — é a forma que a normalização existe
-justamente para continuar aceitando. Escrever `id` explícito (como no
-exemplo da seção 5) é o que um pacote novo faz; a lista de string crua
-continua válida para o que já existe.
+há o que referenciar. Esse snippet é sintético — nenhum pacote do acervo usa
+hoje a forma de string crua; todos os pacotes migrados já escrevem `id`
+explícito. A normalização continua existindo mesmo assim, porque ela
+protege um pacote escrito antes desta convenção e trazido de fora, não
+porque algum pacote deste acervo depende dela. Escrever `id` explícito
+(como no exemplo da seção 5) é o que um pacote novo faz; a lista de string
+crua continua válida para o que já existe fora deste repositório.
 
 ## 4. Exemplo completo de `AGENTS.md`
 
@@ -233,12 +235,16 @@ metadata:
 Corpo do pacote.
 ```
 
-Note o `id` em cada entrada de `human_gates`. `software-house/COMPANY.md`
-usa a forma de lista de string crua (ver seção 3) — as duas formas são
-válidas, mas só a com `id` dá a `capabilities.approve` o que referenciar.
-Um pacote que precisa de um papel aprovando um portão específico escreve
-`id` explícito; um pacote em que ninguém aprova nada por `capabilities.approve`
-pode seguir com a lista de string, que a normalização resolve.
+Note o `id` em cada entrada de `human_gates`. A forma de lista de string
+crua (ver seção 3) continua válida, mas só a com `id` dá a
+`capabilities.approve` o que referenciar. Um pacote que precisa de um
+papel aprovando um portão específico escreve `id` explícito; um pacote em
+que ninguém aprova nada por `capabilities.approve` pode seguir com a lista
+de string, que a normalização resolve. `software-house/COMPANY.md` escreve
+`id` explícito em todos os quatro portões e, mesmo assim, nenhum papel do
+pacote aprova nenhum deles — o portão sobre o próprio teto e o portão de
+deploy são ambos assinados por pessoa nomeada, nunca por um papel, porque
+aprovar o próprio limite é conflito, não segregação de função.
 
 ## 6. A persona não entra no prompt
 

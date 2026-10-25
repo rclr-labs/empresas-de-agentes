@@ -42,7 +42,7 @@ metadata:
       monthly_cap: 400.00
       alert_at: 0.7
       alert_to: coordenacao
-    approve: [deploy-producao]
+    approve: []
   memory:
     scope: project
     retention: project

@@ -33,7 +33,7 @@ metadata:
       signer: pessoa nomeada no kickoff
     - id: gasto-acima-do-teto
       description: gasto acima do teto do papel
-      signer: coordenacao
+      signer: pessoa nomeada no kickoff
     - id: contato-com-cliente
       description: qualquer contato com o cliente
       signer: pessoa nomeada no kickoff
@@ -55,14 +55,18 @@ coordenação recebe demanda e prioriza; tech lead desenha; desenvolvimento
 implementa; revisão contesta; portão de qualidade dá o veredito. Nenhum
 papel acumula implementar e aprovar o próprio trabalho.
 
-**Orçamento.** Teto mensal declarado em `metadata.orcamento`, com alerta em
+**Orçamento.** Teto mensal declarado em `metadata.budget`, com alerta em
 70% e destinatário nomeado. Papel que estoura o teto para — não pede
 desculpa depois.
 
 **Portões humanos.** Quatro ações não acontecem sem assinatura: deploy em
 produção, gasto acima do teto, contato com cliente e remoção de dado de
 produção. Estão listadas em `metadata.human_gates` porque portão que
-não está escrito é portão que não existe.
+não está escrito é portão que não existe. Nenhum papel deste pacote assina
+um desses portões: todo `signer` é pessoa nomeada no kickoff, porque um
+papel pode aprovar uma decisão de domínio, mas nunca o próprio estouro de
+teto ou o próprio release — por isso `capabilities.approve` fica vazio em
+todos os cinco papéis, deliberadamente.
 
 **Ritual.** A tarefa recorrente `tasks/revisao-de-orcamento/` existe para
 que alguém leia a trilha toda semana. Operação sem leitor de trilha é

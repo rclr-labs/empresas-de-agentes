@@ -34,7 +34,7 @@ metadata:
     read: [repository, documentation]
     write: [code, test_evidence, pull_request]
     execute:
-      allow: ["npm *", "npx *", "git add*", "git commit*", "git diff*", "git log*", "gh pr create*"]
+      allow: ["npm *", "npx *", "git add*", "git commit*", "git push*", "git diff*", "git log*", "gh pr create*"]
       deny: ["git push --force*", "git merge*", "kubectl *", "helm *", "terraform *", "sudo *"]
     network: false
     delegate: []
