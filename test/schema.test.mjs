@@ -80,9 +80,17 @@ test('loadPackage carrega skills, teams e tasks, não só agents', () => {
 });
 
 test('listPackages lista só diretório com COMPANY.md, e ignora . e _', () => {
-  const raiz = join(aqui, 'fixtures');
-  const nomes = listPackages(raiz);
-  assert.ok(nomes.includes('pacote-minimo'));
-  assert.ok(nomes.every((n) => !n.startsWith('.') && !n.startsWith('_')));
-  assert.deepEqual(nomes, [...nomes].sort(), 'ordenado');
+  // As fixtures `_ignorado` e `.oculto` TÊM COMPANY.md de propósito: sem
+  // elas, a asserção do filtro é infalsificável — removê-lo de
+  // listPackages deixaria a suíte verde. Medido.
+  const nomes = listPackages(join(aqui, 'fixtures'));
+  assert.deepEqual(nomes, ['outro-pacote', 'pacote-minimo'],
+    'só os dois válidos, e nessa ordem');
+  assert.ok(!nomes.includes('_ignorado'), 'prefixo _ excluído');
+  assert.ok(!nomes.includes('.oculto'), 'prefixo . excluído');
+});
+
+test('listPackages ignora diretório sem COMPANY.md', () => {
+  const nomes = listPackages(join(aqui, 'fixtures'));
+  assert.ok(!nomes.includes('sem-company'), 'diretório sem COMPANY.md não é pacote');
 });
