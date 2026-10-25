@@ -2,7 +2,7 @@
 // rules.mjs, que é puro. Esta separação é o que permite ao Studio
 // reutilizar as regras no browser.
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
-import { join, relative, basename } from 'node:path';
+import { join, basename } from 'node:path';
 import yaml from 'js-yaml';
 import { normalizeAliases } from './rules.mjs';
 
@@ -71,4 +71,3 @@ export function listPackages(root) {
     .sort();
 }
 
-export { relative };

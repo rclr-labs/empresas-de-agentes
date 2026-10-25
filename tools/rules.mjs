@@ -30,11 +30,16 @@ export function normalizeAliases(meta, path = '', warnings = []) {
       continue;
     }
 
-    if (Object.hasOwn(meta, canonical)) {
+    // Duas checagens, não uma. hasOwn(meta, …) pega alias contra canônico;
+    // hasOwn(out, …) pega alias contra alias — ALIASES tem dois pares que
+    // apontam para a mesma chave (destinatario_do_alerta e alerta_para →
+    // alert_to), e sem a segunda checagem o segundo sobrescrevia o primeiro
+    // em silêncio, com dois W01 de aparência inofensiva.
+    if (Object.hasOwn(meta, canonical) || Object.hasOwn(out, canonical)) {
       warnings.push({
         code: 'W02',
         path: childPath,
-        message: `"${key}" e "${canonical}" coexistem; o canônico foi mantido e o alias descartado`,
+        message: `"${key}" colide em "${canonical}", que já foi preenchido; o primeiro valor foi mantido e este alias descartado`,
       });
       continue;
     }

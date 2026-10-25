@@ -43,3 +43,10 @@ test('fronteira, orcamento e capacidades estão entre os aliases', () => {
   assert.equal(ALIASES.teto_mensal, 'monthly_cap');
   assert.equal(ALIASES.portoes_humanos, 'human_gates');
 });
+
+test('os CONTÊINERES VOCABULARY e ALIASES também são congelados', () => {
+  assert.ok(Object.isFrozen(VOCABULARY), 'VOCABULARY congelado');
+  assert.ok(Object.isFrozen(ALIASES), 'ALIASES congelado');
+  assert.throws(() => { VOCABULARY.novoVerbo = []; });
+  assert.throws(() => { ALIASES.novoAlias = 'x'; });
+});

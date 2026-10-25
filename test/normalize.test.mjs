@@ -50,3 +50,14 @@ test('canônico tem precedência quando ambos existem', () => {
   assert.deepEqual(meta.boundary.can, ['canonico']);
   assert.ok(warnings.some((w) => w.code === 'W02'));
 });
+
+test('dois aliases para a mesma chave canônica NÃO perdem dado em silêncio', () => {
+  const { meta, warnings } = normalizeAliases({
+    orcamento: { alerta_para: 'A', destinatario_do_alerta: 'B' },
+  });
+  assert.equal(meta.budget.alert_to, 'A', 'o primeiro vence');
+  const colisao = warnings.find((w) => w.code === 'W02');
+  assert.ok(colisao, 'a colisão entre dois aliases tem de avisar');
+  assert.match(colisao.message, /alert_to/);
+  assert.match(colisao.message, /destinatario_do_alerta/);
+});
