@@ -1,36 +1,75 @@
 runtime: paperclip
 source: >-
-  IDENTIDADE. O acervo já é escrito em agentcompanies/v1, o formato que o
-  Paperclip implementa e que a própria especificação declara "intended to be
-  usable by any agent-company runtime, not only Paperclip". A emissão copia
-  o pacote e o valida; não há tradução a fazer.
+  IDENTIDADE, re-lida em 2026-10-25 contra
+  /Users/rafaelnc/apps/paperclip/docs/companies/companies-spec.md
+  (checkout local de rclr-labs/paperclip, versão `agentcompanies/v1-draft`).
+  A emissão copia o pacote byte a byte — isso não mudou. O que a leitura
+  corrigiu é a afirmação de "zero perda": ela era verdadeira só por
+  confundir SOBREVIVER NO ARQUIVO com SER APLICADO PELO RUNTIME. A spec
+  base (§5–§13) define `AGENTS.md` com `name`, `title`, `reportsTo`,
+  `skills` e o corpo — e PARA POR AÍ. `budget`, permissão de execução,
+  restrição de rede e portão de aprovação não aparecem em lugar nenhum do
+  formato base; §15 os nomeia só como EXEMPLO do que uma extensão de
+  fornecedor carrega, num arquivo `.paperclip.yaml` separado que este
+  acervo não escreve. Logo: o arquivo sobrevive (cópia byte a byte,
+  sempre), mas só o que a spec base de fato define É AGIDO pelo runtime —
+  o resto é preservado sem ser lido como fronteira por nada.
 emits: <pacote>/
 format: identity
-map:
-  read.repository: []
-  read.documentation: []
-  read.audit_trail: []
-  read.test_evidence: []
-  read.database: []
-  read.web: []
-  write.code: []
-  write.documentation: []
-  write.test_evidence: []
-  write.report: []
-  write.pull_request: []
-  execute.allow: []
-  execute.deny: []
-  network: []
-  network.allowlist: []
-  delegate: []
-  budget: []
-  approve: []
-  # skills, memory, context: ponte mínima da tarefa 27 — agora são chave
-  # endereçável por capabilityKeys (ver tools/bindings.mjs), e identidade
-  # os preserva do mesmo jeito que preserva tudo o mais: cópia byte a
-  # byte. []  porque o formato "identity" não usa a lista `tools`.
+rule_order: first-match # identidade não resolve regra nenhuma; campo presente só porque o esquema de três estados o exige quando preenchido — aqui é vestigial.
+allowlist_scope: os # idem: identidade não impõe allowlist nenhuma; o valor não tem efeito em applyBinding porque nenhuma capacidade desta tabela está em `translates` para rede.
+translates:
+  # skills é o ÚNICO ponto desta tabela que a spec base de fato define
+  # (§5, AGENTS.md: "name, title, reportsTo, skills (shortname refs)") —
+  # não é extensão de fornecedor, é vocabulário central do formato. Um
+  # runtime Paperclip real resolve a referência de skill contra
+  # `skills/<slug>/SKILL.md` do mesmo pacote; a cópia byte a byte
+  # preserva o campo E a resolução continua válida, porque nada mudou na
+  # estrutura de arquivo que a resolução depende.
   skills: []
-  memory: []
-  context: []
+preserves:
+  - read.repository
+  - read.documentation
+  - read.audit_trail
+  - read.test_evidence
+  - read.database
+  - read.web
+  - write.code
+  - write.documentation
+  - write.test_evidence
+  - write.report
+  - write.pull_request
+  - execute.allow
+  - execute.deny
+  - network
+  - network.allowlist
+  - delegate
+  - budget
+  - approve
+  - memory
+  - context
+loses: []
+citations:
+  skills: "companies-spec.md §5 — AGENTS.md define `skills`; cópia byte a byte preserva e a resolução do runtime continua válida"
+  read.repository: "companies-spec.md §5–§13 — capabilities.read não é campo da spec base; vive em metadata, extensão deste acervo"
+  read.documentation: "mesma leitura de read.repository"
+  read.audit_trail: "mesma leitura de read.repository"
+  read.test_evidence: "mesma leitura de read.repository"
+  read.database: "mesma leitura de read.repository"
+  read.web: "mesma leitura de read.repository"
+  write.code: "companies-spec.md §5–§13 — capabilities.write não é campo da spec base"
+  write.documentation: "mesma leitura de write.code"
+  write.test_evidence: "mesma leitura de write.code"
+  write.report: "mesma leitura de write.code"
+  write.pull_request: "mesma leitura de write.code"
+  execute.allow: "companies-spec.md §15 — execute é citado como exemplo de extensão de fornecedor (.paperclip.yaml), não campo da spec base"
+  execute.deny: "mesma leitura de execute.allow"
+  network: "companies-spec.md §15 — restrição de rede é extensão de fornecedor"
+  network.allowlist: "mesma leitura de network"
+  delegate: "companies-spec.md §5–§13 — delegate não é campo da spec base (TEAM.md define `manager`, não delegação dinâmica por capacidade)"
+  budget: "companies-spec.md §15 — \"budgets\" é citado nominalmente como exemplo de extensão de fornecedor"
+  approve: "companies-spec.md §15 — \"approval policies\" é citado nominalmente como exemplo de extensão de fornecedor"
+  memory: "companies-spec.md §5–§13 — memory não é campo da spec base"
+  context: "companies-spec.md §5–§13 — context não é campo da spec base"
 unsupported: []
 unsupported_metadata: []

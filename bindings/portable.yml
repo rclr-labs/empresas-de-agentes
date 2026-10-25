@@ -1,36 +1,83 @@
 runtime: portable
 source: >-
   DESENHO PRÓPRIO. Alvo sem perda, para runtime cujo loader ainda não foi
-  lido de fonte primária — o janus entre eles. Emite o manifesto completo em
-  JSON, com toda capacidade, orçamento, portão e contexto preservados, para
-  que o adaptador do runtime leia o que precisar sem reinterpretar markdown.
+  lido de fonte primária. Emite o manifesto completo em JSON, com toda
+  capacidade, orçamento, portão e contexto preservados, para que o
+  adaptador do runtime leia o que precisar sem reinterpretar markdown.
+
+  ACHADO que muda a pendência "promover portable → janus" (medido em
+  2026-10-25, agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md
+  §5.1): janus NÃO TEM formato de agente/papel nenhum. Busca explícita por
+  `AGENTS\.md|agentDefinition|roleConfig|org.?chart` em `src/` e `docs/`
+  do checkout local (`~/apps/janus`) não encontra nada — zero conceito de
+  organograma, empresa, time ou papel persistente. O que janus tem é uma
+  unidade de governança diferente: `Mission` (`*.mission.json`,
+  `src/core/mission.ts`), por TAREFA, não por papel — toda chamada
+  redeclara escopo, orçamento, regra de permissão e aprovação do zero, sem
+  identidade que atravesse duas tarefas.
+
+  Isso NÃO é um binding que falta escrever — é uma pergunta sobre se janus
+  deveria ganhar o conceito de papel persistente. Escrever um
+  `bindings/janus.yml` hoje seria inventar um mapa de "um papel do
+  organograma = um Mission" sem o janus ter pedido isso, e sem garantia de
+  que a correspondência é 1:1 (um papel pode gerar Missions diferentes em
+  tarefas diferentes, com escopo que não é superset nem subset um do
+  outro). A decisão é do Rafael, não deste binding — por isso o portable
+  continua sendo o alvo sem perda genérico, e nenhum binding chamado
+  "janus" existe nesta pasta.
 emits: agent-manifest.json
 format: portable
-map:
-  read.repository: [read.repository]
-  read.documentation: [read.documentation]
-  read.audit_trail: [read.audit_trail]
-  read.test_evidence: [read.test_evidence]
-  read.database: [read.database]
-  read.web: [read.web]
-  write.code: [write.code]
-  write.documentation: [write.documentation]
-  write.test_evidence: [write.test_evidence]
-  write.report: [write.report]
-  write.pull_request: [write.pull_request]
-  execute.allow: [execute.allow]
-  execute.deny: [execute.deny]
-  network: [network]
-  network.allowlist: [network.allowlist]
-  delegate: [delegate]
-  budget: [budget]
-  approve: [approve]
-  # skills, memory, context: ponte mínima da tarefa 27 — ver nota
-  # equivalente em paperclip.yml. O manifesto portable já escreve os três
-  # (ver tools/writers.mjs portableManifest), então o mapa apenas declara
-  # o que já era verdade.
-  skills: [skills]
-  memory: [memory]
-  context: [context]
+rule_order: first-match # portable não resolve regra de permissão nenhuma — campo presente porque o esquema o exige; vestigial aqui como em paperclip.yml.
+allowlist_scope: os # idem: nenhuma capacidade desta tabela está em `translates`, então o valor não produz efeito em applyBinding.
+# Nada aqui é `translates`: o manifesto JSON é um CARREGADOR de dado, não
+# um runtime que age sobre ele — a mesma distinção que corrigiu
+# paperclip.yml. "Zero perda" continua verdadeiro (nada entra em `loses`),
+# mas "zero perda" não é mais confundido com "tudo aplicado".
+translates: {}
+preserves:
+  - read.repository
+  - read.documentation
+  - read.audit_trail
+  - read.test_evidence
+  - read.database
+  - read.web
+  - write.code
+  - write.documentation
+  - write.test_evidence
+  - write.report
+  - write.pull_request
+  - execute.allow
+  - execute.deny
+  - network
+  - network.allowlist
+  - delegate
+  - budget
+  - approve
+  - skills
+  - memory
+  - context
+loses: []
+citations:
+  read.repository: "DESENHO PRÓPRIO — tools/writers.mjs portableManifest grava capabilities.read no JSON, íntegro; nenhum runtime real interpreta o manifesto ainda"
+  read.documentation: "mesma leitura de read.repository"
+  read.audit_trail: "mesma leitura de read.repository"
+  read.test_evidence: "mesma leitura de read.repository"
+  read.database: "mesma leitura de read.repository"
+  read.web: "mesma leitura de read.repository"
+  write.code: "DESENHO PRÓPRIO — ver read.repository"
+  write.documentation: "mesma leitura de write.code"
+  write.test_evidence: "mesma leitura de write.code"
+  write.report: "mesma leitura de write.code"
+  write.pull_request: "mesma leitura de write.code"
+  execute.allow: "DESENHO PRÓPRIO — ver read.repository"
+  execute.deny: "mesma leitura de execute.allow"
+  network: "DESENHO PRÓPRIO — ver read.repository"
+  network.allowlist: "mesma leitura de network"
+  delegate: "DESENHO PRÓPRIO — ver read.repository"
+  budget: "DESENHO PRÓPRIO — ver read.repository"
+  approve: "DESENHO PRÓPRIO — ver read.repository"
+  skills: "DESENHO PRÓPRIO — ver read.repository"
+  memory: "DESENHO PRÓPRIO — ver read.repository"
+  context: "DESENHO PRÓPRIO — ver read.repository"
 unsupported: []
 unsupported_metadata: []

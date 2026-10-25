@@ -186,24 +186,32 @@ export function applyBinding(agent, binding, pkg) {
   checkAllowlistScope(agent, binding, warnings);
 
   // Permissões brutas, para runtime que as expressa (ex.: opencode).
-  const permissions = binding.permissions ? buildPermissions(cap, binding, pkg) : null;
+  const permissions = binding.permissions ? buildPermissions(cap) : null;
 
   return { tools, permissions, translated, preserved, lost, warnings };
 }
 
-function buildPermissions(cap, binding, pkg) {
-  const p = structuredClone(binding.permissions.defaults ?? {});
-  // bash: deny por padrão, allow explícito. O acervo é deny-by-default
-  // por postura; o binding não inverte isso.
-  p.bash = { '*': 'deny' };
-  for (const glob of cap.execute?.deny ?? []) p.bash[glob] = 'deny';
-  for (const glob of cap.execute?.allow ?? []) p.bash[glob] = 'allow';
-  // task: só os slugs em delegate recebem allow.
-  p.task = { '*': 'deny' };
-  for (const slug of cap.delegate ?? []) p.task[slug] = 'allow';
+/**
+ * OpenCode V2: `permissions` é ARRAY de `{action, resource, effect}`,
+ * resolvido última-regra-vence (packages/schema/src/permission.ts,
+ * medido em 2026-10-25 — ver bindings/opencode.yml `source`). Construir a
+ * lista já em ordem "deny amplo primeiro, allow específico depois" é o
+ * que faz a semântica de last-match produzir o resultado pretendido —
+ * invertida, a mesma lista nega o que devia permitir e vice-versa. V1
+ * usava um dict de glob (`bash`, `task`) resolvido mais-específico-vence;
+ * essa função não serve mais ao V1, porque o único binding que a usa
+ * (`opencode.yml`) migrou para V2 na tarefa 28.
+ */
+function buildPermissions(cap) {
+  const regras = [];
+  regras.push({ action: 'shell', resource: '*', effect: 'deny' });
+  for (const glob of cap.execute?.deny ?? []) regras.push({ action: 'shell', resource: glob, effect: 'deny' });
+  for (const glob of cap.execute?.allow ?? []) regras.push({ action: 'shell', resource: glob, effect: 'allow' });
+  regras.push({ action: 'subagent', resource: '*', effect: 'deny' });
+  for (const slug of cap.delegate ?? []) regras.push({ action: 'subagent', resource: slug, effect: 'allow' });
   // edit: allow só quando o papel escreve código.
-  p.edit = (cap.write ?? []).includes('code') ? 'allow' : 'deny';
+  regras.push({ action: 'edit', resource: '*', effect: (cap.write ?? []).includes('code') ? 'allow' : 'deny' });
   // webfetch: allow só quando lê a web.
-  p.webfetch = (cap.read ?? []).includes('web') ? 'allow' : 'deny';
-  return p;
+  regras.push({ action: 'webfetch', resource: '*', effect: (cap.read ?? []).includes('web') ? 'allow' : 'deny' });
+  return regras;
 }

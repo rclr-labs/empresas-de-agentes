@@ -81,18 +81,64 @@ test('paperclip é identidade — o acervo já é o formato', () => {
   assert.deepEqual(b.unsupported ?? [], []);
 });
 
-test('claude-code declara budget e execute.deny como perdidos', () => {
+test('claude-code declara budget como perdido e execute.deny como traduzido, a partir da medição', () => {
+  // Medido em 2026-10-25 (agent-studio/docs/pesquisa/2026-10-25-runtimes-
+  // medidos.md): a versão anterior desta regra testava a INFERÊNCIA
+  // errada ("tools é lista aditiva, sem deny-list" ignorava
+  // disallowedTools e permissions.deny). budget continua perdido — não
+  // há teto de moeda documentado em lugar nenhum da config do runtime.
   const b = carregar('claude-code.yml');
-  assert.ok(b.unsupported.includes('budget'),
+  assert.ok(b.loses.includes('budget'),
     'Claude Code não tem teto por agente; a perda tem de estar declarada');
-  assert.ok(b.unsupported.includes('execute.deny'),
-    'tools é lista aditiva, sem deny-list');
+  assert.ok('execute.deny' in b.translates,
+    'disallowedTools + permissions.deny + hook PreToolUse/agent_type traduzem execute.deny, com ressalva de escopo');
 });
 
-test('opencode está marcado como pendente de confirmação', () => {
+test('opencode foi MEDIDO em 2026-10-25 e deixou de ser "pendente de confirmação"', () => {
+  // A medição (agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md)
+  // leu packages/schema/src/config/agent.ts e permission.ts direto do
+  // repo anomalyco/opencode via `gh api` — não é mais observação de uso
+  // interno não confirmada. O binding agora precisa dizer isso, citando
+  // onde foi lido, e não mais se declarar pendente.
   const b = carregar('opencode.yml');
-  assert.match(b.source, /pendente|observado|n[ãa]o confirmado/i,
-    'formato observado em uso interno não pode ser declarado verificado');
+  assert.match(b.source, /medid[oa]/i,
+    'source precisa declarar que o formato foi medido contra fonte primária');
+  assert.match(b.source, /anomalyco\/opencode/,
+    'source precisa nomear o repo real lido — sst/opencode foi movido');
+  assert.ok(!/pendente de confirma[çc][ãa]o/i.test(b.source),
+    'depois da medição, não é mais honesto chamar o binding de pendente');
+});
+
+test('toda célula de translates/preserves/loses cita a fonte — ou se declara inferida e diz por quê', () => {
+  for (const f of nomes()) {
+    const b = carregar(f);
+    const chaves = new Set([
+      ...Object.keys(b.translates ?? {}), ...(b.preserves ?? []), ...(b.loses ?? []),
+    ]);
+    const citations = b.citations ?? {};
+    for (const chave of chaves) {
+      const cite = citations[chave];
+      assert.ok(cite, `${f}: "${chave}" não tem entrada em citations — célula sem citação é inferência não declarada`);
+      if (typeof cite === 'string') {
+        assert.ok(cite.trim().length > 0, `${f}: citations.${chave} é string vazia`);
+      } else {
+        assert.equal(cite.inferido, true,
+          `${f}: citations.${chave} não é string nem {inferido:true,...} — formato inválido`);
+        assert.ok((cite.source ?? '').trim().length > 0,
+          `${f}: citations.${chave} é inferido sem dizer a razão em "source"`);
+      }
+    }
+  }
+});
+
+test('allowlist_scope é obrigatório sempre que network.allowlist entra em translates', () => {
+  for (const f of nomes()) {
+    const b = carregar(f);
+    if ('network.allowlist' in (b.translates ?? {})) {
+      assert.ok(['os', 'fetch-only'].includes(b.allowlist_scope),
+        `${f} traduz network.allowlist mas não declara allowlist_scope — sem isso não se sabe se a lista cobre shell cru`);
+    }
+  }
 });
 
 test('todo agente do acervo aplica em todo binding sem perda não declarada', () => {

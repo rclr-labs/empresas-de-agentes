@@ -1,25 +1,53 @@
 runtime: opencode
 source: >-
-  OBSERVADO, PENDENTE DE CONFIRMAÇÃO. Formato lido de rclr-labs/dev-factory
-  (agents/*.md com mode: subagent, temperature, color e um bloco permission
-  com edit, bash por glob e task por slug). Não foi confirmado contra a
-  documentação do runtime; até que seja, este binding não é declarado
-  verificado.
+  MEDIDO em 2026-10-25, substituindo a observação pendente anterior. O
+  binding antigo foi lido de rclr-labs/dev-factory — um formato V1
+  (`permission: {edit, bash: {glob: allow|deny}, task: {slug: allow|deny}}`,
+  `temperature`), nunca confirmado contra documentação. A medição confirma
+  DUAS correções de identidade antes de qualquer célula: (1) `sst/opencode`
+  foi movido para `anomalyco/opencode` — mesmo projeto, outra org, confirmado
+  via `gh api repos/sst/opencode` (redireciona); (2) o formato V1 lido é
+  REAL mas DEPRECADO — V2 é o atual, com nomes de campo e estrutura de dados
+  diferentes (array de regras, não dict de glob). Doc da própria V2:
+  "V1 uses different field and action names. In V2, use `permissions`,
+  `shell`, and `subagent` instead of `permission`, `bash`, and `task`" e
+  "Do not use legacy top-level fields such as `temperature`... in new V2
+  agent configuration." Fontes lidas em 2026-10-25:
+  `packages/schema/src/config/agent.ts` (ConfigAgent.Info),
+  `packages/schema/src/permission.ts`, `services/www/src/docs/content/
+  agents.mdx` e `permissions.mdx`, todas do repo `anomalyco/opencode`
+  (via `gh api`, não checkout local — não existe opencode local em ~/work
+  ou ~/apps).
 emits: agents/<slug>.md
 format: opencode
-# last-match: medido em anomalyco/opencode — packages/schema/src/permission.ts
-# e permissions.mdx ("Matching"/"Agents"): regras combinam última-vence, não
-# mais-específica-vence. Reescrita completa de source e mecanismo chega na
-# tarefa 28; este campo é adicionado agora porque o esquema de três estados
-# já exige a declaração.
+# last-match: packages/schema/src/permission.ts + permissions.mdx
+# ("Matching"/"Agents"): regras de `permissions` combinam em ARRAY,
+# última-regra-vence — built-in defaults → config de projeto → regras do
+# agente, nessa ordem, e a ÚLTIMA que bate decide. Isso inverte o modelo
+# "mais específica vence" que o binding V1 assumia (dict de glob). Emitir
+# um array pensado para primeira-vence (deny amplo depois de um allow
+# específico) produz exatamente o oposto da intenção, em silêncio.
 rule_order: last-match
-permissions:
-  defaults:
-    edit: deny
-    bash: {}
-    task: {}
-    webfetch: deny
-map:
+# allowlist_scope: fetch-only. A única ação com formato de rede é
+# `webfetch`, cujo resource é a URL requisitada — então um glob de domínio
+# governa só a CHAMADA DE BUSCA da ferramenta. `shell` é ação separada cujo
+# resource é "o texto do comando produzido pelo scanner", sem noção de
+# host — um papel com `shell` liberado e um comando como curl/wget alcança
+# qualquer host que o processo alcançar, e a allowlist de webfetch não
+# ajuda nada. Fonte: permissions.mdx, citado em agent-studio/docs/pesquisa/
+# 2026-10-25-runtimes-medidos.md §3.2: "`shell` runs with the host user's
+# filesystem, process, and network authority... prefer a narrow shell
+# allowlist instead of patterns intended to recognize every dangerous
+# command."
+allowlist_scope: fetch-only
+# Dispara buildPermissions() em tools/bindings.mjs, que monta o array V2
+# `{action, resource, effect}` em ordem deny-amplo-primeiro, na semântica
+# de last-match. O valor aqui só precisa ser truthy — a lista real é
+# construída a partir de `capabilities`, não de um default estático
+# declarado em YAML, porque V2 não tem um "default" único (built-in →
+# projeto → agente, mesclados).
+permissions: v2
+translates:
   read.repository: []
   read.documentation: []
   read.audit_trail: []
@@ -30,21 +58,89 @@ map:
   write.report: []
   write.pull_request: []
   write.code: []
+  # execute.allow/deny: ação `shell`, resource = texto do comando (glob
+  # `*`/`?` sobre a string normalizada do comando inteiro). Confirmado em
+  # permissions.mdx e packages/schema/src/permission.ts.
   execute.allow: []
   execute.deny: []
   network: []
+  # network.allowlist: ação `webfetch`, resource = URL requisitada — glob
+  # de domínio via `{action:"webfetch", resource:"https://dominio/*",
+  # effect:"allow"}` mais um deny-all. Só cobre a tool call de busca — ver
+  # allowlist_scope acima para a ressalva que importa.
+  network.allowlist: []
   delegate: []
-unsupported:
+  # approve: efeito `ask` pausa a chamada para aprovação ("Allow always"
+  # grava a aprovação). Isso É o portão. O que falta, e por isso não entra
+  # aqui o conceito de signer, é identidade de quem responde: "answered by
+  # the client" — qualquer sessão conectada, sem roteamento a pessoa
+  # nomeada. Mesma ressalva de approve.signer do claude-code.yml.
+  approve: []
+preserves: []
+loses:
+  # budget: busca em Config.Info, ConfigAgent.Info e `gh api search/code`
+  # por budget/monthly_cap/spend_limit/cost_cap/spending_limit no repo
+  # inteiro — zero ocorrência em todo o schema do runtime. Existe
+  # `policies` (allow/deny binário de provider/tool/integration), mas não
+  # tem moeda, teto nem alerta.
   - budget
-  - approve
+  # read.database: `read` é ação só de sistema de arquivo (resource =
+  # caminho). O único jeito de alcançar um banco é via servidor MCP, cuja
+  # ação é `<server>_<tool>` com resource `*` — concede/nega a TOOL
+  # inteira, sem distinguir SELECT de DROP TABLE. Mais grosso que a
+  # capacidade, não equivalente a ela.
   - read.database
-  # permission.webfetch é allow/deny, sem lista de domínio.
-  - network.allowlist
-unsupported_metadata:
-  - memory
-  - context
-  # skills: ponte mínima da tarefa 27 — ver nota equivalente em
-  # claude-code.yml. A tarefa 28 confirma que skills NÃO é campo de
-  # ConfigAgent.Info em opencode V2 (ausente de agent.ts e de agents.mdx),
-  # então aqui o estado real após a medição continua `loses`, não muda.
+  # skills: ConfigAgent.Info (agent.ts) não tem campo `skills`. Existe uma
+  # ação de PERMISSÃO chamada `skill` (resource = skill ID) em
+  # permission.ts, mas essa ação controla se o agente PODE invocar uma
+  # skill já carregada — não é o mecanismo de DECLARAR quais skills o
+  # papel preload no startup, que é o que este acervo expressa. Usar a
+  # ação `skill` aqui seria emprestar um mecanismo de controle de acesso
+  # como se fosse o de carregamento — o mesmo tipo de erro que motivou
+  # esta tarefa inteira.
   - skills
+  # memory: nenhum campo em Config.Info nem ConfigAgent.Info.
+  - memory
+  # context: nenhum campo correspondente — ausência confirmada junto com
+  # memory, mesma leitura de agent.ts.
+  - context
+citations:
+  read.repository:
+    inferido: true
+    source: "destino [] por desenho — V2 não tem lista de tools por ação de leitura separada do resource de caminho; ação `read` com resource `*` cobre o alcance, ver permissions.mdx"
+  read.documentation:
+    inferido: true
+    source: "mesma leitura de read.repository"
+  read.audit_trail:
+    inferido: true
+    source: "mesma leitura de read.repository"
+  read.test_evidence:
+    inferido: true
+    source: "mesma leitura de read.repository"
+  read.web:
+    inferido: true
+    source: "mapeia para a ação webfetch/websearch, mesma fonte de network.allowlist abaixo"
+  write.documentation: "permissions.mdx — ação `edit`, resource = caminho (cobre edit/write/patch)"
+  write.test_evidence: "permissions.mdx — ação `edit`"
+  write.report: "permissions.mdx — ação `edit`"
+  write.pull_request:
+    inferido: true
+    source: "sem ação dedicada a pull request; passa por `shell` (git/gh via linha de comando) — observado, não é campo próprio do schema"
+  write.code: "permissions.mdx — ação `edit`"
+  execute.allow: "permissions.mdx + packages/schema/src/permission.ts — ação `shell`, lidos 2026-10-25"
+  execute.deny: "permissions.mdx + packages/schema/src/permission.ts — ação `shell`, last-match, lidos 2026-10-25"
+  network:
+    inferido: true
+    source: "alcance geral mapeado para a mesma ação webfetch/websearch de read.web — V2 não distingue 'tem rede' de 'tem busca'"
+  network.allowlist: "permissions.mdx — ação `webfetch`, resource = URL requisitada, lido 2026-10-25"
+  delegate: "agents.mdx — ação `subagent`, resource = id do agente alvo, lido 2026-10-25"
+  approve: "permissions.mdx — efeito `ask` e 'Allow always', lido 2026-10-25"
+  budget:
+    inferido: true
+    source: "ausência confirmada por gh api search/code em anomalyco/opencode por budget|monthly_cap|spend_limit|cost_cap|spending_limit — zero ocorrência, lido 2026-10-25"
+  read.database: "permissions.mdx — ação `read` é só caminho de arquivo; `<server>_<tool>` é grosseiro demais, lido 2026-10-25"
+  skills: "packages/schema/src/config/agent.ts (ConfigAgent.Info sem campo skills) + permissions.mdx (ação `skill` é controle de acesso, não declaração), lidos 2026-10-25"
+  memory: "packages/schema/src/config/agent.ts — ausência confirmada, lido 2026-10-25"
+  context: "packages/schema/src/config/agent.ts — ausência confirmada, lido 2026-10-25"
+unsupported: []
+unsupported_metadata: []

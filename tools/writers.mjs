@@ -24,14 +24,18 @@ export const writers = {
     }),
   }),
 
+  // V2 (medido em 2026-10-25): `permissions` é array de
+  // `{action, resource, effect}`, não o dict `permission` de V1 — e
+  // `temperature` é campo legado que a doc do runtime pede para não usar
+  // em config V2 nova ("Do not use legacy top-level fields such as
+  // temperature... in new V2 agent configuration", agents.mdx linha 344).
   opencode: (agent, applied) => ({
     path: `${agent.slug}.md`,
     content: toMarkdown({
       frontmatter: {
         description: descricao(agent),
         mode: 'subagent',
-        temperature: 0.2,
-        permission: applied.permissions,
+        permissions: applied.permissions,
       },
       body: agent.body,
     }),

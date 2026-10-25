@@ -54,28 +54,61 @@ test('claude-code: a persona NÃO vai para o corpo, só a headline na descriptio
   rmSync(out, { recursive: true, force: true });
 });
 
-test('claude-code: avisa a perda de budget e de execute.deny', () => {
+test('claude-code: avisa a perda de budget — execute.deny agora traduz, a partir da medição', () => {
+  // Antes da medição (2026-10-25), execute.deny estava em `unsupported`
+  // por inferência errada; a emissão avisava os dois. Agora traduz via
+  // disallowedTools/permissions.deny/hook, então não há mais perda a
+  // avisar para execute.deny — só budget continua sem teto no runtime.
   const { out, stdout } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
   assert.match(stdout, /budget/);
-  assert.match(stdout, /execute\.deny/);
   assert.match(stdout, /perdid|n[ãa]o expressa/i);
+  assert.ok(!/execute\.deny/.test(stdout),
+    'execute.deny não é mais perda — a medição corrigiu a tradução');
   rmSync(out, { recursive: true, force: true });
 });
 
-test('opencode: emite bloco permission com bash deny por padrão', () => {
+test('opencode V2: emite permissions como array {action,resource,effect}, shell deny por padrão', () => {
   const { out } = emitir(['--package', 'software-house', '--binding', 'opencode']);
   const { frontmatter } = parseMarkdown(readFileSync(join(out, 'desenvolvimento.md'), 'utf8'));
   assert.equal(frontmatter.mode, 'subagent');
-  assert.equal(frontmatter.permission.bash['*'], 'deny', 'deny por padrão');
-  assert.equal(frontmatter.permission.edit, 'allow', 'quem escreve código pode editar');
-  assert.equal(frontmatter.permission.task['*'], 'deny');
+  assert.equal(frontmatter.temperature, undefined,
+    'temperature é campo legado V1 — a doc do runtime pede para não usar em config V2 nova');
+  assert.ok(Array.isArray(frontmatter.permissions), 'permissions é array em V2, não dict');
+  const shellDeny = frontmatter.permissions.find((r) => r.action === 'shell' && r.resource === '*');
+  assert.equal(shellDeny.effect, 'deny', 'deny amplo por padrão');
+  const edit = frontmatter.permissions.find((r) => r.action === 'edit');
+  assert.equal(edit.effect, 'allow', 'quem escreve código pode editar');
+  const subagent = frontmatter.permissions.find((r) => r.action === 'subagent' && r.resource === '*');
+  assert.equal(subagent.effect, 'deny');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('opencode V2: ORDEM da lista é deny-amplo-primeiro — last-match exige isso, inverter quebra a fronteira', () => {
+  // packages/schema/src/permission.ts: regras resolvem última-regra-vence.
+  // Uma lista [allow-específico, deny-amplo] faria o deny amplo (último)
+  // vencer SEMPRE, cancelando o allow — o oposto da intenção. A ordem
+  // certa é deny amplo primeiro, allow específico depois, para que o
+  // allow específico seja o último a bater e vença.
+  const { out } = emitir(['--package', 'software-house', '--binding', 'opencode']);
+  const { frontmatter } = parseMarkdown(readFileSync(join(out, 'desenvolvimento.md'), 'utf8'));
+  const shellRules = frontmatter.permissions
+    .map((r, i) => ({ ...r, i }))
+    .filter((r) => r.action === 'shell');
+  const denyAmplo = shellRules.find((r) => r.resource === '*' && r.effect === 'deny');
+  const allowEspecifico = shellRules.find((r) => r.effect === 'allow');
+  assert.ok(denyAmplo, 'tem deny amplo');
+  if (allowEspecifico) {
+    assert.ok(denyAmplo.i < allowEspecifico.i,
+      'deny amplo tem de vir ANTES do allow específico na lista — V2 é last-match-wins');
+  }
   rmSync(out, { recursive: true, force: true });
 });
 
 test('opencode: quem não escreve código não recebe edit allow', () => {
   const { out } = emitir(['--package', 'software-house', '--binding', 'opencode']);
   const { frontmatter } = parseMarkdown(readFileSync(join(out, 'revisao.md'), 'utf8'));
-  assert.equal(frontmatter.permission.edit, 'deny');
+  const edit = frontmatter.permissions.find((r) => r.action === 'edit');
+  assert.equal(edit.effect, 'deny');
   rmSync(out, { recursive: true, force: true });
 });
 
