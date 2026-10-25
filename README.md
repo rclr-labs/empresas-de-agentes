@@ -63,6 +63,10 @@ Um organograma escrito aqui vale nos dois.
 
 Além do que a especificação exige, todo pacote daqui cumpre:
 
+Como este acervo estende `agentcompanies/v1` — persona, fronteira,
+capacidades, memória, contexto, orçamento, portões humanos, sempre sob
+`metadata.*` — está documentado em [`SCHEMA.md`](SCHEMA.md).
+
 1. **`license` declarado** em todo pacote. Ferramenta compatível é obrigada
    a avisar quando falta (§17 da spec), e pacote sem licença não entra.
 2. **Nenhum segredo, nenhum caminho absoluto.** `requirements.secrets`
