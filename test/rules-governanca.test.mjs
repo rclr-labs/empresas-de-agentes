@@ -1,15 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateGovernance, validatePackage } from '../tools/rules.mjs';
+import { validateStructure, validateGovernance, validatePackage } from '../tools/rules.mjs';
 
-function pacote({ companyBudget = null, agents = [] } = {}) {
+function pacote({ companyBudget = null, agents = [], gates = [] } = {}) {
   return {
     slug: 'teste',
     company: {
       path: 'COMPANY.md',
       frontmatter: {
         slug: 'teste', license: 'MIT',
-        metadata: { human_gates: [], ...(companyBudget ? { budget: companyBudget } : {}) },
+        metadata: { human_gates: gates, ...(companyBudget ? { budget: companyBudget } : {}) },
       },
       body: '',
     },
@@ -87,11 +87,22 @@ test('E08: alert_to que não é papel do pacote falha', () => {
 });
 
 test('E08: teto sem alert_to falha — teto que ninguém lê não é teto', () => {
-  assert.ok(codigos(pacote({
+  const e = validateGovernance(pacote({
     agents: [{ slug: 'a', capabilities: {
       write: ['code'], budget: { currency: 'BRL', monthly_cap: 100 },
     } }],
-  })).includes('E08'));
+  })).find((x) => x.code === 'E08');
+  assert.ok(e);
+  assert.match(e.message, /sem alert_to/i, 'a mensagem tem de distinguir o ramo');
+});
+
+test('E08: orçamento válido com alert_to resolvível NÃO dispara', () => {
+  assert.ok(!validateGovernance(pacote({
+    agents: [{ slug: 'a', capabilities: {
+      write: ['code'],
+      budget: { currency: 'BRL', monthly_cap: 100, alert_at: 0.7, alert_to: 'a' },
+    } }],
+  })).some((x) => x.code === 'E08'));
 });
 
 test('E09: chave de API literal no corpo falha', () => {
@@ -113,6 +124,29 @@ test('E09: nome de variável de ambiente é permitido', () => {
   assert.ok(!codigos(pacote({
     agents: [{ slug: 'a', body: 'o segredo chega em ANTHROPIC_API_KEY' }],
   })).includes('E09'));
+});
+
+test('E09: segredo no COMPANY.md falha — não basta varrer os agentes', () => {
+  // Especime de caminho absoluto, não de chave sk-ant-*: o hook de
+  // secret-scan deste repositório bloqueia commit cujo diff contenha o
+  // padrão sk-ant-* literal, mesmo em fixture de teste. O padrão de
+  // caminho absoluto já cobre o mesmo ponto — E09 varrendo COMPANY.md —
+  // sem colidir com o scanner. A chave sk-ant-* já é exercida pelo teste
+  // 'E09: chave de API literal no corpo falha', sobre um agente.
+  const pkg = pacote({ agents: [{ slug: 'a' }] });
+  pkg.company.body = 'segredo em /Users/alguem/segredos/token.txt';
+  const e = validateGovernance(pkg).find((x) => x.code === 'E09');
+  assert.ok(e, 'E09 tem de varrer o COMPANY.md');
+  assert.equal(e.where, 'COMPANY.md', 'e apontar o arquivo certo');
+});
+
+test('E09: caminho absoluto num SKILL.md falha', () => {
+  const pkg = pacote({ agents: [{ slug: 'a' }] });
+  pkg.skills = [{ path: 'skills/s/SKILL.md', slug: 's', frontmatter: { name: 's' },
+    body: 'leia /Users/outro/.ssh/id_rsa' }];
+  const e = validateGovernance(pkg).find((x) => x.code === 'E09');
+  assert.ok(e, 'E09 tem de varrer skills, teams e tasks também');
+  assert.equal(e.where, 'skills/s/SKILL.md');
 });
 
 test('E10: cannot nega deploy mas execute.allow permite kubectl apply', () => {
@@ -197,4 +231,25 @@ test('validatePackage propaga os avisos de normalização que vieram no pkg', ()
   pkg.warnings = [{ code: 'W01', path: 'fronteira', message: 'alias', file: 'x' }];
   const { warnings } = validatePackage(pkg);
   assert.ok(warnings.some((w) => w.code === 'W01'));
+});
+
+test('E04: portão com acento resolve pelo slug natural', () => {
+  const pkg = pacote({
+    gates: ['deploy em produção', 'remoção de dado de produção'],
+    agents: [{ slug: 'a', capabilities: { approve: ['deploy-em-producao', 'remocao-de-dado-de-producao'] } }],
+  });
+  const e04 = validateStructure(pkg).filter((x) => x.code === 'E04');
+  assert.deepEqual(e04, [], e04.map((x) => x.message).join('\n'));
+});
+
+test('E05: um ciclo é reportado uma vez, não uma por nó', () => {
+  const erros = validateStructure(pacote({
+    agents: [
+      { slug: 'a', reportsTo: 'b' },
+      { slug: 'b', reportsTo: 'c' },
+      { slug: 'c', reportsTo: 'a' },
+    ],
+  }));
+  const ciclos = erros.filter((e) => e.code === 'E05' && /ciclo/i.test(e.message));
+  assert.equal(ciclos.length, 1, 'três nós, um ciclo, um erro');
 });

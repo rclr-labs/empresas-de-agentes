@@ -58,13 +58,23 @@ function erro(code, rule, where, message) {
   return { code, rule, where, message };
 }
 
+// Deriva id de portão a partir da prosa. A dobra de diacrítico (NFD +
+// remoção das marcas combinantes) NÃO é cosmética: sem ela,
+// "deploy em produção" vira "deploy-em-produ-o", e o autor que escrever o
+// slug natural "deploy-em-producao" em capabilities.approve recebe um E04
+// falso — a regra acusa portão inexistente para um portão que existe.
+// Foi medido: dois dos quatro portões de software-house mangavam.
+function slugificarPortao(texto) {
+  return texto
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 function gatesDo(pkg) {
   const raw = pkg.company.frontmatter?.metadata?.human_gates ?? [];
   // Alias de formato: lista de string crua vira {id} com slug derivado.
   return raw.map((g) =>
-    typeof g === 'string'
-      ? { id: g.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), description: g }
-      : g,
+    typeof g === 'string' ? { id: slugificarPortao(g), description: g } : g,
   );
 }
 
@@ -139,15 +149,23 @@ export function validateStructure(pkg) {
     }
   }
 
-  // E05 — ciclo de delegação
+  // E05 — ciclo de delegação. Deduplicado por conjunto de nós: sem isso,
+  // um ciclo a→b→c→a era reportado três vezes, uma por nó de partida, e
+  // quem lê a lista de erros vê três defeitos onde há um.
   const chefeDe = new Map(pkg.agents.map((a) => [a.slug, a.frontmatter?.reportsTo ?? null]));
+  const ciclosVistos = new Set();
   for (const inicio of chefeDe.keys()) {
     const visto = [];
     let atual = inicio;
     while (atual != null && chefeDe.has(atual)) {
       if (visto.includes(atual)) {
-        erros.push(erro('E05', 'ciclo-de-delegacao', `agents/${inicio}/AGENTS.md`,
-          `ciclo de delegação: ${[...visto.slice(visto.indexOf(atual)), atual].join(' → ')}`));
+        const ciclo = [...visto.slice(visto.indexOf(atual)), atual];
+        const chave = [...new Set(ciclo)].sort().join('|');
+        if (!ciclosVistos.has(chave)) {
+          ciclosVistos.add(chave);
+          erros.push(erro('E05', 'ciclo-de-delegacao', `agents/${inicio}/AGENTS.md`,
+            `ciclo de delegação: ${ciclo.join(' → ')}`));
+        }
         break;
       }
       visto.push(atual);
@@ -222,15 +240,6 @@ export function validateGovernance(pkg) {
       }
     }
 
-    // E09 — segredo e caminho absoluto
-    const texto = `${JSON.stringify(agente.frontmatter)}\n${agente.body}`;
-    for (const { re, nome } of SEGREDOS) {
-      if (re.test(texto)) {
-        erros.push(erro('E09', 'segredo-literal', where,
-          `${nome} encontrado. Valor de segredo e caminho de máquina nunca são dados canônicos de pacote; declare apenas o nome da variável`));
-      }
-    }
-
     // E10 — divergência prosa × capacidade
     const naoPode = (meta.boundary?.cannot ?? []).join(' | ');
     for (const { prosa, comandos } of CONTRADICOES) {
@@ -247,6 +256,22 @@ export function validateGovernance(pkg) {
     if ((cap.write ?? []).includes('code') && (cap.approve ?? []).length > 0) {
       erros.push(erro('E11', 'segregacao-violada', where,
         'o mesmo papel escreve código e assina portão humano. Segregação de função: quem implementa não aprova, e quem aprova não implementa'));
+    }
+  }
+
+  // E09 — segredo e caminho absoluto, em TODO arquivo do pacote.
+  // Fora do laço de agentes de propósito: varrer só os agentes deixava
+  // passar segredo em COMPANY.md, que é exatamente o arquivo onde
+  // requirements.secrets vive e onde caminho de organização aparece.
+  // Foi medido: um sk-ant-* no corpo do COMPANY.md e um caminho absoluto
+  // num SKILL.md produziam ZERO erros.
+  for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
+    const texto = `${JSON.stringify(arquivo.frontmatter ?? {})}\n${arquivo.body ?? ''}`;
+    for (const { re, nome } of SEGREDOS) {
+      if (re.test(texto)) {
+        erros.push(erro('E09', 'segredo-literal', arquivo.path,
+          `${nome} encontrado. Valor de segredo e caminho de máquina nunca são dados canônicos de pacote; declare apenas o nome da variável`));
+      }
     }
   }
 
