@@ -11,18 +11,48 @@ function descricao(agent) {
   return headline ? `${title}. ${headline}` : title;
 }
 
+// disallowedTools nega por NOME DE FERRAMENTA (code.claude.com/docs/en/
+// sub-agents: "Tools to deny... Same format as tools") — não por glob de
+// comando. O único caso em que isso corresponde de verdade à intenção do
+// papel é quando `execute.allow` está vazio e `execute.deny` não: o papel
+// não precisa de shell NENHUM (nada em allow justifica conceder Bash — a
+// tradução de execute.allow→[Bash] também não dispara), e `execute.deny`
+// ainda nomeia o que ele não pode fazer. Negar Bash por nome reforça essa
+// intenção em profundidade (`tools:` já é allowlist e não incluiria Bash,
+// mas disallowedTools é o reforço explícito que a doc do runtime
+// confirma existir). NÃO tenta mapear glob de comando (`"kubectl *"`)
+// para nome de ferramenta — isso exigiria glob-level deny, que é o
+// mecanismo de `permissions.deny` + hook documentado em
+// bindings/claude-code.yml, fora do que esta função escreve.
+function disallowedTools(agent) {
+  const cap = agent.frontmatter.metadata?.capabilities ?? {};
+  const allow = cap.execute?.allow ?? [];
+  const deny = cap.execute?.deny ?? [];
+  return allow.length === 0 && deny.length > 0 ? ['Bash'] : [];
+}
+
 export const writers = {
-  'claude-code': (agent, applied) => ({
-    path: `${agent.slug}.md`,
-    content: toMarkdown({
-      frontmatter: {
-        name: agent.slug,
-        description: descricao(agent),
-        tools: applied.tools.join(', '),
-      },
-      body: agent.body,
-    }),
-  }),
+  'claude-code': (agent, applied) => {
+    const meta = agent.frontmatter.metadata ?? {};
+    const skills = agent.frontmatter.skills ?? [];
+    const memoryScope = meta.memory?.scope;
+    const negadas = disallowedTools(agent);
+    const frontmatter = {
+      name: agent.slug,
+      description: descricao(agent),
+      tools: applied.tools.join(', '),
+    };
+    // Campos opcionais só aparecem quando o papel de fato os declara —
+    // emitir `skills: []` ou `memory:` vazio para todo agente poluiria a
+    // saída sem acrescentar fronteira nenhuma.
+    if (skills.length) frontmatter.skills = skills.join(', ');
+    if (memoryScope) frontmatter.memory = memoryScope;
+    if (negadas.length) frontmatter.disallowedTools = negadas.join(', ');
+    return {
+      path: `${agent.slug}.md`,
+      content: toMarkdown({ frontmatter, body: agent.body }),
+    };
+  },
 
   // V2 (medido em 2026-10-25): `permissions` é array de
   // `{action, resource, effect}`, não o dict `permission` de V1 — e

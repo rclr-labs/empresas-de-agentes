@@ -310,3 +310,83 @@ impl=$(grep -ohE "'E[0-9]{2}'" tools/*.mjs | tr -d "'" | sort -u)
 doc=$(grep -ohE "E[0-9]{2}" SCHEMA.md | sort -u)
 diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
 ```
+
+## 8. Bindings: três estados, não dois
+
+`bindings/*.yml` traduz `metadata.capabilities` (e os campos de topo
+`skills`/`memory`/`context`) para o vocabulário de um runtime concreto.
+Até 2026-10-25 essa tradução era binária: `map` (traduzido) ou
+`unsupported` (perdido). O binário não consegue expressar o meio do
+caminho — um dado que **sobrevive no arquivo emitido** sem que o runtime
+**aja** sobre ele. `tools/bindings.mjs` (`applyBinding`) resolve toda
+capacidade em um de três estados:
+
+| Estado | Significa | Exemplo medido |
+|---|---|---|
+| `translates` | O runtime **honra** a capacidade; a célula nomeia o mecanismo | `execute.deny` no Claude Code: `disallowedTools` + `permissions.deny` + hook `PreToolUse`/`agent_type` |
+| `preserves` | O dado **sobrevive** no arquivo; o runtime **não age** sobre ele | `budget` no Paperclip: a spec base não define orçamento (§15 — extensão de fornecedor), mas a cópia byte a byte preserva o campo |
+| `loses` | Nem sobrevive, nem é honrado | `budget` no Claude Code e no OpenCode: nenhum campo de custo existe em nenhum dos dois |
+
+Capacidade fora dos três estados é **defeito do binding** — `applyBinding`
+reporta como perda com motivo "não declarada", nunca em silêncio.
+`map`/`unsupported`/`unsupported_metadata` continuam carregando como alias
+de leitura de `translates`/`loses`, para binding de terceiro escrito no
+formato antigo.
+
+Duas propriedades adicionais mudam o RESULTADO da tradução, não só o
+vocabulário:
+
+- **`rule_order`** (`first-match` | `last-match`) — a ordem em que o
+  runtime resolve uma lista de regra de permissão. Medido: o OpenCode V2
+  resolve **última-regra-vence** (`packages/schema/src/permission.ts`),
+  não mais-específica-vence. Emitir uma lista pensada para primeira-vence
+  inverte a fronteira em silêncio.
+- **`allowlist_scope`** (`os` | `fetch-only`) — o que uma allowlist de
+  domínio de rede realmente cobre. `os` (Claude Code, medido em
+  `code.claude.com/docs/en/sandboxing`) intercepta todo processo filho,
+  shell cru incluído. `fetch-only` (OpenCode V2 e janus com provider
+  `kind=cli`) só cobre a chamada de busca da ferramenta — um papel com
+  shell liberado escapa da lista por completo.
+
+Toda célula de um binding publicado cita a página ou o arquivo lido
+(`citations: { <chave>: "fonte" | { inferido: true, source: "razão" } }`).
+Célula sem citação é inferência não declarada.
+
+### 8.1 A tabela medida dos quatro bindings
+
+Medição de **2026-10-25**
+(`agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md`) — tabela
+envelhece sem avisar se a data não acompanhar; ao reler este arquivo
+depois de uma nova medição, atualizar a data junto com as células.
+
+| Capacidade | claude-code | opencode (V2) | paperclip | portable |
+|---|---|---|---|---|
+| `execute.deny` | **traduz**, com ressalva de escopo (`disallowedTools`/`permissions.deny`/hook) | **traduz** (`shell`, last-match) | preserva (§15, extensão de fornecedor) | preserva (desenho próprio) |
+| `network.allowlist` | **traduz** (`sandbox.network.allowedDomains`, SO — cobre shell cru) | **traduz**, mas void se o papel também tem shell (`fetch-only`) | preserva (§15) | preserva |
+| `budget` | **perde** (sem campo de custo; `maxTurns` é proxy de turno, não de gasto) | **perde** (zero ocorrência no schema) | preserva (§15) | preserva |
+| `read.database` | **traduz** (composição: tool do servidor MCP + `disallowedTools: Bash`) | **perde** (`read` é só caminho de arquivo; MCP tool é grosseiro demais) | preserva (§5–§13, não é campo base) | preserva |
+| `approve` | **traduz o portão** (`permissions.ask`), perde o signer nomeado | **traduz o portão** (`ask`), perde o signer nomeado | preserva (§15) | preserva |
+| `skills` | **traduz** (campo de frontmatter documentado) | **perde** (ausente de `ConfigAgent.Info`; ação `skill` é controle de acesso, não declaração) | **traduz** (§5, único ponto da spec base que a tabela cobre) | preserva |
+| `memory`/`context` | `memory` traduz (campo existe, vocabulário de valor não 1:1); `context` perde | ambos perdem (ausentes de `ConfigAgent.Info`) | ambos preservam (§5–§13) | ambos preservam |
+
+A contabilidade de perda mudou de forma qualitativa, não só quantitativa:
+antes da medição, `claude-code.yml` declarava quatro perdas por
+inferência errada (`network.allowlist`, `execute.deny`, `read.database`,
+`approve`) que na verdade são tradução — e `skills` não tinha estado
+nenhum em binding nenhum. Depois: só `budget` perde de verdade no Claude
+Code, e `paperclip`/`portable` deixaram de se chamar "zero perda" sem
+qualificação — preservam tudo, mas não aplicam a maior parte, porque a
+spec base `agentcompanies/v1` não define a maior parte (ver
+`bindings/paperclip.yml` §15).
+
+### 8.2 janus não entra nesta tabela
+
+Medido (2026-10-25, §5.1 da pesquisa): janus **não tem formato de
+agente/papel**. A unidade de governança dele é `Mission`
+(`*.mission.json`), por **tarefa**, não identidade persistente de papel —
+toda chamada redeclara escopo, orçamento e aprovação do zero. Escrever
+`bindings/janus.yml` hoje seria inventar a correspondência "um papel do
+organograma = um Mission", sem garantia de que é 1:1. A pendência
+"promover `portable` → `janus`" registrada em `bindings/portable.yml`
+`source` não é "escrever um mapa" — é a decisão, do Rafael, de se janus
+deveria ganhar o conceito de papel persistente.

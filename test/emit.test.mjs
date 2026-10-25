@@ -37,6 +37,54 @@ test('claude-code: emite um .md por agente, com name, description e tools', () =
   rmSync(out, { recursive: true, force: true });
 });
 
+test('claude-code: skills, memory e disallowedTools saem do frontmatter quando o papel os declara', () => {
+  // Medido em 2026-10-25: skills e memory são campos documentados de
+  // code.claude.com/docs/en/sub-agents — ficaram sem estado em nenhum
+  // binding até a tarefa 27/28 (classe de defeito 2 do relato). polaris
+  // declara os dois: skills: [veredito-com-confianca, evidencia-
+  // replayavel] e memory.scope: project.
+  const { out } = emitir(['--package', 'fabrica-de-testes', '--binding', 'claude-code']);
+  const { frontmatter } = parseMarkdown(readFileSync(join(out, 'polaris.md'), 'utf8'));
+  assert.match(frontmatter.skills, /veredito-com-confianca/);
+  assert.match(frontmatter.skills, /evidencia-replayavel/);
+  assert.equal(frontmatter.memory, 'project');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: papel sem execute.allow e com execute.deny recebe disallowedTools: Bash', () => {
+  // Nenhum papel real do acervo cai nesse caso hoje (todos declaram
+  // execute.allow não vazio) — por isso o teste exercita o escritor
+  // direto, com um agente sintético, em vez de depender de um pacote
+  // publicado ter esse formato.
+  const agent = {
+    slug: 'sintetico', body: '\n# Sintético\n',
+    frontmatter: {
+      name: 'Sintético', title: 'Sintético', slug: 'sintetico', skills: [],
+      metadata: {
+        capabilities: { execute: { allow: [], deny: ['sudo *'] } },
+      },
+    },
+  };
+  const { content } = writers['claude-code'](agent, { tools: [] });
+  const { frontmatter } = parseMarkdown(content);
+  assert.equal(frontmatter.disallowedTools, 'Bash');
+});
+
+test('claude-code: papel com execute.allow não recebe disallowedTools — Bash é legítimo', () => {
+  const agent = {
+    slug: 'sintetico2', body: '\n# Sintético\n',
+    frontmatter: {
+      name: 'Sintético 2', title: 'Sintético 2', slug: 'sintetico2', skills: [],
+      metadata: {
+        capabilities: { execute: { allow: ['npm test*'], deny: ['sudo *'] } },
+      },
+    },
+  };
+  const { content } = writers['claude-code'](agent, { tools: ['Bash'] });
+  const { frontmatter } = parseMarkdown(content);
+  assert.equal(frontmatter.disallowedTools, undefined);
+});
+
 test('claude-code: delegação sai como Agent(slug)', () => {
   const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
   const { frontmatter } = parseMarkdown(readFileSync(join(out, 'tech-lead.md'), 'utf8'));

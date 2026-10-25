@@ -77,6 +77,20 @@ placeholder de pacote público — na adaptação, ele é substituído pelo host
 real do ambiente de staging do cliente, do mesmo jeito que `pentest-aplicacao`
 vai nomear o seu próprio alvo quando esse papel existir.
 
+Este papel também declara `curl -s*` em `execute.allow` — e isso muda o que
+a allowlist de rede acima realmente é, dependendo do runtime de destino.
+**No Claude Code**, o sandbox de sistema operacional intercepta toda saída
+de rede do processo, `curl` incluído — a allowlist é fronteira de verdade
+porque `allowlist_scope` daquele binding é `os` (medido em 2026-10-25:
+`sandbox.network.allowedDomains`, code.claude.com/docs/en/sandboxing).
+**No OpenCode V2 e no janus com provider `kind=cli`**, a allowlist de rede
+só cobre a chamada de busca da própria ferramenta — `shell`/CLI não passa
+por ela (`allowlist_scope: fetch-only`), e o `curl` liberado em
+`execute.allow` alcança qualquer host, não só `api-staging.exemplo.com.br`.
+Isso não é defeito deste papel: é o que o operador precisa saber antes de
+confiar na allowlist como fronteira — a restrição real, fora do Claude
+Code, tem de vir de rede ou proxy, não do runtime.
+
 ## Formato de achado
 
 Três partes obrigatórias — sem as três, não relate:
