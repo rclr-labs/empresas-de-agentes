@@ -21,16 +21,25 @@ requirements:
     - ANTHROPIC_API_KEY
     - OPENAI_API_KEY
 metadata:
-  orcamento:
-    moeda: BRL
-    teto_mensal: 2000.00
-    alerta_em: 0.7
-    destinatario_do_alerta: coordenacao
-  portoes_humanos:
-    - deploy em produção
-    - gasto acima do teto do papel
-    - qualquer contato com o cliente
-    - remoção de dado de produção
+  capability_vocabulary: capabilities/v1
+  budget:
+    currency: BRL
+    monthly_cap: 2000.00
+    alert_at: 0.7
+    alert_to: coordenacao
+  human_gates:
+    - id: deploy-producao
+      description: deploy em produção
+      signer: pessoa nomeada no kickoff
+    - id: gasto-acima-do-teto
+      description: gasto acima do teto do papel
+      signer: coordenacao
+    - id: contato-com-cliente
+      description: qualquer contato com o cliente
+      signer: pessoa nomeada no kickoff
+    - id: remocao-de-dado-de-producao
+      description: remoção de dado de produção
+      signer: pessoa nomeada no kickoff
 ---
 
 # Casa de Software
@@ -52,7 +61,7 @@ desculpa depois.
 
 **Portões humanos.** Quatro ações não acontecem sem assinatura: deploy em
 produção, gasto acima do teto, contato com cliente e remoção de dado de
-produção. Estão listadas em `metadata.portoes_humanos` porque portão que
+produção. Estão listadas em `metadata.human_gates` porque portão que
 não está escrito é portão que não existe.
 
 **Ritual.** A tarefa recorrente `tasks/revisao-de-orcamento/` existe para
