@@ -98,6 +98,40 @@ test('um AGENTS.md malformado não aborta o pacote: nomeia o arquivo e deixa os 
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('toMarkdown preserva corpo CRLF byte a byte', () => {
+  const corpo = '\r\n# Titulo\r\nlinha\r\n';
+  const texto = toMarkdown({ frontmatter: { name: 'X' }, body: corpo });
+  const depois = texto.slice(texto.indexOf('---\r\n', 4) + 5);
+  assert.equal(depois, corpo, 'o corpo tem de sair idêntico ao que entrou');
+});
+
+test('toMarkdown não apaga espaço no fim da última linha do corpo', () => {
+  const corpo = '\n# X\nlinha com espaco   \n';
+  const texto = toMarkdown({ frontmatter: { name: 'X' }, body: corpo });
+  assert.ok(texto.includes('linha com espaco   '), 'espaço é conteúdo, não lixo');
+});
+
+test('--fix sem alvo é RECUSADO, não aplicado a tudo', () => {
+  const { code, stdout, stderr } = rodar(['--fix']);
+  assert.equal(code, 2, 'sai 2: erro de uso, não de validação');
+  assert.match(stdout + stderr, /alvo expl[íi]cito/i);
+});
+
+test('--fix NÃO reescreve pacote que tem erro', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pkg-'));
+  mkdirSync(join(dir, 'agents', 'a'), { recursive: true });
+  writeFileSync(join(dir, 'COMPANY.md'),
+    '---\nname: X\nslug: x\nschema: agentcompanies/v1\nkind: company\n---\n\n# x\n');
+  const comAlias = '---\nname: A\nslug: a\nreportsTo: null\nmetadata:\n  fronteira:\n    pode: [ler]\n    nao_pode: []\n---\n\n# A\n';
+  writeFileSync(join(dir, 'agents', 'a', 'AGENTS.md'), comAlias);
+
+  const { code } = rodar([dir, '--fix']);
+  assert.equal(code, 1, 'o erro ainda reprova');
+  assert.equal(readFileSync(join(dir, 'agents', 'a', 'AGENTS.md'), 'utf8'), comAlias,
+    'arquivo intocado: reescrever pacote reprovado esconde o defeito atrás de formatação');
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('--json devolve saída parseável', () => {
   const { stdout } = rodar(['--json']);
   const dados = JSON.parse(stdout);

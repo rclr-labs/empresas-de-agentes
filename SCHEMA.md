@@ -190,7 +190,7 @@ invariantes:
   contém.** Teto de empresa abaixo do teto de um papel significa que o
   papel nunca alcança o próprio limite — o limite do papel fica decorativo.
   Esta segunda invariante é uma exigência de coerência do pacote; não
-  encontrei uma regra do validador (E01–E11) que a verifique diretamente,
+  encontrei uma regra do validador (seção 7) que a verifique diretamente,
   então não afirmo que ela é aplicada — só que um pacote que a viola não
   faz sentido lido como um todo.
 
@@ -258,3 +258,48 @@ A única parte da persona que chega a um emissor de runtime é
 linha que uma plataforma usa para listar o papel. `display_name`, `icon`,
 `pronouns`, `background`, `strengths` e `signature_question` ficam fora de
 qualquer emissor: eles servem para construir a página, não a chamada.
+
+## 7. Catálogo de erros e avisos
+
+Este catálogo é gerado a partir do código (`tools/rules.mjs` e
+`tools/schema.mjs`), não de memória — toda entrada abaixo corresponde a um
+`erro('E..', 'slug', ...)` ou `{ code: 'W..', ... }` real no validador.
+
+**Erro reprova, aviso não.** `node tools/validate.mjs` sai `1` se houver
+qualquer erro, `0` se só houver avisos. Essa é a única garantia que o
+CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
+
+### Erros (`E01`–`E13`) — reprovam o pacote
+
+| Código | Regra (`rule`) | O que rejeita | Consequência sem a regra |
+|---|---|---|---|
+| E01 | `license-ausente` | `COMPANY.md` sem `license` declarado | Pacote sem base legal de uso entraria no acervo público sem aviso |
+| E02 | `vocabulario-desconhecido` | Valor fora do vocabulário fechado de `capabilities/v1` (`capabilities.read`/`write`, `memory.scope`, `memory.retention`, `context.sources[].kind`) | Cada pacote inventaria seu próprio dialeto; nada seria portável entre runtimes |
+| E03 | `delegacao-orfa` | `capabilities.delegate` aponta para um slug que não é agente do pacote | Delegação para papel fantasma, que falha silenciosamente em runtime |
+| E04 | `portao-inexistente` | `capabilities.approve` referencia um gate que não está em `metadata.human_gates` | Aprovação sem portão real por trás — segurança decorativa |
+| E05 | `hierarquia-rota` / `ciclo-de-delegacao` | `reportsTo` que não resolve para um papel do pacote, ou cadeia de `reportsTo` que forma ciclo | Organograma sem raiz resolvível, ou raiz circular — hierarquia impossível de desenhar |
+| E06 | `fronteira-ausente` | Papel sem `metadata.boundary` (nem `can` nem `cannot`) | Papel sem fronteira declarada é, por omissão, papel que pode tudo |
+| E07 | `orcamento-ausente` | Papel que escreve ou executa comando e não tem `budget`, próprio nem herdado da empresa | Agente sem teto é risco financeiro sem alarme |
+| E08 | `alerta-sem-destinatario` | `budget` sem `alert_to`, ou `alert_to` que não é papel do pacote | Teto que ninguém aplica, porque ninguém é avisado quando ele é cruzado |
+| E09 | `segredo-literal` | Segredo literal (chave `sk-*`, token do GitHub, access key AWS, chave privada) ou caminho absoluto de máquina, em qualquer arquivo do pacote | Acervo público vazaria credencial ou caminho de máquina interna |
+| E10 | `prosa-contradiz-capacidade` | `boundary.cannot` nega uma ação (deploy, merge, push, escrever código) que `execute.allow` permite | Prosa e capacidade descrevem a mesma fronteira e discordam; quem lê a prosa confia na fronteira errada |
+| E11 | `segregacao-violada` | O mesmo papel escreve código (`capabilities.write` inclui `code`) e aprova portão humano | Segregação de função violada: quem implementa também assina o próprio trabalho |
+| E12 | `arquivo-malformado` | `COMPANY.md`, ou um item de `agents`/`skills`/`teams`/`tasks`, não carrega (YAML malformado, frontmatter sem `---` de fechamento, etc.) | Antes desta regra, isso abortava a carga do pacote inteiro com stack trace bruta, sem nomear o arquivo culpado |
+| E13 | `portao-malformado` | `metadata.human_gates` que não é lista, ou uma entrada que não é string nem objeto com `id` válido | Antes desta regra, um gate sem `id` virava `undefined` no conjunto de ids, e produzia um E04 que acusa "portão não existe" quando a causa real é a declaração malformada do próprio portão |
+
+### Avisos (`W01`–`W04`) — não reprovam o pacote
+
+| Código | O que sinaliza | Consequência de ignorar |
+|---|---|---|
+| W01 | Alias pt-BR em uso (ex.: `fronteira`, `pode`, `orcamento`) em vez do canônico em inglês | Nenhuma — o alias é aceito na leitura. `--fix` reescreve para o canônico |
+| W02 | Alias pt-BR colide com a chave canônica, que já estava preenchida | O alias foi descartado, o primeiro valor (canônico) foi mantido — aviso evita que a colisão passe em silêncio |
+| W03 | Papel sem `metadata.persona.display_name` | O Studio mostra o slug no lugar do nome legível — cosmético, não funcional |
+| W04 | Papel sem `skills` declaradas | Papel sem skill associada — não impede o pacote de validar, mas é informação incompleta |
+
+### Verificação de completude do catálogo
+
+```bash
+impl=$(grep -ohE "'E[0-9]{2}'" tools/*.mjs | tr -d "'" | sort -u)
+doc=$(grep -ohE "E[0-9]{2}" SCHEMA.md | sort -u)
+diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
+```

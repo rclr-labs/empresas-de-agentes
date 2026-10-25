@@ -13,6 +13,16 @@ const fix = argv.includes('--fix');
 const json = argv.includes('--json');
 const alvos = argv.filter((a) => !a.startsWith('--'));
 
+// --fix é a única operação destrutiva deste CLI, e sem alvo ele significa
+// "todos os pacotes do repositório". Medido: os pacotes publicados têm 47
+// avisos de alias, logo um `npm run validate -- --fix` reescreveria os dois
+// na hora. A guarda vive aqui, na ferramenta, e não num aviso ao operador.
+if (fix && alvos.length === 0) {
+  console.error('--fix exige alvo explícito. Sem alvo, ele reescreveria todos os pacotes do repositório.');
+  console.error('uso: node tools/validate.mjs <pacote> [--fix]');
+  process.exit(2);
+}
+
 const dirs = alvos.length
   ? alvos.map((a) => resolve(a))
   : listPackages(RAIZ).map((n) => join(RAIZ, n));
@@ -46,7 +56,10 @@ for (const dir of dirs) {
   relatorio.errors += todosErros.length;
   relatorio.warnings += warnings.length;
 
-  if (fix && warnings.some((w) => w.code === 'W01' || w.code === 'W02')) {
+  const temAlias = warnings.some((w) => w.code === 'W01' || w.code === 'W02');
+  if (fix && temAlias && todosErros.length > 0) {
+    console.error(`${pkg.slug}: --fix NÃO aplicado — o pacote tem ${todosErros.length} erro. Reescrever arquivo que o validador acabou de reprovar esconde o defeito atrás de uma mudança de formatação. Corrija os erros e rode de novo.`);
+  } else if (fix && temAlias) {
     // O pkg já vem normalizado por loadPackage; reescrever o arquivo
     // a partir dele é o próprio fix.
     for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
