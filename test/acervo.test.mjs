@@ -118,3 +118,49 @@ test('todo papel que abre pull request consegue dar push', () => {
     }
   }
 });
+
+test('fabrica-de-testes: zero erro', () => {
+  const { errors } = relatorio('fabrica-de-testes');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+});
+
+test('fabrica-de-testes: zero aviso', () => {
+  const { warnings } = relatorio('fabrica-de-testes');
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('fabrica-de-testes: só polaris é raiz; os cinco especialistas reportam a ela', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const raizes = pkg.agents.filter((a) => a.frontmatter.reportsTo == null);
+  assert.deepEqual(raizes.map((a) => a.slug), ['polaris']);
+  for (const a of pkg.agents.filter((x) => x.slug !== 'polaris')) {
+    assert.equal(a.frontmatter.reportsTo, 'polaris', `${a.slug} reporta a polaris`);
+  }
+});
+
+test('fabrica-de-testes: nenhum especialista pode emitir veredito', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  for (const a of pkg.agents.filter((x) => x.slug !== 'polaris')) {
+    assert.deepEqual(a.frontmatter.metadata.capabilities.approve, [],
+      `${a.slug} não assina portão — veredito é de polaris`);
+    assert.deepEqual(a.frontmatter.metadata.capabilities.delegate, [],
+      `${a.slug} não delega — especialista é folha`);
+  }
+});
+
+test('fabrica-de-testes: só polaris delega, e para os cinco especialistas', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const polaris = pkg.agents.find((a) => a.slug === 'polaris');
+  assert.deepEqual(polaris.frontmatter.metadata.capabilities.delegate.sort(), [
+    'acessibilidade', 'contrato-api', 'exploratorio', 'integridade-de-dados', 'privacidade',
+  ]);
+});
+
+test('fabrica-de-testes: nenhum especialista lê database sem portão humano declarado', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const integridade = pkg.agents.find((a) => a.slug === 'integridade-de-dados');
+  assert.ok(integridade.frontmatter.metadata.capabilities.read.includes('database'),
+    'integridade-de-dados precisa ler base para comparar origem e destino');
+  assert.ok(integridade.frontmatter.metadata.boundary.cannot.some((t) => /produ[çc][ãa]o/i.test(t)),
+    'e a prosa precisa negar produção explicitamente');
+});

@@ -20,16 +20,25 @@ requirements:
   secrets:
     - ANTHROPIC_API_KEY
 metadata:
-  principio: A ferramenta executa, o modelo decide
-  orcamento:
-    moeda: BRL
-    teto_por_run: 25.00
-    alerta_em: 0.7
-    destinatario_do_alerta: polaris
-  portoes_humanos:
-    - teste contra ambiente de produção
-    - qualquer carga acima do teto acordado com o cliente
-    - divulgação de achado de segurança para fora da equipe
+  capability_vocabulary: capabilities/v1
+  budget:
+    currency: BRL
+    monthly_cap: 1500.00
+    alert_at: 0.7
+    alert_to: polaris
+  human_gates:
+    - id: tocar-producao
+      description: executar qualquer checagem contra ambiente de produção
+      signer: pessoa nomeada no kickoff
+    - id: carga-acima-do-acordado
+      description: teste de carga acima do volume acordado
+      signer: pessoa nomeada no kickoff
+    - id: divulgar-achado-de-seguranca
+      description: divulgar achado de segurança fora da equipe
+      signer: pessoa nomeada no kickoff
+    - id: gasto-acima-do-teto
+      description: gasto acima do teto da execução
+      signer: pessoa nomeada no kickoff
 ---
 
 # Fábrica de Testes
