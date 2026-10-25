@@ -1,0 +1,29 @@
+runtime: paperclip
+source: >-
+  IDENTIDADE. O acervo já é escrito em agentcompanies/v1, o formato que o
+  Paperclip implementa e que a própria especificação declara "intended to be
+  usable by any agent-company runtime, not only Paperclip". A emissão copia
+  o pacote e o valida; não há tradução a fazer.
+emits: <pacote>/
+format: identity
+map:
+  read.repository: []
+  read.documentation: []
+  read.audit_trail: []
+  read.test_evidence: []
+  read.database: []
+  read.web: []
+  write.code: []
+  write.documentation: []
+  write.test_evidence: []
+  write.report: []
+  write.pull_request: []
+  execute.allow: []
+  execute.deny: []
+  network: []
+  network.allowlist: []
+  delegate: []
+  budget: []
+  approve: []
+unsupported: []
+unsupported_metadata: []

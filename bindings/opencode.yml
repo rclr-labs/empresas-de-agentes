@@ -1,0 +1,39 @@
+runtime: opencode
+source: >-
+  OBSERVADO, PENDENTE DE CONFIRMAÇÃO. Formato lido de rclr-labs/dev-factory
+  (agents/*.md com mode: subagent, temperature, color e um bloco permission
+  com edit, bash por glob e task por slug). Não foi confirmado contra a
+  documentação do runtime; até que seja, este binding não é declarado
+  verificado.
+emits: agents/<slug>.md
+format: opencode
+permissions:
+  defaults:
+    edit: deny
+    bash: {}
+    task: {}
+    webfetch: deny
+map:
+  read.repository: []
+  read.documentation: []
+  read.audit_trail: []
+  read.test_evidence: []
+  read.web: []
+  write.documentation: []
+  write.test_evidence: []
+  write.report: []
+  write.pull_request: []
+  write.code: []
+  execute.allow: []
+  execute.deny: []
+  network: []
+  delegate: []
+unsupported:
+  - budget
+  - approve
+  - read.database
+  # permission.webfetch é allow/deny, sem lista de domínio.
+  - network.allowlist
+unsupported_metadata:
+  - memory
+  - context

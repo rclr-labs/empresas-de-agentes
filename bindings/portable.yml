@@ -1,0 +1,29 @@
+runtime: portable
+source: >-
+  DESENHO PRÓPRIO. Alvo sem perda, para runtime cujo loader ainda não foi
+  lido de fonte primária — o janus entre eles. Emite o manifesto completo em
+  JSON, com toda capacidade, orçamento, portão e contexto preservados, para
+  que o adaptador do runtime leia o que precisar sem reinterpretar markdown.
+emits: agent-manifest.json
+format: portable
+map:
+  read.repository: [read.repository]
+  read.documentation: [read.documentation]
+  read.audit_trail: [read.audit_trail]
+  read.test_evidence: [read.test_evidence]
+  read.database: [read.database]
+  read.web: [read.web]
+  write.code: [write.code]
+  write.documentation: [write.documentation]
+  write.test_evidence: [write.test_evidence]
+  write.report: [write.report]
+  write.pull_request: [write.pull_request]
+  execute.allow: [execute.allow]
+  execute.deny: [execute.deny]
+  network: [network]
+  network.allowlist: [network.allowlist]
+  delegate: [delegate]
+  budget: [budget]
+  approve: [approve]
+unsupported: []
+unsupported_metadata: []

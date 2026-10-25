@@ -1,0 +1,45 @@
+runtime: claude-code
+source: >-
+  VERIFICADO em 2026-10-24 por leitura direta do formato em uso: o plugin
+  dev-squad (agents/*.md com name, description e tools como string separada
+  por vírgula, incluindo Agent(slug) para delegação) e ~/.claude/agents
+  (model, color, memory).
+emits: .claude/agents/<slug>.md
+format: claude-code
+map:
+  read.repository: [Read, Grep, Glob]
+  read.documentation: [Read, Grep, Glob]
+  read.audit_trail: [Read, Grep, Glob]
+  read.test_evidence: [Read, Grep, Glob]
+  read.web: [WebFetch, WebSearch]
+  write.code: [Write, Edit]
+  write.documentation: [Write, Edit]
+  write.test_evidence: [Write, Edit]
+  write.report: [Write, Edit]
+  write.pull_request: [Bash]
+  execute.allow: [Bash]
+  network: [WebFetch, WebSearch]
+  delegate: "Agent({slug})"
+unsupported:
+  # Claude Code não tem teto de gasto por agente. O teto continua escrito
+  # no pacote e tem de ser aplicado fora do runtime.
+  - budget
+  # tools é lista aditiva: concede, não nega. Não há deny-list de bash,
+  # então execute.deny se perde e o operador precisa saber.
+  - execute.deny
+  # Sem leitor de banco nativo; o acesso passaria por Bash, o que
+  # alargaria a fronteira além do declarado.
+  - read.database
+  # approve é portão humano, não ferramenta. O runtime não o conhece.
+  - approve
+  # WebFetch/WebSearch não aceitam allowlist de domínio. O papel sai para
+  # a internet inteira, não só para os alvos autorizados. Em papel de
+  # pentest ou e2e isso é material: a lista continua escrita no pacote e
+  # tem de ser aplicada por rede ou proxy, fora do runtime.
+  - network.allowlist
+unsupported_metadata:
+  # memory: Claude Code tem `memory:`, mas o único valor confirmado de
+  # fonte primária é `user`, sem mapa para session/project/org. Declarar
+  # perda é mais honesto que inventar a tradução.
+  - memory
+  - context
