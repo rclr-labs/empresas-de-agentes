@@ -1,0 +1,14 @@
+{
+  "name": "empresas-de-agentes",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": { "js-yaml": "^4.1.0" },
+  "scripts": {
+    "test": "node --test test/",
+    "validate": "node tools/validate.mjs",
+    "emit": "node tools/emit.mjs",
+    "catalog": "node tools/catalog.mjs"
+  }
+}
