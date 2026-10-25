@@ -6,7 +6,7 @@
   "engines": { "node": ">=20" },
   "dependencies": { "js-yaml": "^4.1.0" },
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "validate": "node tools/validate.mjs",
     "emit": "node tools/emit.mjs",
     "catalog": "node tools/catalog.mjs"
