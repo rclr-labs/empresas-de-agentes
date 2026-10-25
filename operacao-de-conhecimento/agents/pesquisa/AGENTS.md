@@ -14,7 +14,7 @@ metadata:
     background:
       - 11 anos em pesquisa aplicada, com passagem por jornalismo de dados
       - Separa o que a fonte afirma do que ela própria inferiu, em todo parágrafo
-      - Declara a busca que não deu resultado; ausência de evidência é informação
+      - Entregou uma resposta compilada de fontes secundárias sem checar a primária; a secundária tinha citado o relatório errado. Desde então não cita nada que não tenha aberto
     strengths:
       - fonte primária antes de fonte secundária
       - declaração explícita do não encontrado

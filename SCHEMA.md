@@ -275,7 +275,7 @@ Este catálogo é gerado a partir do código (`tools/rules.mjs` e
 qualquer erro, `0` se só houver avisos. Essa é a única garantia que o
 CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 
-### Erros (`E01`–`E13`) — reprovam o pacote
+### Erros (`E01`–`E14`) — reprovam o pacote
 
 | Código | Regra (`rule`) | O que rejeita | Consequência sem a regra |
 |---|---|---|---|
@@ -292,6 +292,7 @@ CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 | E11 | `segregacao-violada` | O mesmo papel escreve código (`capabilities.write` inclui `code`) e aprova portão humano | Segregação de função violada: quem implementa também assina o próprio trabalho |
 | E12 | `arquivo-malformado` | `COMPANY.md`, ou um item de `agents`/`skills`/`teams`/`tasks`, não carrega (YAML malformado, frontmatter sem `---` de fechamento, etc.) | Antes desta regra, isso abortava a carga do pacote inteiro com stack trace bruta, sem nomear o arquivo culpado |
 | E13 | `portao-malformado` | `metadata.human_gates` que não é lista, ou uma entrada que não é string nem objeto com `id` válido | Antes desta regra, um gate sem `id` virava `undefined` no conjunto de ids, e produzia um E04 que acusa "portão não existe" quando a causa real é a declaração malformada do próprio portão |
+| E14 | `approve-discorda-do-signer` | `capabilities.approve` lista um gate cujo `human_gates[].signer` não é o próprio papel | `approve` significa "este papel pode assinar"; se o `signer` real é outra pessoa ou outro papel, a declaração é falsa — segurança decorativa do mesmo tipo que E04, só que com o portão existindo de fato |
 
 ### Avisos (`W01`–`W04`) — não reprovam o pacote
 

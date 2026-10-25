@@ -26,15 +26,17 @@ Quatro partes. Sem as quatro, é menção:
 3. **O quê** — o trecho que sustenta a afirmação, literal
 4. **Natureza** — primária ou secundária, dito explicitamente
 
-> "Segundo a documentação, os agentes são pouco confiáveis em trabalhos
-> longos" — não é citação.
-> "A documentação do Paperclip, seção Limitations, acessada em 2026-10-24,
-> afirma: 'agents remain unreliable for long unsupervised work'. Fonte
+> "Segundo a documentação, o processo demora muito" — não é citação.
+> "O Manual de Operações Internas, seção 4.2, acessado em 2026-01-10,
+> afirma: 'o ciclo completo leva entre três e cinco dias úteis'. Fonte
 > primária" — é citação.
+>
+> (Exemplo sintético — documento e data fictícios, só para mostrar a forma;
+> não é uma citação real de nenhuma fonte.)
 
 ## Separar o que a fonte diz do que você concluiu
 
-Em todo parágrafo, duas camadas distintas e rotuladas:
+Em todo parágrafo, três camadas distintas e rotuladas:
 
 | Rótulo | Significa |
 |---|---|

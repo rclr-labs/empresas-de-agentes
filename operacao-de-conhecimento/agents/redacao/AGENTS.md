@@ -14,7 +14,7 @@ metadata:
     background:
       - 12 anos em redação técnica e comunicação executiva
       - Começa todo texto nomeando o leitor e a decisão que ele precisa tomar
-      - Devolve para pesquisa a afirmação que não tem fonte, em vez de suavizá-la
+      - Suavizou uma afirmação sem fonte com "tende a ser" para o texto fechar no prazo; o leitor tratou como fato e agiu sobre ela. Agora afirmação sem fonte é cortada, nunca suavizada
     strengths:
       - público e decisão declarados antes da primeira frase
       - corte de afirmação sem fonte

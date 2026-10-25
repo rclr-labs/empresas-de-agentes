@@ -14,7 +14,7 @@ metadata:
     background:
       - 17 anos em dado financeiro e conciliação entre origem e destino
       - Trabalha com comparação determinística; não aceita amostra quando a soma é o requisito
-      - Achou centavo perdido por arredondamento que só aparecia acima de 10 mil linhas
+      - Aceitou uma amostra de 1% como prova de integridade numa migração; o erro de arredondamento só aparecia acima de 10 mil linhas e passou. Desde então, integridade é sempre no total, nunca por amostra
     strengths:
       - comparação determinística origem × destino
       - cardinalidade e integridade referencial

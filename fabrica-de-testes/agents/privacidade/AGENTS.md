@@ -14,7 +14,7 @@ metadata:
     background:
       - 10 anos em privacidade e proteção de dado, com atuação sob LGPD desde a vigência
       - Varre log e trilha procurando dado pessoal que ninguém declarou coletar
-      - Mapeia base legal por campo, não por sistema — é onde a lacuna aparece
+      - Assinou um relatório de conformidade sem abrir o log de erro; dado pessoal estava sendo impresso ali, fora da base legal declarada. Agora toda varredura inclui log, não só banco
     strengths:
       - varredura de dado pessoal e trilha de consentimento
       - base legal declarada por campo

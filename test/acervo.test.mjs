@@ -85,7 +85,14 @@ test('software-house: a persona não vaza para o corpo do agente', () => {
   }
 });
 
-test('nenhum papel assina o portão sobre os próprios limites', () => {
+test('nenhum papel assina o portão de teto sobre os próprios limites', () => {
+  // Teste estreito, de propósito — e isso é aceitável aqui porque o
+  // portão de teto tem razão própria para nunca ter um papel como signer,
+  // mesmo quando esse papel seria tecnicamente elegível: alertar a si
+  // mesmo é notificação, autorizar o próprio estouro é conflito. A
+  // cobertura universal — nenhum approve pode discordar do signer
+  // declarado, de qualquer portão — é o teste seguinte, que espelha a
+  // regra E14 do validador em vez de uma lista de padrões de nome.
   for (const nome of listPackages(RAIZ)) {
     const pkg = loadPackage(join(RAIZ, nome));
     const slugs = new Set(pkg.agents.map((a) => a.slug));
@@ -105,6 +112,19 @@ test('nenhum papel assina o portão sobre os próprios limites', () => {
   }
 });
 
+test('nenhum pacote do acervo produz E14 — approve sempre concorda com o signer declarado', () => {
+  // Cobertura universal, escrita a partir do princípio (approve == "eu
+  // assino"), não do padrão de nome do portão encontrado na última
+  // rodada. É esta a diferença entre a guarda acima — que só pega o
+  // portão de teto — e esta, que pega qualquer portão, de qualquer
+  // pacote, cujo approve discorde do signer.
+  for (const nome of listPackages(RAIZ)) {
+    const { errors } = relatorio(nome);
+    const e14 = errors.filter((e) => e.code === 'E14');
+    assert.deepEqual(e14, [], e14.map((e) => `${e.where}: ${e.message}`).join('\n'));
+  }
+});
+
 test('todo papel que abre pull request consegue dar push', () => {
   for (const nome of listPackages(RAIZ)) {
     for (const a of loadPackage(join(RAIZ, nome)).agents) {
@@ -115,6 +135,31 @@ test('todo papel que abre pull request consegue dar push', () => {
         `${nome}/${a.slug} declara write: [pull_request] mas não tem git push em execute.allow — capacidade inalcançável`);
       assert.ok((cap.execute?.deny ?? []).some((g) => /force/.test(g)),
         `${nome}/${a.slug} pode dar push e tem de negar push --force explicitamente`);
+    }
+  }
+});
+
+test('nenhum papel declara alcance que não tem', () => {
+  // Mesma classe de defeito do teste de pull_request acima, nas duas
+  // direções: ler "web" sem nenhum mecanismo de rede é alcance
+  // inalcançável; e um comando de rede em execute.allow com
+  // network: false é a contradição inversa — a capacidade promete
+  // silêncio e o comando promete saída.
+  const COMANDOS_DE_REDE = [/^curl\s/i, /^wget\s/i, /^http\s/i];
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const cap = a.frontmatter.metadata?.capabilities ?? {};
+      const temRede = cap.network === true || (Array.isArray(cap.network) && cap.network.length > 0);
+      if ((cap.read ?? []).includes('web')) {
+        assert.ok(temRede,
+          `${nome}/${a.slug} lê "web" mas network é ${JSON.stringify(cap.network)} — não há mecanismo declarado para alcançar a rede`);
+      }
+      const allow = cap.execute?.allow ?? [];
+      const comandoDeRede = allow.find((g) => COMANDOS_DE_REDE.some((re) => re.test(g)));
+      if (comandoDeRede) {
+        assert.ok(temRede,
+          `${nome}/${a.slug} tem "${comandoDeRede}" em execute.allow mas network é ${JSON.stringify(cap.network)} — a capacidade nega a mesma rede que o comando usa`);
+      }
     }
   }
 });

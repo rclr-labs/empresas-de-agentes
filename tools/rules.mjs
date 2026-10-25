@@ -282,6 +282,27 @@ export function validateGovernance(pkg) {
       erros.push(erro('E11', 'segregacao-violada', where,
         'o mesmo papel escreve código e assina portão humano. Segregação de função: quem implementa não aprova, e quem aprova não implementa'));
     }
+
+    // E14 — approve tem de concordar com signer.
+    // `approve` significa "este papel PODE ASSINAR este portão". Se o
+    // signer do portão é outra pessoa ou outro papel, a declaração é
+    // falsa: o papel não assina nada.
+    // Esta regra nasceu de uma guarda em TESTE que era estreita demais —
+    // ela filtrava por /gasto|teto|orcamento/, escrita a partir do caso
+    // encontrado e não do princípio, e por isso deixou passar um gerente
+    // de teste aprovando "tocar produção", "carga acima do acordado" e
+    // "divulgar achado de segurança", todos assinados por pessoa nomeada,
+    // num pacote cujo próprio COMPANY.md diz "nenhum é decisão de agente".
+    // Guarda escrita a partir da instância protege a instância; regra
+    // escrita a partir do princípio protege a classe.
+    for (const gateId of cap.approve ?? []) {
+      const portao = gatesDo(pkg).gates.find((g) => g.id === gateId);
+      if (!portao) continue; // ausência é E04, não duplica aqui
+      if (portao.signer !== agente.slug) {
+        erros.push(erro('E14', 'approve-discorda-do-signer', where,
+          `aprova "${gateId}", mas o signer desse portão é "${portao.signer}". approve significa "pode assinar": se quem assina é outra pessoa ou outro papel, este papel não aprova nada — remova o portão de approve, ou declare este papel como signer`));
+      }
+    }
   }
 
   // E09 — segredo e caminho absoluto, em TODO arquivo do pacote.
