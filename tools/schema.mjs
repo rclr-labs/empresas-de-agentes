@@ -25,9 +25,24 @@ export function parseMarkdown(text) {
   return { frontmatter, body };
 }
 
+// Toda falha de leitura ou parse carrega o caminho relativo do arquivo —
+// é o único frame que conhece esse caminho. Sem isso, quem recebe o erro
+// (loadCollection, ou o catch de borda no CLI) só sabe "algo falhou",
+// nunca o quê.
 function loadFile(dir, relPath, warnings) {
-  const text = readFileSync(join(dir, relPath), 'utf8');
-  const { frontmatter, body } = parseMarkdown(text);
+  let text;
+  try {
+    text = readFileSync(join(dir, relPath), 'utf8');
+  } catch (e) {
+    throw new Error(`${relPath}: não foi possível ler o arquivo (${e.code ?? e.message})`);
+  }
+  let parsed;
+  try {
+    parsed = parseMarkdown(text);
+  } catch (e) {
+    throw new Error(`${relPath}: ${e.message}`);
+  }
+  const { frontmatter, body } = parsed;
   if (frontmatter.metadata) {
     const r = normalizeAliases(frontmatter.metadata);
     frontmatter.metadata = r.meta;
@@ -36,7 +51,13 @@ function loadFile(dir, relPath, warnings) {
   return { path: relPath, frontmatter, body };
 }
 
-function loadCollection(dir, sub, filename, warnings) {
+// Falha em UM item da coleção (ex.: um AGENTS.md com YAML malformado) não
+// pode abortar o pacote inteiro — os outros agentes do mesmo pacote
+// continuam válidos e merecem ser reportados como tal. O item quebrado
+// sai da coleção e entra em `problems`, nomeado pelo caminho e pela causa;
+// a função que chama loadPackage decide o que fazer com isso (reportar
+// como erro E12, por exemplo) — esta camada só coleta.
+function loadCollection(dir, sub, filename, warnings, problems) {
   const base = join(dir, sub);
   if (!existsSync(base)) return [];
   return readdirSync(base)
@@ -44,23 +65,35 @@ function loadCollection(dir, sub, filename, warnings) {
     .filter((name) => existsSync(join(base, name, filename)))
     .sort()
     .map((name) => {
-      const file = loadFile(dir, join(sub, name, filename), warnings);
-      return { ...file, slug: file.frontmatter.slug ?? name };
-    });
+      const relPath = join(sub, name, filename);
+      try {
+        const file = loadFile(dir, relPath, warnings);
+        return { ...file, slug: file.frontmatter.slug ?? name };
+      } catch (e) {
+        problems.push({ code: 'E12', rule: 'arquivo-malformado', where: relPath, message: e.message });
+        return null;
+      }
+    })
+    .filter((item) => item !== null);
 }
 
 export function loadPackage(dir) {
   const warnings = [];
+  const problems = [];
+  // COMPANY.md é a âncora do pacote (slug, license, human_gates); se ele
+  // não carrega, não há pacote coerente para validar — a falha sobe para
+  // quem chamou loadPackage, já com o nome do arquivo embutido por loadFile.
   const company = loadFile(dir, 'COMPANY.md', warnings);
   return {
     slug: company.frontmatter.slug ?? basename(dir),
     dir,
     company,
-    agents: loadCollection(dir, 'agents', 'AGENTS.md', warnings),
-    skills: loadCollection(dir, 'skills', 'SKILL.md', warnings),
-    teams: loadCollection(dir, 'teams', 'TEAM.md', warnings),
-    tasks: loadCollection(dir, 'tasks', 'TASK.md', warnings),
+    agents: loadCollection(dir, 'agents', 'AGENTS.md', warnings, problems),
+    skills: loadCollection(dir, 'skills', 'SKILL.md', warnings, problems),
+    teams: loadCollection(dir, 'teams', 'TEAM.md', warnings, problems),
+    tasks: loadCollection(dir, 'tasks', 'TASK.md', warnings, problems),
     warnings,
+    problems,
   };
 }
 

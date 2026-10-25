@@ -97,6 +97,29 @@ test('E04: approve para gate existente passa', () => {
   })).includes('E04'));
 });
 
+// Gate malformado (sem "id") não pode poluir o Set de ids com `undefined`
+// e produzir, a jusante, um E04 que mente sobre a causa — "portão não
+// existe" quando o problema real é a declaração do portão. A regra deve
+// nomear o defeito como E13 e NÃO emitir E04 para este caso, já que o
+// "approve" não referencia o gate malformado (que não tem id nenhum).
+test('E13: gate sem "id" é malformado, nomeado, e não poluiu o Set com undefined', () => {
+  const erros = validateStructure(pacote({
+    gates: [{ description: 'portão sem id' }],
+    agents: [{ slug: 'a', capabilities: { approve: ['deploy'] } }],
+  }));
+  assert.ok(erros.some((e) => e.code === 'E13'), 'gate malformado é nomeado');
+  const e04 = erros.filter((e) => e.code === 'E04');
+  assert.equal(e04.length, 1, 'approve a "deploy" ainda falha, mas por gate inexistente, não por poluição');
+  assert.doesNotMatch(e04[0].message, /undefined/, 'a mensagem de E04 não cita "undefined" como portão existente');
+});
+
+test('E13: human_gates que não é lista falha nomeando o tipo recebido', () => {
+  const pkg = pacote({ agents: [{ slug: 'a' }] });
+  pkg.company.frontmatter.metadata.human_gates = 'não é uma lista';
+  const erros = validateStructure(pkg);
+  assert.ok(erros.some((e) => e.code === 'E13' && /string/.test(e.message)));
+});
+
 test('E05: reportsTo para slug inexistente falha', () => {
   assert.ok(codigos(pacote({
     agents: [{ slug: 'a', reportsTo: 'ninguem' }],

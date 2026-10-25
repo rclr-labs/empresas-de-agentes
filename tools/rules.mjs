@@ -70,12 +70,36 @@ function slugificarPortao(texto) {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// Retorna { gates, erros }, não só a lista: um gate sem "id" resolvível
+// não pode simplesmente entrar no Set de ids como `undefined` — medido:
+// isso produzia, a jusante, um E04 que acusa "portão não existe" quando o
+// problema real é a declaração malformada do próprio portão. Aqui o
+// defeito é nomeado (E13) e o gate malformado é descartado do Set, em vez
+// de poluí-lo.
 function gatesDo(pkg) {
-  const raw = pkg.company.frontmatter?.metadata?.human_gates ?? [];
-  // Alias de formato: lista de string crua vira {id} com slug derivado.
-  return raw.map((g) =>
-    typeof g === 'string' ? { id: slugificarPortao(g), description: g } : g,
-  );
+  const raw = pkg.company.frontmatter?.metadata?.human_gates;
+  const erros = [];
+  if (raw == null) return { gates: [], erros };
+  if (!Array.isArray(raw)) {
+    erros.push(erro('E13', 'portao-malformado', 'COMPANY.md',
+      `metadata.human_gates deveria ser uma lista; veio ${typeof raw}`));
+    return { gates: [], erros };
+  }
+  const gates = [];
+  raw.forEach((g, i) => {
+    // Alias de formato: lista de string crua vira {id} com slug derivado.
+    if (typeof g === 'string') {
+      gates.push({ id: slugificarPortao(g), description: g });
+      return;
+    }
+    if (isPlainObject(g) && typeof g.id === 'string' && g.id.length > 0) {
+      gates.push(g);
+      return;
+    }
+    erros.push(erro('E13', 'portao-malformado', 'COMPANY.md',
+      `metadata.human_gates[${i}] não é string nem objeto com "id" válido: ${JSON.stringify(g)}`));
+  });
+  return { gates, erros };
 }
 
 function enumDe(verbo) {
@@ -85,9 +109,10 @@ function enumDe(verbo) {
 }
 
 export function validateStructure(pkg) {
-  const erros = [];
   const slugs = new Set(pkg.agents.map((a) => a.slug));
-  const gateIds = new Set(gatesDo(pkg).map((g) => g.id));
+  const { gates, erros: gateErros } = gatesDo(pkg);
+  const erros = [...gateErros];
+  const gateIds = new Set(gates.map((g) => g.id));
 
   // E01 — license
   if (!pkg.company.frontmatter?.license) {
