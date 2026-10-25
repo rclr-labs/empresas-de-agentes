@@ -146,7 +146,7 @@ metadata:
       currency: BRL
       monthly_cap: 400.00
       alert_at: 0.7
-      alert_to: coordenacao
+      alert_to: gerente
     approve: [deploy-producao]
   memory: { scope: project, retention: project, writes: [] }
   context:
@@ -177,6 +177,23 @@ que convive com o teto da empresa em `COMPANY.md` (seção 5). São dois
 números porque respondem a perguntas diferentes: quanto a empresa gasta no
 total, e quanto este papel especificamente pode gastar antes de parar.
 
+Os dois exemplos, lidos como um pacote só (o papel `gerente` desta seção
+dentro do pacote `pacote-minimo` da seção 5), têm de respeitar duas
+invariantes:
+
+- **`alert_to` tem de nomear um papel que existe no mesmo pacote.** Teto
+  cujo alerta vai para ninguém é teto que ninguém aplica — e esta não é só
+  uma regra de estilo: é a regra de validação E08, que **reprova** o
+  pacote, não avisa. É por isso que `alert_to` aqui é `gerente`, o único
+  papel deste pacote, e não um papel de outro exemplo.
+- **O teto da empresa tem de ficar acima dos tetos de papel que ele
+  contém.** Teto de empresa abaixo do teto de um papel significa que o
+  papel nunca alcança o próprio limite — o limite do papel fica decorativo.
+  Esta segunda invariante é uma exigência de coerência do pacote; não
+  encontrei uma regra do validador (E01–E11) que a verifique diretamente,
+  então não afirmo que ela é aplicada — só que um pacote que a viola não
+  faz sentido lido como um todo.
+
 `context.sources[].kind` usa o vocabulário fechado de `context_kind`:
 `repo_file` lê um arquivo do repositório pelo caminho (`path`); `package_doc`
 lê outro arquivo do próprio pacote por referência relativa (`ref`);
@@ -202,7 +219,7 @@ metadata:
   capability_vocabulary: capabilities/v1
   budget:
     currency: BRL
-    monthly_cap: 100.00
+    monthly_cap: 2000.00
     alert_at: 0.7
     alert_to: gerente
   human_gates:
