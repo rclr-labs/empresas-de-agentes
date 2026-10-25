@@ -125,6 +125,46 @@ test('paperclip: identidade — o pacote sai íntegro', () => {
   rmSync(out, { recursive: true, force: true });
 });
 
+test('IDENTIDADE: a árvore inteira sai byte a byte, diretório nenhum esquecido', () => {
+  // O teste de UM arquivo acima prova que o escritor não reformata. Este
+  // prova a afirmação real da identidade — "zero perda" — comparando a
+  // LISTA de arquivos, não só o conteúdo de um já escolhido. Foi assim
+  // que projects/ ficou invisível: o teste de um arquivo passava mesmo
+  // com o diretório inteiro ausente da saída.
+  const { out } = emitir(['--package', 'software-house', '--binding', 'paperclip']);
+  const arvore = (raiz) => {
+    const acc = [];
+    const andar = (rel) => {
+      for (const e of readdirSync(join(raiz, rel), { withFileTypes: true })) {
+        if (e.name.startsWith('.')) continue;
+        const r = rel ? join(rel, e.name) : e.name;
+        if (e.isDirectory()) andar(r); else acc.push(r);
+      }
+    };
+    andar('');
+    return acc.sort();
+  };
+  const origem = join(RAIZ, 'software-house');
+  assert.deepEqual(arvore(out), arvore(origem), 'mesma lista de arquivos');
+  for (const rel of arvore(origem)) {
+    assert.equal(readFileSync(join(out, rel), 'utf8'), readFileSync(join(origem, rel), 'utf8'),
+      `${rel} não saiu byte a byte`);
+  }
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('portable: projects/ viaja no manifesto — não é só agents', () => {
+  const { out } = emitir(['--package', 'software-house', '--binding', 'portable']);
+  const manifesto = JSON.parse(readFileSync(join(out, 'agent-manifest.json'), 'utf8'));
+  assert.ok(Array.isArray(manifesto.projects) && manifesto.projects.length > 0,
+    'projects precisa estar no manifesto portable, ou o alvo "zero perda" perde projeto em silêncio');
+  const proj = manifesto.projects.find((p) => p.slug === 'entrada-de-demanda');
+  assert.ok(proj, 'projeto entrada-de-demanda presente');
+  assert.ok(proj.tasks.some((t) => t.slug === 'triagem-de-demanda'),
+    'tarefa aninhada do projeto viaja junto');
+  rmSync(out, { recursive: true, force: true });
+});
+
 test('recusa emitir pacote inválido', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ruim-'));
   // COMPANY.md sem license → E01. writeFileSync vem do import do topo:

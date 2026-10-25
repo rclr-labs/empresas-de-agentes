@@ -58,6 +58,25 @@ function erro(code, rule, where, message) {
   return { code, rule, where, message };
 }
 
+/**
+ * Todo arquivo carregado do pacote, numa lista só. Existe para que uma
+ * regra que precisa varrer "o pacote inteiro" (hoje, E09) não tenha de
+ * enumerar as coleções à mão — foi exatamente assim que o E09 ficou cego
+ * para projects/ depois de já ter sido corrigido uma vez por ficar cego
+ * para COMPANY.md. Vive aqui, não em schema.mjs: é puro (só reformata um
+ * objeto que já existe em memória, nenhum acesso a disco), e rules.mjs não
+ * pode importar de schema.mjs sem herdar `node:fs` — o contrato de pureza
+ * deste módulo não permite essa dependência na direção contrária.
+ */
+export function allFiles(pkg) {
+  return [
+    pkg.company,
+    ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks,
+    ...(pkg.projects ?? []),
+    ...(pkg.projects ?? []).flatMap((p) => p.tasks ?? []),
+  ];
+}
+
 // Deriva id de portão a partir da prosa. A dobra de diacrítico (NFD +
 // remoção das marcas combinantes) NÃO é cosmética: sem ela,
 // "deploy em produção" vira "deploy-em-produ-o", e o autor que escrever o
@@ -311,7 +330,7 @@ export function validateGovernance(pkg) {
   // requirements.secrets vive e onde caminho de organização aparece.
   // Foi medido: um sk-ant-* no corpo do COMPANY.md e um caminho absoluto
   // num SKILL.md produziam ZERO erros.
-  for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
+  for (const arquivo of allFiles(pkg)) {
     const texto = `${JSON.stringify(arquivo.frontmatter ?? {})}\n${arquivo.body ?? ''}`;
     for (const { re, nome } of SEGREDOS) {
       if (re.test(texto)) {

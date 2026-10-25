@@ -84,6 +84,13 @@ export function loadPackage(dir) {
   // não carrega, não há pacote coerente para validar — a falha sobe para
   // quem chamou loadPackage, já com o nome do arquivo embutido por loadFile.
   const company = loadFile(dir, 'COMPANY.md', warnings);
+  const projects = loadCollection(dir, 'projects', 'PROJECT.md', warnings, problems);
+  // `projects/<slug>/tasks/<slug>/TASK.md` é ANINHADO, duas pastas abaixo —
+  // loadCollection só varre `<sub>/<nome>/<arquivo>`, logo essas tarefas
+  // precisam de uma segunda passada.
+  for (const proj of projects) {
+    proj.tasks = loadCollection(dir, join('projects', proj.slug, 'tasks'), 'TASK.md', warnings, problems);
+  }
   return {
     slug: company.frontmatter.slug ?? basename(dir),
     dir,
@@ -92,6 +99,7 @@ export function loadPackage(dir) {
     skills: loadCollection(dir, 'skills', 'SKILL.md', warnings, problems),
     teams: loadCollection(dir, 'teams', 'TEAM.md', warnings, problems),
     tasks: loadCollection(dir, 'tasks', 'TASK.md', warnings, problems),
+    projects,
     warnings,
     problems,
   };

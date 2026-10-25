@@ -71,6 +71,25 @@ export function portableManifest(pkg) {
         context: a.frontmatter.metadata?.context ?? null,
         prompt: a.body.trim(),
       })),
+      // portable é o alvo "zero perda" por desenho — um manifesto que se
+      // declara completo e larga projects/ no chão repete, uma camada
+      // acima, o mesmo defeito que fez a identidade perder a pasta
+      // inteira em silêncio. Cada projeto viaja com as próprias tarefas
+      // aninhadas, que não são `pkg.tasks` (aquelas são tarefas soltas do
+      // pacote; estas pertencem a um projeto específico).
+      projects: (pkg.projects ?? []).map((p) => ({
+        slug: p.slug,
+        name: p.frontmatter.name,
+        description: p.frontmatter.description ?? null,
+        owner: p.frontmatter.owner ?? null,
+        tags: p.frontmatter.tags ?? [],
+        body: p.body.trim(),
+        tasks: (p.tasks ?? []).map((t) => ({
+          slug: t.slug,
+          name: t.frontmatter.name,
+          body: t.body.trim(),
+        })),
+      })),
     }, null, 2)}\n`,
   };
 }

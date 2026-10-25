@@ -149,6 +149,20 @@ test('E09: caminho absoluto num SKILL.md falha', () => {
   assert.equal(e.where, 'skills/s/SKILL.md');
 });
 
+test('E09 varre projects/ e as tarefas aninhadas nele', () => {
+  // Especime genérico de caminho absoluto, mesmo padrão dos dois testes
+  // acima — não é sobre QUAL padrão dispara, é sobre o ESCOPO: projects/
+  // é uma coleção aninhada (PROJECT.md com tasks/ dentro), e ficou de fora
+  // tanto do loader quanto do E09 até ser medido contra o acervo real.
+  const pkg = pacote({ agents: [{ slug: 'a' }] });
+  pkg.projects = [{ path: 'projects/p/PROJECT.md', slug: 'p', frontmatter: { name: 'p' },
+    body: 'leia /Users/outro/.ssh/id_rsa',
+    tasks: [{ path: 'projects/p/tasks/t/TASK.md', slug: 't', frontmatter: { name: 't' }, body: '' }] }];
+  const e = validateGovernance(pkg).find((x) => x.code === 'E09');
+  assert.ok(e, 'E09 tem de varrer projects/');
+  assert.equal(e.where, 'projects/p/PROJECT.md');
+});
+
 test('E10: cannot nega deploy mas execute.allow permite kubectl apply', () => {
   const erros = validateGovernance(pacote({
     agents: [{ slug: 'a',

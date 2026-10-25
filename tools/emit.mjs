@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, copyFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
@@ -60,14 +60,24 @@ if (binding.format === 'portable') {
   const { path, content } = portableManifest(pkg, binding, aplicados);
   writeFileSync(join(out, path), content, 'utf8');
 } else if (binding.format === 'identity') {
-  // Identidade de verdade: cópia byte a byte. O acervo já é
-  // agentcompanies/v1; reescrever via toMarkdown mudaria formatação sem
-  // mudar conteúdo, e aí não seria identidade.
-  for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
-    const destino = join(out, arquivo.path);
-    mkdirSync(dirname(destino), { recursive: true });
-    writeFileSync(destino, readFileSync(join(pkg.dir, arquivo.path), 'utf8'), 'utf8');
-  }
+  // Identidade de verdade: cópia byte a byte da ÁRVORE INTEIRA, não das
+  // coleções que o loader conhece. Copiar por enumeração (company +
+  // agents + skills + teams + tasks) foi exatamente o que deixou
+  // projects/ invisível à emissão "zero perda" — qualquer diretório novo
+  // que loadPackage ainda não saiba nomear repetiria o defeito. Andar o
+  // disco em vez de enumerar fecha a CLASSE do problema, não só a
+  // instância medida.
+  const copiarArvore = (relativo) => {
+    for (const entrada of readdirSync(join(pkg.dir, relativo), { withFileTypes: true })) {
+      if (entrada.name.startsWith('.')) continue;
+      const rel = relativo ? join(relativo, entrada.name) : entrada.name;
+      if (entrada.isDirectory()) { copiarArvore(rel); continue; }
+      const destino = join(out, rel);
+      mkdirSync(dirname(destino), { recursive: true });
+      copyFileSync(join(pkg.dir, rel), destino);
+    }
+  };
+  copiarArvore('');
 } else {
   const escritor = writers[binding.format];
   if (!escritor) {
