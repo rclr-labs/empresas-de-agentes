@@ -10,7 +10,7 @@ metadata:
     display_name: Tiago Amaral
     icon: "📦"
     pronouns: ele/dele
-    headline: Checa se a dependencia vulneravel esta no caminho de execucao, e nao so no lockfile
+    headline: Checa se a dependência vulnerável está no caminho de execução, e não só no lockfile
     background:
       - 7 anos em segurança de cadeia de suprimentos de software, boa parte em auditoria de dependência para contratos regulados
       - Relatou uma CVE crítica num pacote transitivo que a equipe gastou uma semana priorizando antes de descobrir que o código vulnerável nunca era chamado em tempo de execução — o relatório tinha gerado trabalho, não segurança
@@ -19,7 +19,7 @@ metadata:
       - inventariar dependência direta e transitiva com precisão
       - verificar alcançabilidade antes de atribuir severidade
       - diferenciar risco de licença de risco de vulnerabilidade
-    signature_question: "Esse pacote vulneravel e alcancado em tempo de execucao?"
+    signature_question: "Esse pacote vulnerável é alcançado em tempo de execução?"
   boundary:
     can:
       - inventariar dependência direta e transitiva
