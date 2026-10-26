@@ -18,6 +18,7 @@ function arg(nome) {
 const alvo = arg('package');
 const runtime = arg('binding');
 const out = arg('out');
+const verbose = process.argv.includes('--verbose');
 
 if (!alvo || !runtime || !out) {
   console.error('uso: node tools/emit.mjs --package <slug|dir> --binding <runtime> --out <dir>');
@@ -94,6 +95,27 @@ if (binding.format === 'portable') {
     mkdirSync(dirname(destino), { recursive: true });
     writeFileSync(destino, content, 'utf8');
   }
+  // network.allowlist, Claude Code: o binding declara `translates` desde
+  // o fix round 1 porque este bloco de fato EMITE o mecanismo —
+  // `.claude/settings.json` com `sandbox.network.allowedDomains`, união
+  // dos domínios de `capabilities.network` de todo agente do pacote.
+  // Escopo de PROJETO, não por agente — ver o caveat em
+  // bindings/claude-code.yml (allowlist_scope). Escrito só quando há ao
+  // menos um domínio a declarar; pacote sem nenhum papel com allowlist
+  // de rede não ganha um settings.json vazio.
+  if (binding.format === 'claude-code') {
+    const dominios = new Set();
+    for (const agente of pkg.agents) {
+      const cap = agente.frontmatter?.metadata?.capabilities ?? {};
+      if (Array.isArray(cap.network)) for (const d of cap.network) dominios.add(d);
+    }
+    if (dominios.size) {
+      const settings = { sandbox: { network: { allowedDomains: [...dominios].sort() } } };
+      const destino = join(out, '.claude', 'settings.json');
+      mkdirSync(dirname(destino), { recursive: true });
+      writeFileSync(destino, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
+    }
+  }
 }
 
 console.log(`${pkg.slug} → ${runtime}: ${pkg.agents.length} agente(s) em ${out}`);
@@ -104,10 +126,42 @@ console.log(`${pkg.slug} → ${runtime}: ${pkg.agents.length} agente(s) em ${out
 // mesma coisa é exatamente o "no loss" que a tarefa 27 existe para
 // corrigir, porque "paperclip copia byte a byte" e "claude-code aplica a
 // permissão" não são a mesma garantia.
+//
+// Fix round 1 (achado 2 da auditoria): PRESERVADA agrega por MOTIVO, não
+// por papel × capacidade. Quando toda capacidade de um pacote some sob o
+// mesmo motivo (identidade/portable: a spec base não define a maioria),
+// listar papel × capacidade produz 49, 66, 72 linhas carregando uma
+// única informação — o sinal real (as poucas perdas nomeadas de
+// claude-code/opencode) passa a competir com ruído, e um operador que
+// aprende a pular esse bloco aprende a pular a parte que importa. PERDIDA
+// continua item a item, sempre: perda é rara e específica, cada uma
+// nomeia uma lacuna diferente — agregar aqui esconderia exatamente o que
+// a tarefa 27 existe para não esconder.
+function agruparPorMotivo(itens) {
+  const grupos = new Map();
+  for (const it of itens) {
+    if (!grupos.has(it.reason)) grupos.set(it.reason, []);
+    grupos.get(it.reason).push(it);
+  }
+  return grupos;
+}
+
 if (preservadas.length) {
-  console.log(`\nAVISO — ${preservadas.length} capacidade(s) PRESERVADA(S) mas não aplicada(s):`);
-  for (const p of preservadas) {
-    console.log(`  ${p.slug}: ${p.capability} — ${p.reason}`);
+  const grupos = agruparPorMotivo(preservadas);
+  console.log(`\nAVISO — ${preservadas.length} capacidade(s) PRESERVADA(S) mas não aplicada(s), por ${grupos.size} motivo(s):`);
+  for (const [motivo, itens] of grupos) {
+    const slugsUnicos = [...new Set(itens.map((i) => i.slug))];
+    const papeis = slugsUnicos.length === pkg.agents.length
+      ? `todos os ${pkg.agents.length}`
+      : slugsUnicos.join(', ');
+    console.log(`  [${itens.length}] ${motivo}`);
+    console.log(`       papéis: ${papeis}`);
+  }
+  if (verbose) {
+    console.log('\n  Detalhe por papel:');
+    for (const p of preservadas) console.log(`    ${p.slug}: ${p.capability} — ${p.reason}`);
+  } else {
+    console.log('\n  Detalhe por papel: --verbose');
   }
 }
 

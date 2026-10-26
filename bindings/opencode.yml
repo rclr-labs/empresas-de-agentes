@@ -18,6 +18,20 @@ source: >-
   agents.mdx` e `permissions.mdx`, todas do repo `anomalyco/opencode`
   (via `gh api`, não checkout local — não existe opencode local em ~/work
   ou ~/apps).
+
+  FIX ROUND 1 (2026-10-26, auditoria de "translates significa emitido"):
+  `approve` estava em `translates` citando o efeito `ask`, mas
+  `buildPermissions()` (tools/bindings.mjs) nunca escreve uma regra
+  `ask` — mesmo defeito corrigido em claude-code.yml na mesma rodada.
+  Movido para `loses`. Também corrigidas duas regras de
+  `buildPermissions()` que o audit encontrou quebradas para QUALQUER
+  binding que as use: `edit` só disparava para `write.code` (um papel
+  que escreve `documentation`/`test_evidence`/`report` sem escrever
+  código ficava com `edit: deny`, contradizendo o que a tabela abaixo
+  declara como traduzido), e `webfetch` só disparava para `read.web`
+  (um papel com `network: true` sem `read.web` ficaria com `webfetch:
+  deny`). As duas foram corrigidas no código, não na tabela — a tabela
+  já estava certa, o código é que não implementava o que ela dizia.
 emits: agents/<slug>.md
 format: opencode
 # last-match: packages/schema/src/permission.ts + permissions.mdx
@@ -66,18 +80,28 @@ translates:
   network: []
   # network.allowlist: ação `webfetch`, resource = URL requisitada — glob
   # de domínio via `{action:"webfetch", resource:"https://dominio/*",
-  # effect:"allow"}` mais um deny-all. Só cobre a tool call de busca — ver
-  # allowlist_scope acima para a ressalva que importa.
+  # effect:"allow"}` mais um deny-all ANTES dele na lista (last-match:
+  # o allow específico tem de vir depois para vencer). EMITIDO de
+  # verdade (fix round 1): buildPermissions() em tools/bindings.mjs
+  # escreve as duas regras por domínio, dentro do frontmatter de CADA
+  # agente — sem o risco de conflito entre papéis que a Opção A teve no
+  # Claude Code (não há arquivo de projeto compartilhado aqui). Só cobre
+  # a chamada de busca da ferramenta — ver allowlist_scope acima para a
+  # ressalva que importa (shell cru escapa por completo).
   network.allowlist: []
   delegate: []
-  # approve: efeito `ask` pausa a chamada para aprovação ("Allow always"
-  # grava a aprovação). Isso É o portão. O que falta, e por isso não entra
-  # aqui o conceito de signer, é identidade de quem responde: "answered by
-  # the client" — qualquer sessão conectada, sem roteamento a pessoa
-  # nomeada. Mesma ressalva de approve.signer do claude-code.yml.
-  approve: []
 preserves: []
 loses:
+  # approve: FIX ROUND 1 — movido de translates para loses, mesma
+  # auditoria que corrigiu claude-code.yml. O efeito `ask` (resource =
+  # texto de comando) é mecanismo real, mas buildPermissions() (tools/
+  # bindings.mjs) nunca escreve uma regra `ask` — e, como no Claude Code,
+  # não haveria dado no pacote para construir o `resource` certo:
+  # capabilities.approve referencia `human_gates[].id`, não um padrão de
+  # comando. "Allow always" e a ausência de signer nomeado (mesma
+  # ressalva de approve.signer do claude-code.yml) ficam documentados
+  # aqui em prosa, não como chave própria do vocabulário.
+  - approve
   # budget: busca em Config.Info, ConfigAgent.Info e `gh api search/code`
   # por budget/monthly_cap/spend_limit/cost_cap/spending_limit no repo
   # inteiro — zero ocorrência em todo o schema do runtime. Existe
@@ -132,9 +156,9 @@ citations:
   network:
     inferido: true
     source: "alcance geral mapeado para a mesma ação webfetch/websearch de read.web — V2 não distingue 'tem rede' de 'tem busca'"
-  network.allowlist: "permissions.mdx — ação `webfetch`, resource = URL requisitada, lido 2026-10-25"
+  network.allowlist: "permissions.mdx — ação `webfetch`, resource = URL requisitada, lido 2026-10-25; EMITIDO em tools/bindings.mjs (fix round 1) como deny-geral + allow por domínio, dentro do frontmatter de cada agente"
   delegate: "agents.mdx — ação `subagent`, resource = id do agente alvo, lido 2026-10-25"
-  approve: "permissions.mdx — efeito `ask` e 'Allow always', lido 2026-10-25"
+  approve: "permissions.mdx — efeito `ask` é mecanismo real, mas NÃO emitido (fix round 1): buildPermissions() não escreve regra ask, e capabilities.approve não carrega o padrão de comando que ela exigiria"
   budget:
     inferido: true
     source: "ausência confirmada por gh api search/code em anomalyco/opencode por budget|monthly_cap|spend_limit|cost_cap|spending_limit — zero ocorrência, lido 2026-10-25"

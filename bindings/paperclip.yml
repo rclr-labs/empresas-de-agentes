@@ -49,27 +49,39 @@ preserves:
   - memory
   - context
 loses: []
+# Fix round 1: citações unificadas por GRUPO semântico, texto idêntico
+# para toda chave do mesmo grupo. Isso não é só estilo — é o que permite
+# ao emissor agregar o aviso por MOTIVO em vez de por papel × capacidade
+# (achado 2 da auditoria: 66 linhas carregando duas informações é pior
+# que duas linhas). Duas citações quase-iguais ("mesma leitura de X") em
+# vez de UMA citação repetida teriam produzido dois grupos de aviso onde
+# devia haver um.
 citations:
   skills: "companies-spec.md §5 — AGENTS.md define `skills`; cópia byte a byte preserva e a resolução do runtime continua válida"
-  read.repository: "companies-spec.md §5–§13 — capabilities.read não é campo da spec base; vive em metadata, extensão deste acervo"
-  read.documentation: "mesma leitura de read.repository"
-  read.audit_trail: "mesma leitura de read.repository"
-  read.test_evidence: "mesma leitura de read.repository"
-  read.database: "mesma leitura de read.repository"
-  read.web: "mesma leitura de read.repository"
-  write.code: "companies-spec.md §5–§13 — capabilities.write não é campo da spec base"
-  write.documentation: "mesma leitura de write.code"
-  write.test_evidence: "mesma leitura de write.code"
-  write.report: "mesma leitura de write.code"
-  write.pull_request: "mesma leitura de write.code"
-  execute.allow: "companies-spec.md §15 — execute é citado como exemplo de extensão de fornecedor (.paperclip.yaml), não campo da spec base"
-  execute.deny: "mesma leitura de execute.allow"
-  network: "companies-spec.md §15 — restrição de rede é extensão de fornecedor"
-  network.allowlist: "mesma leitura de network"
-  delegate: "companies-spec.md §5–§13 — delegate não é campo da spec base (TEAM.md define `manager`, não delegação dinâmica por capacidade)"
-  budget: "companies-spec.md §15 — \"budgets\" é citado nominalmente como exemplo de extensão de fornecedor"
-  approve: "companies-spec.md §15 — \"approval policies\" é citado nominalmente como exemplo de extensão de fornecedor"
-  memory: "companies-spec.md §5–§13 — memory não é campo da spec base"
-  context: "companies-spec.md §5–§13 — context não é campo da spec base"
+  # Grupo 1 — nenhum destes é campo da spec base (§5–§13): vive em
+  # metadata, extensão deste acervo, não do formato.
+  read.repository: &nao-e-spec-base "companies-spec.md §5–§13 — não é campo da spec base; vive em metadata, extensão deste acervo"
+  read.documentation: *nao-e-spec-base
+  read.audit_trail: *nao-e-spec-base
+  read.test_evidence: *nao-e-spec-base
+  read.database: *nao-e-spec-base
+  read.web: *nao-e-spec-base
+  write.code: *nao-e-spec-base
+  write.documentation: *nao-e-spec-base
+  write.test_evidence: *nao-e-spec-base
+  write.report: *nao-e-spec-base
+  write.pull_request: *nao-e-spec-base
+  delegate: *nao-e-spec-base
+  memory: *nao-e-spec-base
+  context: *nao-e-spec-base
+  # Grupo 2 — citados nominalmente em §15 como EXEMPLO de extensão de
+  # fornecedor (.paperclip.yaml): a spec sabe que existem, mas não os
+  # define no formato base.
+  execute.allow: &extensao-de-fornecedor "companies-spec.md §15 — citado como exemplo de extensão de fornecedor (.paperclip.yaml), não campo da spec base"
+  execute.deny: *extensao-de-fornecedor
+  network: *extensao-de-fornecedor
+  network.allowlist: *extensao-de-fornecedor
+  budget: *extensao-de-fornecedor
+  approve: *extensao-de-fornecedor
 unsupported: []
 unsupported_metadata: []

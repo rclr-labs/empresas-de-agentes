@@ -102,16 +102,32 @@ test('claude-code: a persona NÃO vai para o corpo, só a headline na descriptio
   rmSync(out, { recursive: true, force: true });
 });
 
-test('claude-code: avisa a perda de budget — execute.deny agora traduz, a partir da medição', () => {
-  // Antes da medição (2026-10-25), execute.deny estava em `unsupported`
-  // por inferência errada; a emissão avisava os dois. Agora traduz via
-  // disallowedTools/permissions.deny/hook, então não há mais perda a
-  // avisar para execute.deny — só budget continua sem teto no runtime.
+test('claude-code: avisa a perda de budget E de execute.deny — fix round 1 reverteu a tradução não emitida', () => {
+  // Fix round 1: execute.deny voltou a ser perda, porque o emissor não
+  // escreve o mecanismo (ver nota em bindings-arquivos.test.mjs).
   const { out, stdout } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
   assert.match(stdout, /budget/);
+  assert.match(stdout, /execute\.deny/);
   assert.match(stdout, /perdid|n[ãa]o expressa/i);
-  assert.ok(!/execute\.deny/.test(stdout),
-    'execute.deny não é mais perda — a medição corrigiu a tradução');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: emite .claude/settings.json com sandbox.network.allowedDomains quando algum papel declara allowlist', () => {
+  // INVARIANTE desta rodada: toda capacidade traduzida tem de ser
+  // EMITIDA de verdade. network.allowlist é o único caso, entre os
+  // quatro revisados, em que a Opção A (emitir o mecanismo) era segura
+  // neste acervo — este teste prova que o arquivo existe e carrega o
+  // domínio declarado.
+  const { out } = emitir(['--package', 'fabrica-de-testes', '--binding', 'claude-code']);
+  const settings = JSON.parse(readFileSync(join(out, '.claude', 'settings.json'), 'utf8'));
+  assert.ok(settings.sandbox.network.allowedDomains.includes('api-staging.exemplo.com.br'));
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: NÃO emite settings.json quando nenhum papel do pacote declara allowlist de rede', () => {
+  const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
+  assert.ok(!existsSync(join(out, '.claude', 'settings.json')),
+    'software-house não tem nenhum papel com capabilities.network como lista de domínio');
   rmSync(out, { recursive: true, force: true });
 });
 
@@ -152,12 +168,60 @@ test('opencode V2: ORDEM da lista é deny-amplo-primeiro — last-match exige is
   rmSync(out, { recursive: true, force: true });
 });
 
-test('opencode: quem não escreve código não recebe edit allow', () => {
+test('opencode V2: network.allowlist restringe webfetch por domínio — fix round 1, segundo achado da auditoria', () => {
+  // Auditoria do fix round 1: network.allowlist já estava declarado
+  // translates, mas buildPermissions() só emitia uma regra webfetch
+  // genérica (resource "*"), nunca restrita ao domínio — a mesma classe
+  // de defeito de execute.deny/read.database/approve, só que aqui a
+  // correção segura é emitir o mecanismo (Opção A), porque permissions
+  // vive DENTRO do frontmatter de cada agente, sem risco de conflito
+  // entre papéis do mesmo pacote.
+  const { out } = emitir(['--package', 'fabrica-de-testes', '--binding', 'opencode']);
+  const { frontmatter } = parseMarkdown(readFileSync(join(out, 'contrato-api.md'), 'utf8'));
+  const webfetchRules = frontmatter.permissions
+    .map((r, i) => ({ ...r, i }))
+    .filter((r) => r.action === 'webfetch');
+  const denyGeral = webfetchRules.find((r) => r.resource === '*' && r.effect === 'deny');
+  const allowDominio = webfetchRules.find((r) => r.effect === 'allow');
+  assert.ok(denyGeral, 'tem deny geral de webfetch');
+  assert.ok(allowDominio, 'tem allow específico do domínio');
+  assert.match(allowDominio.resource, /api-staging\.exemplo\.com\.br/);
+  assert.ok(denyGeral.i < allowDominio.i,
+    'deny geral antes do allow do domínio — last-match exige isso aqui também');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('opencode: write.report também concede edit — a ação edit cobre edit/write/patch, não só código', () => {
+  // Fix round 1 (achado na auditoria "translates significa emitido"): a
+  // condição antiga checava só write.includes('code'); revisao escreve
+  // `report`, declara write.report como translates no binding, e
+  // recebia `edit: deny` na emissão real — exatamente o defeito desta
+  // rodada, só que no lado do OpenCode. revisao é o exemplo real: não
+  // escreve código, mas escreve relatório, e tem de poder editar o
+  // arquivo do relatório.
   const { out } = emitir(['--package', 'software-house', '--binding', 'opencode']);
   const { frontmatter } = parseMarkdown(readFileSync(join(out, 'revisao.md'), 'utf8'));
   const edit = frontmatter.permissions.find((r) => r.action === 'edit');
-  assert.equal(edit.effect, 'deny');
+  assert.equal(edit.effect, 'allow', 'revisao escreve report — edit tem de ser allow');
   rmSync(out, { recursive: true, force: true });
+});
+
+test('opencode: papel que não escreve NENHUM alvo de arquivo recebe edit: deny', () => {
+  // Nenhum papel real do acervo tem write vazio (todos escrevem ao menos
+  // report) — exercita o escritor direto com um agente sintético para
+  // provar o caso negativo, agora que write.report também concede edit.
+  const agent = {
+    slug: 'sintetico3', body: '\n# Sintético\n',
+    frontmatter: {
+      name: 'Sintético 3', title: 'Sintético 3', slug: 'sintetico3', skills: [],
+      metadata: { capabilities: { write: [], read: [] } },
+    },
+  };
+  const applied = applyBinding(agent, { translates: {}, preserves: [], loses: [], permissions: true }, { slug: 'p' });
+  const { content } = writers.opencode(agent, applied);
+  const { frontmatter } = parseMarkdown(content);
+  const edit = frontmatter.permissions.find((r) => r.action === 'edit');
+  assert.equal(edit.effect, 'deny');
 });
 
 test('portable: um JSON por pacote, com budget preservado', () => {
@@ -264,6 +328,33 @@ test('recusa emitir pacote inválido', () => {
   }
   assert.ok(falhou, 'emissão de pacote inválido tem de falhar');
   rmSync(dir, { recursive: true, force: true });
+});
+
+test('VOLUME: saída padrão (sem --verbose) de um pacote de 6 agentes fica sob 40 linhas, em todo binding', () => {
+  // Achado 2 da auditoria (fix round 1): paperclip/portable chegavam a
+  // 69/75 linhas para fabrica-de-testes (6 agentes) porque listavam
+  // PRESERVADA por papel × capacidade em vez de por motivo — 66/72
+  // linhas carregando 1-2 fatos. Threshold justificado pelo pior caso
+  // LEGÍTIMO medido: opencode, que não agrega perda (perda é item a
+  // item por desenho), fica em 33 linhas para 6 agentes — 40 dá margem
+  // sem esconder uma regressão de volume que volte a listar por papel.
+  for (const binding of ['claude-code', 'opencode', 'paperclip', 'portable']) {
+    const { out, stdout } = emitir(['--package', 'fabrica-de-testes', '--binding', binding]);
+    const linhas = stdout.trim().split('\n').length;
+    assert.ok(linhas < 40,
+      `${binding} × fabrica-de-testes: ${linhas} linhas na saída padrão — threshold é 40; agregar PRESERVADA por motivo é o que mantém isso baixo independente do número de agentes`);
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('VOLUME: --verbose devolve o detalhe por papel que o padrão esconde', () => {
+  const { out, stdout: padrao } = emitir(['--package', 'fabrica-de-testes', '--binding', 'paperclip']);
+  rmSync(out, { recursive: true, force: true });
+  const { out: out2, stdout: detalhado } = emitir(['--package', 'fabrica-de-testes', '--binding', 'paperclip', '--verbose']);
+  rmSync(out2, { recursive: true, force: true });
+  assert.ok(detalhado.length > padrao.length, '--verbose produz mais saída que o padrão');
+  assert.match(detalhado, /polaris: budget —/,
+    '--verbose lista o detalhe por papel que a agregação por motivo esconde no padrão');
 });
 
 test('PROVA DE AGNOSTICISMO: os três pacotes compilam para os quatro bindings', () => {

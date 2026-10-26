@@ -202,6 +202,19 @@ export function applyBinding(agent, binding, pkg) {
  * essa função não serve mais ao V1, porque o único binding que a usa
  * (`opencode.yml`) migrou para V2 na tarefa 28.
  */
+// Correção de auditoria (fix round 1): a condição original de `edit` só
+// checava `write.includes('code')` — um papel que escreve documentação,
+// evidência de teste ou relatório, sem escrever código, declarava
+// write.documentation/test_evidence/report como `translates` na tabela
+// de binding e recebia `edit: deny` na emissão real. A ação `edit` do
+// OpenCode V2 cobre "edit/write/patch" em geral (permissions.mdx, §2 da
+// pesquisa), não só código — é esse o escopo real que a condição tem de
+// testar. pull_request fica de fora de propósito: isso é operação de
+// shell (git/gh), não de edição de arquivo, e só é honrada de verdade
+// quando o papel também lista o comando correspondente em execute.allow —
+// caveat registrado em bindings/opencode.yml, não resolvido aqui.
+const ESCRITA_QUE_EDIT_COBRE = ['code', 'documentation', 'test_evidence', 'report'];
+
 function buildPermissions(cap) {
   const regras = [];
   regras.push({ action: 'shell', resource: '*', effect: 'deny' });
@@ -209,9 +222,36 @@ function buildPermissions(cap) {
   for (const glob of cap.execute?.allow ?? []) regras.push({ action: 'shell', resource: glob, effect: 'allow' });
   regras.push({ action: 'subagent', resource: '*', effect: 'deny' });
   for (const slug of cap.delegate ?? []) regras.push({ action: 'subagent', resource: slug, effect: 'allow' });
-  // edit: allow só quando o papel escreve código.
-  regras.push({ action: 'edit', resource: '*', effect: (cap.write ?? []).includes('code') ? 'allow' : 'deny' });
-  // webfetch: allow só quando lê a web.
-  regras.push({ action: 'webfetch', resource: '*', effect: (cap.read ?? []).includes('web') ? 'allow' : 'deny' });
+  // edit: allow quando o papel escreve qualquer um dos alvos de arquivo
+  // que a ação `edit` cobre — não só código.
+  const escreveArquivo = (cap.write ?? []).some((w) => ESCRITA_QUE_EDIT_COBRE.includes(w));
+  regras.push({ action: 'edit', resource: '*', effect: escreveArquivo ? 'allow' : 'deny' });
+  // webfetch: allow quando lê a web OU quando a capacidade `network`
+  // está declarada (true ou lista de domínio) — correção de auditoria:
+  // antes só `read.web` disparava, e um papel com `network: true` mas
+  // sem `read.web` (nenhum no acervo hoje, mas a tabela de binding
+  // declara `network` como translates incondicionalmente) ficaria com
+  // webfetch negado apesar de a capacidade dizer que tem rede.
+  //
+  // Segunda correção de auditoria, mesma rodada: quando `network` é uma
+  // LISTA de domínio (não `true`), o binding declara `network.allowlist`
+  // em `translates` — mas até aqui nada restringia `webfetch` a esses
+  // domínios especificamente; a regra única `resource:'*'` dava acesso
+  // geral, exatamente a perda "internet inteira em vez de só o alvo"
+  // que `network.allowlist` existe para impedir. Diferente do Claude
+  // Code, `permissions` aqui é escrito DENTRO do frontmatter de CADA
+  // agente — não há arquivo compartilhado de projeto, então restringir
+  // por domínio não corre o risco de conflito entre papéis que quebrou
+  // a Opção A de `execute.deny` no Claude Code.
+  const temRede = (cap.read ?? []).includes('web') || cap.network === true || Array.isArray(cap.network);
+  const dominios = Array.isArray(cap.network) ? cap.network : [];
+  if (dominios.length) {
+    regras.push({ action: 'webfetch', resource: '*', effect: 'deny' });
+    for (const dominio of dominios) {
+      regras.push({ action: 'webfetch', resource: `https://${dominio}/*`, effect: 'allow' });
+    }
+  } else {
+    regras.push({ action: 'webfetch', resource: '*', effect: temRede ? 'allow' : 'deny' });
+  }
   return regras;
 }

@@ -4,12 +4,35 @@ source: >-
   dev-squad e ~/.claude/agents) para name/description/tools/delegate — e
   RE-VERIFICADO em 2026-10-25 por leitura direta da documentação primária
   (code.claude.com/docs/en) para as cinco capacidades que a pesquisa
-  agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md corrigiu:
-  network.allowlist, execute.deny, approve, skills e budget. As células
-  antigas (declaradas perdidas por inferência, não por leitura) estavam
-  erradas em três casos — network.allowlist e execute.deny traduzem, e
-  skills nem tinha estado nenhum — e corretas num quarto (budget perde de
-  verdade). Toda célula desta versão cita a página lida.
+  agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md corrigiu.
+
+  FIX ROUND 1 (2026-10-25, auditoria pós-tarefa-29): a primeira reescrita
+  cometeu a MESMA classe de defeito que corrigia — declarou `translates`
+  no nível de "o que o runtime consegue expressar" em vez de "o que este
+  emissor de fato escreve no arquivo". `execute.deny`, `read.database` e
+  `approve` citavam mecanismo real (confirmado por leitura), mas
+  `tools/writers.mjs` não produz nenhum dos três: `disallowedTools` só
+  dispara no caso raro em que `execute.allow` está vazio (nenhum papel do
+  acervo cai nisso), `read.database` exigiria nomear um servidor MCP que
+  o pacote não declara, e `approve` exigiria um padrão de comando que
+  `capabilities.approve` (que só referencia `human_gates[].id`) não
+  carrega. Investiguei a Opção A (emitir um `.claude/settings.json` de
+  projeto com a união de `execute.deny` de todos os papéis) e descobri
+  que é ATIVAMENTE PERIGOSA para este acervo, não só incompleta:
+  `deny` do Claude Code vale independente de escopo
+  ("deny rules from any scope are evaluated before allow rules",
+  code.claude.com/docs/en/permissions) — então a união de deny de
+  `software-house` bloquearia `git push*`/`git commit*` para
+  `desenvolvimento`, que é o ÚNICO papel que precisa deles e os declara
+  em `execute.allow`. Um binding que "traduz" `execute.deny` dessa forma
+  quebraria o papel que mais precisa de `execute.allow` no mesmo pacote.
+  Por isso escolhi a Opção B para as três: mover para `loses`, com o
+  mecanismo real nomeado no motivo. `network.allowlist` passou pela MESMA
+  pergunta e sobreviveu como `translates`, porque a Opção A ali é segura
+  neste acervo (nenhum pacote publicado tem um papel com `network: true`
+  convivendo com um papel de outro escopo que precisasse de allowlist
+  restrita no MESMO pacote) — `tools/emit.mjs` agora emite de fato um
+  `.claude/settings.json` com `sandbox.network.allowedDomains`.
 emits: .claude/agents/<slug>.md
 format: claude-code
 # first-match (leitura honesta, não medição direta): a doc de permissões
@@ -28,7 +51,13 @@ rule_order: first-match
 # não só a tool de busca. Fonte: code.claude.com/docs/en/sandboxing,
 # lido em 2026-10-25 ("Claude Code runs the sandbox proxy on your machine,
 # outside the sandbox... The proxy checks the hostname of each connection
-# against your allowed and denied domains").
+# against your allowed and denied domains"). CAVEAT que sobrevive do fix
+# round 1: o `.claude/settings.json` emitido é de ESCOPO DE PROJETO, não
+# por agente — um papel com `network: false` ainda compartilha a mesma
+# allowedDomains que um papel do mesmo pacote com domínio declarado,
+# porque o sandbox não tem campo por agente confirmado em nenhuma doc
+# lida. É alargamento de fronteira para o papel `network: false`, não
+# estreitamento — documentado aqui, não escondido.
 allowlist_scope: os
 translates:
   read.repository: [Read, Grep, Glob]
@@ -44,104 +73,68 @@ translates:
   execute.allow: [Bash]
   network: [WebFetch, WebSearch]
   delegate: "Agent({slug})"
-  # CORRIGIDO (estava em `unsupported` por inferência). Mecanismo real:
-  # `sandbox.network.allowedDomains`/`deniedDomains` em settings.json —
-  # um allowlist de SISTEMA OPERACIONAL, não de ferramenta. A emissão real
-  # (fora do escopo desta tarefa, que só traduz capacidade→ferramenta) tem
-  # de escrever essas chaves num .claude/settings.json ao lado do
-  # agente, não no frontmatter — frontmatter de subagente não tem campo de
-  # rede próprio. Ver allowlist_scope acima: cobre shell cru também,
-  # porque o proxy intercepta o processo inteiro, não só webfetch.
+  # network.allowlist: EMITIDO de verdade (fix round 1). tools/emit.mjs
+  # escreve `.claude/settings.json` com `sandbox.network.allowedDomains`
+  # = união dos domínios de `capabilities.network` de todo agente do
+  # pacote — allowlist de SISTEMA OPERACIONAL, cobre shell cru também
+  # (ver allowlist_scope acima). Destino [] porque o mecanismo não entra
+  # na lista `tools` do frontmatter — vive num arquivo-irmão.
   network.allowlist: []
-  # CORRIGIDO (estava em `unsupported` por inferência: "Claude Code não é
-  # leitor de banco nativo"). O vocabulário continua certo — Claude Code
-  # não sabe o que é "banco de dados" — mas o runtime TEM como restringir
-  # o acesso à superfície exata de um papel: conceder só a tool do
-  # servidor MCP que expõe o banco (`mcp__<server>__<tool>`, confirmado em
-  # code.claude.com/docs/en/permissions, exemplo do servidor
-  # database-tools) e negar Bash (`disallowedTools: [Bash]`, confirmado em
-  # code.claude.com/docs/en/sub-agents) para que o acesso não vaze por uma
-  # query solta em shell. É composição de dois campos documentados, não um
-  # campo único "ler banco" — por isso a célula cita os dois.
-  # Destino [] de propósito: o mecanismo real (nome concreto do servidor
-  # MCP que expõe o banco) não é informação que o pacote declara em
-  # nenhum AGENTS.md do acervo — não há como escrever um nome de tool
-  # funcional aqui sem inventar um servidor que o papel não nomeou. A
-  # célula registra que o ESTADO é `translates` (o runtime TEM o
-  # mecanismo, ver citations) sem forçar um valor de ferramenta fictício
-  # na lista `tools` emitida — isso seria exatamente o "mecanismo
-  # implementado que não existe" que a regra de honestidade desta tarefa
-  # proíbe.
-  read.database: []
-  # CORRIGIDO (estava em `unsupported` por inferência: "tools é lista
-  # aditiva, sem deny-list"). Isso é verdade para `tools:` no frontmatter,
-  # mas o runtime tem DOIS mecanismos de deny que a leitura da doc confirma:
-  # `disallowedTools` no frontmatter nega por NOME DE FERRAMENTA (sem glob
-  # de comando — "Tools to deny... Same format as tools", code.claude.com/
-  # docs/en/sub-agents), e `permissions.deny` em settings.json nega por
-  # GLOB DE COMANDO (`"deny": ["Bash(sudo *)"]`, code.claude.com/docs/en/
-  # permissions) — mas esse segundo mecanismo é de ESCOPO DE PROJETO, não
-  # por agente. Para um glob de deny valer só para UM papel, o operador
-  # precisa de um hook `PreToolUse` que leia `agent_type` do input do hook
-  # (confirmado em code.claude.com/docs/en/hooks: "agent_type: Agent name
-  # ... Present when ... the hook fires inside a subagent") e recuse a
-  # chamada quando o agente é este e o comando bate o glob. Três peças
-  # documentadas, nenhuma delas sozinha cobre o caso — a célula nomeia as
-  # três porque esconder a composição seria fingir que é uma só chamada.
-  # Destino [] pelo mesmo motivo de read.database acima: o deny de NOME DE
-  # FERRAMENTA (disallowedTools) é o único pedaço que entra na lista
-  # `tools`/`disallowedTools` do frontmatter de verdade — o deny de GLOB
-  # DE COMANDO (permissions.deny + hook) vive em settings.json e num
-  # script de hook, fora do que este binding escreve na lista de
-  # ferramentas. tools/writers.mjs (tarefa 29) emite a parte de nome puro
-  # via `disallowedTools`; a parte de glob fica documentada aqui como
-  # mecanismo existente, não como ferramenta emitida.
-  execute.deny: []
-  # CORRIGIDO (estava em `unsupported` por inferência: "approve é portão
-  # humano, não ferramenta"). O efeito `ask` em `permissions.ask`
-  # (`"ask": ["Bash(terraform apply:*)"]`, confirmado em code.claude.com/
-  # docs/en/permissions, seção de ask rules) pausa a chamada para
-  # aprovação humana — isso É o portão. O que não existe, e por isso NÃO
-  # fica em translates, é o assinante nomeado: ver `loses.approve.signer`
-  # abaixo.
-  approve: []
-  # CORRIGIDO: skills não tinha estado nenhum em nenhum binding (classe de
-  # defeito 2 do relato). `skills:` é campo de frontmatter documentado em
-  # code.claude.com/docs/en/sub-agents ("Skills to preload into the
-  # subagent's context at startup") — tradução direta, sem composição.
-  # Destino []: skills não é "ferramenta" que o papel GANHA, é campo de
-  # frontmatter que tools/writers.mjs escreve direto a partir de
-  # `frontmatter.skills` (tarefa 29) — não passa pela lista `tools`.
+  # skills: EMITIDO de verdade — tools/writers.mjs escreve `skills:` no
+  # frontmatter a partir de `frontmatter.skills`, testado em
+  # test/emit.test.mjs. Destino [] porque não é "ferramenta", é campo de
+  # frontmatter escrito direto.
   skills: []
-  # `memory:` é campo de frontmatter documentado (code.claude.com/docs/en/
-  # sub-agents, "Persistent memory scope: user, project, or local"), mas o
-  # vocabulário de VALOR não combina: este acervo usa
-  # none/session/project/org (capabilities/v1.md), o Claude Code usa
-  # user/project/local. "project" coincide; os outros três não têm
-  # correspondência confirmada por leitura — inventar um mapa de valor
-  # (session→local? org→user?) seria exatamente a inferência que esta
-  # tarefa existe para eliminar. O CAMPO traduz; o VALOR, fora de
-  # "project", é aproximação do emissor, não medição.
-  # Destino [] pelo mesmo motivo de skills: campo de frontmatter escrito
-  # direto de `metadata.memory.scope` (tarefa 29), fora da lista `tools`.
+  # memory: EMITIDO de verdade — mesma lógica de skills, a partir de
+  # `metadata.memory.scope`. Vocabulário de VALOR não combina 1:1 (este
+  # acervo usa none/session/project/org; Claude Code usa
+  # user/project/local) — "project" coincide, os outros três são
+  # aproximação do emissor, não medição. O CAMPO traduz; o valor fora de
+  # "project" é aproximação assumida, não garantida.
   memory: []
-# approve.signer NÃO é chave própria do vocabulário (capabilityKeys não a
-# produz) — fica documentado em prosa aqui e no reason de `approve`
-# porque não há onde declarar separadamente sem crescer o vocabulário de
-# capacidades, que é mudança de versão (capabilities/v1 → v2), fora do
-# escopo desta tarefa.
 preserves: []
 loses:
   # budget: sem teto de moeda em lugar nenhum da configuração do Claude
   # Code (frontmatter de sub-agente ou settings.json) — busca feita em
   # code.claude.com/docs/en/sub-agents e code.claude.com/docs/en/settings
   # não encontrou campo de custo. `maxTurns` existe (confirmado,
-  # sub-agents) mas é teto de QUANTIDADE DE TURNO, não de GASTO — um turno
-  # caro e um turno barato contam igual. Usar maxTurns como proxy de
-  # orçamento é exatamente a tradução emprestada que o relato aponta como
-  # erro: fica fora de translates, registrado como perda com o proxy
-  # nomeado no motivo.
+  # sub-agents) mas é teto de QUANTIDADE DE TURNO, não de GASTO.
   - budget
+  # execute.deny: FIX ROUND 1 — movido de translates para loses. O
+  # mecanismo citado (disallowedTools nome puro + permissions.deny de
+  # projeto + hook PreToolUse/agent_type) é real, mas este emissor não
+  # produz nenhum dos dois últimos, e o primeiro só dispara no caso raro
+  # em que execute.allow está vazio (nenhum papel do acervo hoje). Pior:
+  # uma emissão por união de projeto (a alternativa óbvia) seria ATIVA-
+  # MENTE ERRADA aqui — software-house/desenvolvimento declara
+  # `execute.allow: [..., "git push*", "git commit*", ...]`, e QUATRO
+  # outros papéis do mesmo pacote declaram esses mesmos padrões em
+  # `execute.deny`; como o Claude Code resolve deny-sempre-vence
+  # independente de escopo, uma lista de projeto feita da união dos
+  # `execute.deny` bloquearia o `git push`/`git commit` que
+  # desenvolvimento precisa e tem permissão explícita para usar. Perder
+  # é mais honesto do que "traduzir" de um jeito que quebra o papel que
+  # mais precisa do `execute.allow` correspondente.
+  - execute.deny
+  # read.database: FIX ROUND 1 — movido de translates para loses. O
+  # mecanismo (tool do servidor MCP + disallowedTools: Bash) é real, mas
+  # exige nomear um servidor MCP concreto que nenhum AGENTS.md do acervo
+  # declara — não há dado para o emissor escrever, e inventar um nome de
+  # servidor seria fabricar informação que o papel não forneceu.
+  - read.database
+  # approve: FIX ROUND 1 — movido de translates para loses.
+  # `permissions.ask` é mecanismo real, mas `capabilities.approve`
+  # referencia `human_gates[].id` (ex.: "deploy-producao"), não um
+  # padrão de comando Bash — não há dado no pacote para construir o
+  # `resource` (`"Bash(terraform apply:*)"`) que a regra `ask` exige.
+  # Sem esse padrão, não há o que escrever. approve.signer (ressalva do
+  # assinante nomeado, que o mecanismo também não cobre) continua
+  # documentado em prosa aqui, não como chave própria — crescer o
+  # vocabulário é mudança de capabilities/v2, fora do escopo deste fix.
+  - approve
+  # context: nenhum campo correspondente na frontmatter de sub-agente
+  # documentada.
+  - context
 citations:
   read.repository: "code.claude.com/docs/en/tools-reference — nomes de tool confirmados (lido em 2026-10-24)"
   read.documentation: "code.claude.com/docs/en/tools-reference"
@@ -158,21 +151,17 @@ citations:
   execute.allow: "code.claude.com/docs/en/tools-reference — Bash"
   network: "code.claude.com/docs/en/tools-reference — WebFetch, WebSearch"
   delegate: "code.claude.com/docs/en/sub-agents — Agent(AgentName)"
-  network.allowlist: "code.claude.com/docs/en/sandboxing, lido 2026-10-25 — sandbox.network.allowedDomains"
-  read.database: "code.claude.com/docs/en/permissions (mcp__<server>__<tool>) + code.claude.com/docs/en/sub-agents (disallowedTools), lidos 2026-10-25"
-  execute.deny: "code.claude.com/docs/en/sub-agents (disallowedTools) + code.claude.com/docs/en/permissions (permissions.deny) + code.claude.com/docs/en/hooks (agent_type), lidos 2026-10-25"
-  approve: "code.claude.com/docs/en/permissions — ask rules, lido 2026-10-25"
-  skills: "code.claude.com/docs/en/sub-agents — campo `skills`, lido 2026-10-25"
-  memory: "code.claude.com/docs/en/sub-agents — campo `memory` (user|project|local), lido 2026-10-25; vocabulário de valor não confirmado 1:1 com este acervo"
+  network.allowlist: "code.claude.com/docs/en/sandboxing, lido 2026-10-25 — sandbox.network.allowedDomains; EMITIDO em tools/emit.mjs (fix round 1), caveat de escopo de projeto documentado acima"
+  skills: "code.claude.com/docs/en/sub-agents — campo `skills`, lido 2026-10-25; EMITIDO em tools/writers.mjs"
+  memory: "code.claude.com/docs/en/sub-agents — campo `memory` (user|project|local), lido 2026-10-25; EMITIDO em tools/writers.mjs; vocabulário de valor não confirmado 1:1 com este acervo"
   budget:
     inferido: true
     source: "ausência confirmada por busca em code.claude.com/docs/en/sub-agents e /settings — nenhum campo de custo/teto encontrado; maxTurns existe mas é proxy de turno, não de gasto"
+  execute.deny: "code.claude.com/docs/en/sub-agents (disallowedTools) + code.claude.com/docs/en/permissions (permissions.deny), lidos 2026-10-25 — mecanismo real, NÃO emitido por este emissor (fix round 1); união de projeto seria ativamente errada, ver `source` do arquivo"
+  read.database: "code.claude.com/docs/en/permissions (mcp__<server>__<tool>) + code.claude.com/docs/en/sub-agents (disallowedTools), lidos 2026-10-25 — mecanismo real, NÃO emitido (fix round 1): nenhum AGENTS.md nomeia um servidor MCP"
+  approve: "code.claude.com/docs/en/permissions — ask rules, lido 2026-10-25 — mecanismo real, NÃO emitido (fix round 1): capabilities.approve não carrega padrão de comando"
   context:
     inferido: true
     source: "nenhum campo 'context' na frontmatter de sub-agente documentada — ausência confirmada por leitura de code.claude.com/docs/en/sub-agents"
-# unsupported/map/unsupported_metadata mantidos vazios de propósito: este
-# binding usa só o esquema novo a partir desta tarefa. context permanece
-# perdido (sem campo no runtime); skills e memory saem de
-# unsupported_metadata para translates.
 unsupported: []
-unsupported_metadata: [context]
+unsupported_metadata: []

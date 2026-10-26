@@ -57,27 +57,31 @@ preserves:
   - memory
   - context
 loses: []
+# Fix round 1: uma única citação, texto idêntico para toda chave — o
+# motivo é literalmente o mesmo para as 21 capacidades (o manifesto é
+# carregador, não runtime), então o aviso agregado por motivo colapsa
+# tudo num grupo só, em vez de 21 linhas repetindo a mesma frase.
 citations:
-  read.repository: "DESENHO PRÓPRIO — tools/writers.mjs portableManifest grava capabilities.read no JSON, íntegro; nenhum runtime real interpreta o manifesto ainda"
-  read.documentation: "mesma leitura de read.repository"
-  read.audit_trail: "mesma leitura de read.repository"
-  read.test_evidence: "mesma leitura de read.repository"
-  read.database: "mesma leitura de read.repository"
-  read.web: "mesma leitura de read.repository"
-  write.code: "DESENHO PRÓPRIO — ver read.repository"
-  write.documentation: "mesma leitura de write.code"
-  write.test_evidence: "mesma leitura de write.code"
-  write.report: "mesma leitura de write.code"
-  write.pull_request: "mesma leitura de write.code"
-  execute.allow: "DESENHO PRÓPRIO — ver read.repository"
-  execute.deny: "mesma leitura de execute.allow"
-  network: "DESENHO PRÓPRIO — ver read.repository"
-  network.allowlist: "mesma leitura de network"
-  delegate: "DESENHO PRÓPRIO — ver read.repository"
-  budget: "DESENHO PRÓPRIO — ver read.repository"
-  approve: "DESENHO PRÓPRIO — ver read.repository"
-  skills: "DESENHO PRÓPRIO — ver read.repository"
-  memory: "DESENHO PRÓPRIO — ver read.repository"
-  context: "DESENHO PRÓPRIO — ver read.repository"
+  read.repository: &desenho-proprio "DESENHO PRÓPRIO — tools/writers.mjs portableManifest grava a capacidade no JSON, íntegra; nenhum runtime real interpreta o manifesto ainda, então nada é aplicado, só preservado"
+  read.documentation: *desenho-proprio
+  read.audit_trail: *desenho-proprio
+  read.test_evidence: *desenho-proprio
+  read.database: *desenho-proprio
+  read.web: *desenho-proprio
+  write.code: *desenho-proprio
+  write.documentation: *desenho-proprio
+  write.test_evidence: *desenho-proprio
+  write.report: *desenho-proprio
+  write.pull_request: *desenho-proprio
+  execute.allow: *desenho-proprio
+  execute.deny: *desenho-proprio
+  network: *desenho-proprio
+  network.allowlist: *desenho-proprio
+  delegate: *desenho-proprio
+  budget: *desenho-proprio
+  approve: *desenho-proprio
+  skills: *desenho-proprio
+  memory: *desenho-proprio
+  context: *desenho-proprio
 unsupported: []
 unsupported_metadata: []

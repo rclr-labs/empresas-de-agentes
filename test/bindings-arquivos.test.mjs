@@ -81,17 +81,34 @@ test('paperclip é identidade — o acervo já é o formato', () => {
   assert.deepEqual(b.unsupported ?? [], []);
 });
 
-test('claude-code declara budget como perdido e execute.deny como traduzido, a partir da medição', () => {
+test('claude-code declara budget, execute.deny, read.database e approve como perdidos — fix round 1', () => {
   // Medido em 2026-10-25 (agent-studio/docs/pesquisa/2026-10-25-runtimes-
-  // medidos.md): a versão anterior desta regra testava a INFERÊNCIA
-  // errada ("tools é lista aditiva, sem deny-list" ignorava
-  // disallowedTools e permissions.deny). budget continua perdido — não
-  // há teto de moeda documentado em lugar nenhum da config do runtime.
+  // medidos.md). A tarefa 28 tinha movido execute.deny/read.database/
+  // approve para `translates` citando mecanismo real — mas nenhum dos
+  // três é de fato EMITIDO por tools/writers.mjs ou tools/emit.mjs
+  // (auditoria do fix round 1): disallowedTools só dispara no caso raro
+  // em que execute.allow está vazio (nenhum papel real cai nisso), e uma
+  // emissão por união de projeto para execute.deny seria ATIVAMENTE
+  // ERRADA — bloquearia o git push/commit que software-house/
+  // desenvolvimento tem permissão explícita para usar. "translates" tem
+  // de significar "este emissor escreve o mecanismo", não "o runtime
+  // tem o mecanismo em algum lugar" — os três voltam para `loses`.
+  // network.allowlist continua `translates`: diferente dos outros três,
+  // esse MECANISMO (.claude/settings.json com sandbox.network.
+  // allowedDomains) é de fato emitido por tools/emit.mjs, e a união de
+  // projeto não cria o mesmo conflito perigoso (nenhum pacote publicado
+  // tem dois papéis com posturas de rede incompatíveis).
   const b = carregar('claude-code.yml');
   assert.ok(b.loses.includes('budget'),
     'Claude Code não tem teto por agente; a perda tem de estar declarada');
-  assert.ok('execute.deny' in b.translates,
-    'disallowedTools + permissions.deny + hook PreToolUse/agent_type traduzem execute.deny, com ressalva de escopo');
+  assert.ok(b.loses.includes('execute.deny'),
+    'o mecanismo existe no runtime, mas este emissor não o escreve — e uma emissão por união seria perigosa');
+  assert.ok(b.loses.includes('read.database'),
+    'nenhum AGENTS.md nomeia um servidor MCP para construir o mecanismo');
+  assert.ok(b.loses.includes('approve'),
+    'capabilities.approve não carrega o padrão de comando que permissions.ask exige');
+  assert.ok('network.allowlist' in b.translates,
+    'este, ao contrário dos outros três, É de fato emitido — tools/emit.mjs escreve .claude/settings.json');
 });
 
 test('opencode foi MEDIDO em 2026-10-25 e deixou de ser "pendente de confirmação"', () => {
@@ -152,6 +169,37 @@ test('todo agente do acervo aplica em todo binding sem perda não declarada', ()
         assert.deepEqual(naoDeclaradas, [],
           `${f} × ${nome}/${a.slug}: ${naoDeclaradas.map((l) => l.capability).join(', ')}`);
       }
+    }
+  }
+});
+
+// --- Fix round 1: invariante "translates significa emitido" -----------
+
+// Mecanismos que o escritor do Claude Code emite SEM passar pela lista
+// `tools` (destino vazio em `translates` é esperado para eles, cada um
+// com teste próprio provando a emissão em test/emit.test.mjs):
+//   - skills/memory: campo de frontmatter escrito direto de
+//     frontmatter.skills / metadata.memory.scope.
+//   - network.allowlist: .claude/settings.json escrito por tools/emit.mjs.
+// Qualquer OUTRA chave de `translates` com destino vazio é suspeita por
+// definição — ou tem destino de ferramenta, ou é um dos mecanismos
+// especiais acima (com teste de emissão correspondente), ou não devia
+// estar em `translates`. Foi exatamente a ausência desta verificação que
+// deixou execute.deny/read.database/approve declarados como `translates`
+// sem o emissor escrever nada para os três.
+const MECANISMOS_ESPECIAIS_CLAUDE_CODE = new Set(['skills', 'memory', 'network.allowlist']);
+
+test('INVARIANTE: toda capacidade traduzida do claude-code é emitida ou é mecanismo especial testado — nunca nenhum dos dois', () => {
+  const b = carregar('claude-code.yml');
+  for (const [chave, destino] of Object.entries(b.translates)) {
+    const alvos = typeof destino === 'string' ? [destino] : destino;
+    if (alvos.length === 0 && !MECANISMOS_ESPECIAIS_CLAUDE_CODE.has(chave)) {
+      assert.fail(
+        `claude-code.yml declara "${chave}" em translates com destino vazio, e não está em ` +
+        `MECANISMOS_ESPECIAIS_CLAUDE_CODE — isso é exatamente o defeito "translates sem emitir" ` +
+        `do fix round 1. Ou dá um destino de ferramenta real, ou implementa e testa a emissão e ` +
+        `soma a chave à lista de mecanismos especiais, ou move a chave para loses.`,
+      );
     }
   }
 });
