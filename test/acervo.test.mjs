@@ -2,8 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import yaml from 'js-yaml';
 import { loadPackage, listPackages } from '../tools/schema.mjs';
 import { validatePackage } from '../tools/rules.mjs';
+import { applyBinding } from '../tools/bindings.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -376,4 +379,94 @@ test('produto-e-design: só pesquisa-ux fala com usuário, e isso é portão hum
   assert.ok(ids.includes('contato-com-usuario'),
     'falar com usuário real é portão humano: tem gente de verdade do outro lado');
   assert.ok(ux.frontmatter.metadata.boundary.cannot.some((t) => /usu[áa]rio/i.test(t)));
+});
+
+test('seguranca-ofensiva: cinco papéis, liderança na raiz', () => {
+  const { pkg } = relatorio('seguranca-ofensiva');
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(), [
+    'cadeia-de-suprimentos', 'configuracao-de-nuvem', 'lideranca-de-seguranca',
+    'pentest-aplicacao', 'revisao-de-codigo-seguro',
+  ]);
+  assert.deepEqual(
+    pkg.agents.filter((a) => a.frontmatter.reportsTo == null).map((a) => a.slug),
+    ['lideranca-de-seguranca']);
+});
+
+test('seguranca-ofensiva: zero erro e zero aviso', () => {
+  const { errors, warnings } = relatorio('seguranca-ofensiva');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('seguranca-ofensiva: autorização escrita é portão humano com assinante nomeado', () => {
+  const { pkg } = relatorio('seguranca-ofensiva');
+  const gates = pkg.company.frontmatter.metadata.human_gates ?? [];
+  const autorizacao = gates.find((g) => g.id === 'escopo-autorizado-por-escrito');
+  assert.ok(autorizacao, 'o escopo autorizado é portão, não campo de configuração');
+  assert.ok(autorizacao.signer, 'e tem assinante nomeado');
+});
+
+test('seguranca-ofensiva: só pentest sai para a rede, e com allowlist de domínio', () => {
+  const { pkg } = relatorio('seguranca-ofensiva');
+  const comRede = pkg.agents.filter((a) => a.frontmatter.metadata.capabilities.network !== false);
+  assert.deepEqual(comRede.map((a) => a.slug), ['pentest-aplicacao'],
+    'concentrar a saída externa num papel é o que torna a fronteira auditável');
+  assert.ok(Array.isArray(comRede[0].frontmatter.metadata.capabilities.network),
+    'network é lista de domínio autorizado, nunca true — true é a internet inteira');
+  assert.ok(comRede[0].frontmatter.metadata.capabilities.network.length > 0);
+});
+
+test('seguranca-ofensiva: nenhum papel aplica mudança em ambiente', () => {
+  const { pkg } = relatorio('seguranca-ofensiva');
+  for (const a of pkg.agents) {
+    const allow = a.frontmatter.metadata.capabilities.execute?.allow ?? [];
+    for (const g of allow) {
+      assert.ok(!/(apply|upgrade|destroy|delete)/i.test(g),
+        `${a.slug}: "${g}" aplica mudança; este pacote avalia e não remedia`);
+    }
+  }
+});
+
+test('seguranca-ofensiva: só a liderança divulga achado, e por portão', () => {
+  const { pkg } = relatorio('seguranca-ofensiva');
+  for (const a of pkg.agents.filter((x) => x.slug !== 'lideranca-de-seguranca')) {
+    assert.deepEqual(a.frontmatter.metadata.capabilities.approve, [],
+      `${a.slug} não assina portão — divulgação é da liderança`);
+  }
+});
+
+// EMISSÃO — desvio do brief (ver task-22-report.md): o Step 1 do brief
+// pedia "a allowlist do pentest é reportada como perda em claude-code".
+// Isso descreve um estado do binding que não existe mais neste acervo:
+// `bindings/claude-code.yml` hoje TRADUZ `network.allowlist` de verdade
+// (sandbox.network.allowedDomains, fix round 1) — não há "perda" nenhuma
+// a reportar ali, e nenhum dos quatro bindings publicados tem
+// `network.allowlist` em `loses` (claude-code e opencode traduzem,
+// portable e paperclip preservam). `fase-f-constraints.md` ("Regra de
+// allowlist de rede") e `contrato-api/AGENTS.md` descrevem o mecanismo
+// real: Claude Code é fronteira de verdade (`allowlist_scope: os`);
+// OpenCode V2 e o janus com provider `kind=cli` são `fetch-only` — a
+// allowlist cobre só a chamada de busca da ferramenta, e o shell cru
+// liberado em `execute.allow` (aqui, `curl -s*`) escapa dela. O teste
+// abaixo verifica o par: opencode avisa, claude-code não.
+test('EMISSÃO: opencode avisa que a allowlist do pentest é decorativa (fetch-only + shell); claude-code não avisa (os)', () => {
+  const pkg = loadPackage(join(RAIZ, 'seguranca-ofensiva'));
+  const pentest = pkg.agents.find((a) => a.slug === 'pentest-aplicacao');
+
+  const opencode = yaml.load(readFileSync(join(RAIZ, 'bindings/opencode.yml'), 'utf8'),
+    { schema: yaml.CORE_SCHEMA });
+  const { warnings: avisosOpencode } = applyBinding(pentest, opencode, pkg);
+  const avisoFetchOnly = avisosOpencode.find((w) => /curl/.test(w.message));
+  assert.ok(avisoFetchOnly,
+    'opencode é allowlist_scope: fetch-only e pentest-aplicacao tem curl em execute.allow — ' +
+    'o operador TEM de ser avisado, senão a lista de domínio parece fronteira e não é');
+
+  const claudeCode = yaml.load(readFileSync(join(RAIZ, 'bindings/claude-code.yml'), 'utf8'),
+    { schema: yaml.CORE_SCHEMA });
+  const { warnings: avisosClaudeCode, translated } = applyBinding(pentest, claudeCode, pkg);
+  assert.deepEqual(avisosClaudeCode, [],
+    'claude-code é allowlist_scope: os — o sandbox do sistema operacional cobre o shell cru, ' +
+    'a lista é fronteira de verdade e não há perda a avisar');
+  assert.ok(translated.includes('network.allowlist'),
+    'claude-code traduz a allowlist de verdade (sandbox.network.allowedDomains)');
 });
