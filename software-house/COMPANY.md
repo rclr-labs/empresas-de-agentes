@@ -60,10 +60,16 @@ irreversíveis.
 
 ## As quatro decisões, tomadas
 
-**Organograma e fronteira.** Cinco papéis, delegação em uma direção só:
-coordenação recebe demanda e prioriza; tech lead desenha; desenvolvimento
-implementa; revisão contesta; portão de qualidade dá o veredito. Nenhum
-papel acumula implementar e aprovar o próprio trabalho.
+**Organograma e fronteira.** Nove papéis, delegação em uma direção só:
+coordenação recebe demanda e prioriza; product owner é dono do valor e
+escreve o critério de aceite; tech lead desenha; desenvolvimento
+implementa (genérico, ou especializado em frontend, backend e
+fullstack); revisão contesta; portão de qualidade dá o veredito. O PO é
+dono do valor, a coordenação é dona da capacidade — a mesma pergunta
+"isso entra na fila?" tem duas respostas diferentes dependendo de quem a
+faz. Nenhum papel acumula implementar e aprovar o próprio trabalho.
+Stack é skill anexável, não papel — quem adaptar não cria
+`desenvolvimento-java`; anexa `stack-java` ao papel de dev que escolher.
 
 **Orçamento.** Teto mensal declarado em `metadata.budget`, com alerta em
 70% e destinatário nomeado. Papel que estoura o teto para — não pede
@@ -76,7 +82,7 @@ não está escrito é portão que não existe. Nenhum papel deste pacote assina
 um desses portões: todo `signer` é pessoa nomeada no kickoff, porque um
 papel pode aprovar uma decisão de domínio, mas nunca o próprio estouro de
 teto ou o próprio release — por isso `capabilities.approve` fica vazio em
-todos os cinco papéis, deliberadamente. `deploy-producao` e
+todos os nove papéis, deliberadamente. `deploy-producao` e
 `remocao-de-dado-de-producao` declaram `triggers` — o glob de comando que
 pede confirmação antes de rodar; os outros dois não têm padrão de comando
 (gasto é avaliado, contato é conversa) e por isso não declaram nenhum.
@@ -104,3 +110,7 @@ uma recomendação universal:
 - **Produto com regulação:** acrescente um papel de conformidade com
   `reportsTo: null`, fora da cadeia de entrega. Papel de conformidade que
   reporta a quem ele audita não audita.
+- **Time sem especialização de dev:** mantenha só `desenvolvimento` e
+  anexe a skill de stack. Os três perfis existem para quem tem fronteira
+  real entre interface e serviço; criar a fronteira no papel sem ela
+  existir no time só adiciona handoff.

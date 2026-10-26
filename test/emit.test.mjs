@@ -25,10 +25,13 @@ test('claude-code: emite um .md por agente, com name, description e tools', () =
   const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
   // Tarefa 30: software-house agora também ganha `.claude/` (settings.json
   // com permissions.ask, dos gatilhos de human_gates) — por isso o
-  // diretório não é só os cinco .md.
+  // diretório não é só os .md. Tarefa 19 expandiu o pacote de cinco para
+  // nove papéis.
   const arquivos = readdirSync(out).sort();
   assert.deepEqual(arquivos, [
-    '.claude', 'coordenacao.md', 'desenvolvimento.md', 'portao-qualidade.md',
+    '.claude', 'coordenacao.md', 'desenvolvimento-backend.md',
+    'desenvolvimento-frontend.md', 'desenvolvimento-fullstack.md',
+    'desenvolvimento.md', 'portao-qualidade.md', 'product-owner.md',
     'revisao.md', 'tech-lead.md',
   ]);
   const { frontmatter, body } = parseMarkdown(readFileSync(join(out, 'tech-lead.md'), 'utf8'));
@@ -348,12 +351,12 @@ test('portable: um JSON por pacote, com budget preservado', () => {
   const { out } = emitir(['--package', 'software-house', '--binding', 'portable']);
   const manifesto = JSON.parse(readFileSync(join(out, 'agent-manifest.json'), 'utf8'));
   assert.equal(manifesto.package, 'software-house');
-  assert.equal(manifesto.agents.length, 5);
+  assert.equal(manifesto.agents.length, 9); // tarefa 19: cinco papéis → nove
   const pq = manifesto.agents.find((a) => a.slug === 'portao-qualidade');
   // NOTA: o brief original desta tarefa esperava
   // `pq.capabilities.approve` igual a ['deploy-producao']. Não é o que o
   // pacote real declara: software-house/COMPANY.md diz explicitamente que
-  // "capabilities.approve fica vazio em todos os cinco papéis,
+  // "capabilities.approve fica vazio em todos os nove papéis,
   // deliberadamente" — nenhum signer de human_gates é um papel, todos são
   // "pessoa nomeada no kickoff", e E14 reprovaria qualquer approve que
   // apontasse para um desses portões. A asserção certa é que o valor REAL

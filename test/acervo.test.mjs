@@ -22,11 +22,61 @@ test('software-house: zero aviso — nada de alias, toda persona preenchida', ()
   assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
 });
 
-test('software-house: os cinco papéis com os slugs estáveis', () => {
+test('software-house: nove papéis depois da expansão', () => {
   const { pkg } = relatorio('software-house');
   assert.deepEqual(pkg.agents.map((a) => a.slug).sort(), [
-    'coordenacao', 'desenvolvimento', 'portao-qualidade', 'revisao', 'tech-lead',
+    'coordenacao', 'desenvolvimento', 'desenvolvimento-backend',
+    'desenvolvimento-frontend', 'desenvolvimento-fullstack',
+    'portao-qualidade', 'product-owner', 'revisao', 'tech-lead',
   ]);
+});
+
+test('software-house: só backend e fullstack leem banco', () => {
+  const { pkg } = relatorio('software-house');
+  const comBanco = pkg.agents
+    .filter((a) => (a.frontmatter.metadata.capabilities.read ?? []).includes('database'))
+    .map((a) => a.slug).sort();
+  assert.deepEqual(comBanco, ['desenvolvimento-backend', 'desenvolvimento-fullstack'],
+    'frontend não toca banco — é a fronteira que separa os perfis');
+});
+
+test('software-house: tech-lead delega para os quatro perfis de dev e para revisao', () => {
+  const { pkg } = relatorio('software-house');
+  const tl = pkg.agents.find((a) => a.slug === 'tech-lead');
+  assert.deepEqual(tl.frontmatter.metadata.capabilities.delegate.sort(), [
+    'desenvolvimento', 'desenvolvimento-backend', 'desenvolvimento-frontend',
+    'desenvolvimento-fullstack', 'revisao',
+  ]);
+});
+
+test('software-house: product-owner nao prioriza capacidade e coordenacao nao escreve critério', () => {
+  const { pkg } = relatorio('software-house');
+  const po = pkg.agents.find((a) => a.slug === 'product-owner');
+  const co = pkg.agents.find((a) => a.slug === 'coordenacao');
+  // O par de risco: se as duas fronteiras convergirem, é um papel com dois nomes.
+  assert.ok(po.frontmatter.metadata.boundary.cannot.some((t) => /capacidade|fila|or[çc]amento/i.test(t)),
+    'o PO declara que não prioriza capacidade');
+  assert.ok(co.frontmatter.metadata.boundary.cannot.some((t) => /crit[ée]rio/i.test(t)),
+    'a coordenação declara que não escreve critério de aceite');
+  assert.notDeepEqual(po.frontmatter.metadata.capabilities, co.frontmatter.metadata.capabilities,
+    'dois papéis com as mesmas capacidades são um papel com dois nomes');
+});
+
+test('software-house: as cinco skills de stack existem e nenhuma é papel', () => {
+  const { pkg } = relatorio('software-house');
+  const stacks = pkg.skills.map((s) => s.slug).filter((s) => s.startsWith('stack-')).sort();
+  assert.deepEqual(stacks, ['stack-dotnet', 'stack-java', 'stack-node', 'stack-php', 'stack-python']);
+  for (const s of stacks) {
+    assert.ok(!pkg.agents.some((a) => a.slug === s), `${s} é skill, não papel`);
+  }
+});
+
+test('software-house: nenhum papel de dev amarra stack no slug', () => {
+  const { pkg } = relatorio('software-house');
+  for (const a of pkg.agents) {
+    assert.ok(!/java|php|python|node|dotnet/i.test(a.slug),
+      `${a.slug} amarra stack no papel; stack é skill anexável`);
+  }
 });
 
 test('software-house: toda persona tem nome, ícone, pronomes e histórico', () => {

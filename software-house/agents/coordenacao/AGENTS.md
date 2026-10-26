@@ -27,6 +27,7 @@ metadata:
       - interromper qualquer trabalho em andamento
     cannot:
       - escrever código
+      - escrever o critério de aceite de um item — isso é do product-owner
       - aprovar o próprio pedido
       - autorizar deploy em produção
   capabilities:
@@ -36,7 +37,7 @@ metadata:
       allow: ["git log*", "git diff*"]
       deny: ["git push*", "git merge*", "sudo *"]
     network: false
-    delegate: [tech-lead, portao-qualidade]
+    delegate: [product-owner, tech-lead, portao-qualidade]
     budget:
       currency: BRL
       monthly_cap: 400.00

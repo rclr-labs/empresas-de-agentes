@@ -7,6 +7,9 @@ kind: team
 manager: ../../agents/tech-lead/AGENTS.md
 includes:
   - ../../agents/desenvolvimento/AGENTS.md
+  - ../../agents/desenvolvimento-frontend/AGENTS.md
+  - ../../agents/desenvolvimento-backend/AGENTS.md
+  - ../../agents/desenvolvimento-fullstack/AGENTS.md
   - ../../agents/revisao/AGENTS.md
   - ../../agents/portao-qualidade/AGENTS.md
   - ../../skills/criterio-de-verificacao/SKILL.md

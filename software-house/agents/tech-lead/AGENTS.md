@@ -36,7 +36,7 @@ metadata:
       allow: ["git log*", "git diff*", "npm test*"]
       deny: ["git push*", "git merge*", "sudo *"]
     network: false
-    delegate: [desenvolvimento, revisao]
+    delegate: [desenvolvimento, desenvolvimento-frontend, desenvolvimento-backend, desenvolvimento-fullstack, revisao]
     budget:
       currency: BRL
       monthly_cap: 400.00
