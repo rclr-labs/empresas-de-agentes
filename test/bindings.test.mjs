@@ -237,3 +237,75 @@ test('alias map/unsupported antigo ainda carrega — formato de terceiro continu
   assert.deepEqual(tools, ['Read', 'Grep', 'Glob']);
   assert.deepEqual(lost, []);
 });
+
+// --- Tarefa 30: quarto estado, not_emitted -----------------------------
+
+test('not_emitted obriga a declarar o mecanismo e o que falta', () => {
+  const b = {
+    runtime: 't', emits: 'x', format: 'claude-code',
+    translates: {}, preserves: [], loses: [],
+    not_emitted: { 'execute.deny': { mechanism: 'permissions.deny', falta: 'emissor nao gera' } },
+  };
+  const { not_emitted } = applyBinding(
+    agente({ execute: { allow: [], deny: ['sudo *'] } }), b, PKG);
+  assert.equal(not_emitted.length, 1);
+  assert.ok(not_emitted[0].mechanism, 'sem mecanismo nomeado, e so perda com outro nome');
+  assert.ok(not_emitted[0].falta);
+});
+
+test('not_emitted NAO conta como perda e NAO conta como traduzido', () => {
+  const b = { runtime: 't', emits: 'x', format: 'claude-code', translates: {}, preserves: [], loses: [],
+    not_emitted: { 'execute.deny': { mechanism: 'm', falta: 'f' } } };
+  const r = applyBinding(agente({ execute: { allow: [], deny: ['sudo *'] } }), b, PKG);
+  assert.equal(r.lost.length, 0);
+  assert.ok(!r.translated.includes('execute.deny'));
+});
+
+test('ordem de resolucao: not_emitted so entra depois de translates, preserves e loses', () => {
+  // Uma chave que esteja em MAIS de um dos quatro mapas/listas (erro de
+  // configuração do binding) resolve pela ordem documentada em
+  // applyBinding — translates vence sobre not_emitted, por exemplo —
+  // nunca o inverso.
+  const b = {
+    runtime: 't', emits: 'x', format: 'claude-code',
+    translates: { 'execute.deny': [] }, preserves: [], loses: [],
+    not_emitted: { 'execute.deny': { mechanism: 'm', falta: 'f' } },
+  };
+  const { translated, not_emitted } = applyBinding(
+    agente({ execute: { allow: [], deny: ['sudo *'] } }), b, PKG);
+  assert.ok(translated.includes('execute.deny'), 'translates vence quando a chave está nos dois');
+  assert.equal(not_emitted.length, 0);
+});
+
+test('capacidade fora dos quatro estados continua sendo perda nao declarada — defeito do binding', () => {
+  const b = { runtime: 't', emits: 'x', format: 'claude-code', translates: {}, preserves: [], loses: [], not_emitted: {} };
+  const { lost, not_emitted } = applyBinding(agente({ read: ['repository'] }), b, PKG);
+  assert.equal(not_emitted.length, 0);
+  assert.match(lost[0].reason, /n[ãa]o declarada/i);
+});
+
+// loses obriga a declarar a busca que confirmou a ausência. O schema real
+// de `loses` neste acervo é uma LISTA de nomes de capacidade — não um
+// dict chave→citação, como num binding sintético poderia parecer — e a
+// citação que sustenta cada perda vive em `citations[cap]`, separada.
+// Adaptado à forma real do arquivo (ver nota no relatório da tarefa 30:
+// o brief original tratava `loses` como dict; os quatro bindings
+// publicados usam lista + citations desde a tarefa 27, e mudar essa forma
+// agora espalharia a mudança por toda a suíte sem necessidade).
+test('loses obriga a declarar a busca que confirmou a ausencia', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const yaml = (await import('js-yaml')).default;
+  const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'bindings');
+  const carregar = (f) => yaml.load(readFileSync(join(DIR, f), 'utf8'), { schema: yaml.CORE_SCHEMA });
+  for (const f of ['claude-code.yml', 'opencode.yml']) {
+    const b = carregar(f);
+    for (const cap of b.loses ?? []) {
+      const cite = b.citations?.[cap];
+      const texto = typeof cite === 'string' ? cite : (cite?.source ?? '');
+      assert.match(texto, /aus[êe]ncia|busca|n[ãa]o encontr|zero ocorr/i,
+        `${f}: ${cap} em loses sem declarar a busca que confirmou a ausência — perda afirmada sem evidência é inferência outra vez`);
+    }
+  }
+});

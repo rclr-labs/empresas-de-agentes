@@ -31,6 +31,10 @@ metadata:
     - id: deploy-producao
       description: deploy em produção
       signer: pessoa nomeada no kickoff
+      triggers:
+        - "kubectl apply*"
+        - "helm upgrade*"
+        - "terraform apply*"
     - id: gasto-acima-do-teto
       description: gasto acima do teto do papel
       signer: pessoa nomeada no kickoff
@@ -40,6 +44,12 @@ metadata:
     - id: remocao-de-dado-de-producao
       description: remoção de dado de produção
       signer: pessoa nomeada no kickoff
+      triggers:
+        - "DROP TABLE*"
+        - "DELETE FROM*"
+        - "TRUNCATE TABLE*"
+        - "terraform destroy*"
+        - "kubectl delete*"
 ---
 
 # Casa de Software
@@ -66,7 +76,10 @@ não está escrito é portão que não existe. Nenhum papel deste pacote assina
 um desses portões: todo `signer` é pessoa nomeada no kickoff, porque um
 papel pode aprovar uma decisão de domínio, mas nunca o próprio estouro de
 teto ou o próprio release — por isso `capabilities.approve` fica vazio em
-todos os cinco papéis, deliberadamente.
+todos os cinco papéis, deliberadamente. `deploy-producao` e
+`remocao-de-dado-de-producao` declaram `triggers` — o glob de comando que
+pede confirmação antes de rodar; os outros dois não têm padrão de comando
+(gasto é avaliado, contato é conversa) e por isso não declaram nenhum.
 
 **Ritual.** A tarefa recorrente `tasks/revisao-de-orcamento/` existe para
 que alguém leia a trilha toda semana. Operação sem leitor de trilha é

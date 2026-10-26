@@ -46,13 +46,37 @@ test('REGRA CENTRAL: todo binding cobre toda capacidade do acervo, em map ou uns
     // dois é o que impede a classe de defeito 2 (skills sem casa) de
     // voltar: toda chave nova em capabilityKeys cai automaticamente sob
     // esta mesma verificação, sem precisar de um segundo mecanismo.
+    // TAREFA 30 soma `not_emitted` à união pela mesma razão: o quarto
+    // estado não é "esquecer de declarar" — uma capacidade em
+    // `not_emitted` conta como coberta; uma capacidade fora dos quatro
+    // continua sendo o defeito que esta regra existe para apanhar.
     const cobertas = new Set([
       ...Object.keys(b.map ?? {}), ...(b.unsupported ?? []), ...(b.unsupported_metadata ?? []),
       ...Object.keys(b.translates ?? {}), ...(b.preserves ?? []), ...(b.loses ?? []),
+      ...Object.keys(b.not_emitted ?? {}),
     ]);
     const descobertas = [...usadas].filter((k) => !cobertas.has(k));
     assert.deepEqual(descobertas, [],
-      `${f} não cobre: ${descobertas.join(', ')}. Toda capacidade entra em map ou em unsupported — perda silenciosa não é opção`);
+      `${f} não cobre: ${descobertas.join(', ')}. Toda capacidade entra em translates, preserves, loses ou not_emitted — perda silenciosa não é opção`);
+  }
+});
+
+test('not_emitted exige mechanism e falta em toda célula dos bindings publicados', () => {
+  // A obrigação que distingue "não emitido" de "perdido com outro nome":
+  // sem mechanism, não há mecanismo nomeado para cobrar depois; sem
+  // falta, não há o que resolver. MUTAÇÃO: remover `mechanism` de
+  // qualquer célula de `not_emitted` em bindings/*.yml tem de fazer este
+  // teste falhar.
+  for (const f of nomes()) {
+    const b = carregar(f);
+    for (const [cap, info] of Object.entries(b.not_emitted ?? {})) {
+      assert.ok(typeof info === 'object' && info !== null,
+        `${f}: not_emitted.${cap} não é objeto — precisa de { mechanism, falta }`);
+      assert.ok((info.mechanism ?? '').trim().length > 0,
+        `${f}: not_emitted.${cap} sem "mechanism" — sem mecanismo nomeado, é só perda com outro nome`);
+      assert.ok((info.falta ?? '').trim().length > 0,
+        `${f}: not_emitted.${cap} sem "falta" — sem dizer o que falta, não há o que resolver`);
+    }
   }
 });
 
@@ -81,34 +105,39 @@ test('paperclip é identidade — o acervo já é o formato', () => {
   assert.deepEqual(b.unsupported ?? [], []);
 });
 
-test('claude-code declara budget, execute.deny, read.database e approve como perdidos — fix round 1', () => {
-  // Medido em 2026-10-25 (agent-studio/docs/pesquisa/2026-10-25-runtimes-
-  // medidos.md). A tarefa 28 tinha movido execute.deny/read.database/
-  // approve para `translates` citando mecanismo real — mas nenhum dos
-  // três é de fato EMITIDO por tools/writers.mjs ou tools/emit.mjs
-  // (auditoria do fix round 1): disallowedTools só dispara no caso raro
-  // em que execute.allow está vazio (nenhum papel real cai nisso), e uma
-  // emissão por união de projeto para execute.deny seria ATIVAMENTE
-  // ERRADA — bloquearia o git push/commit que software-house/
-  // desenvolvimento tem permissão explícita para usar. "translates" tem
-  // de significar "este emissor escreve o mecanismo", não "o runtime
-  // tem o mecanismo em algum lugar" — os três voltam para `loses`.
-  // network.allowlist continua `translates`: diferente dos outros três,
-  // esse MECANISMO (.claude/settings.json com sandbox.network.
-  // allowedDomains) é de fato emitido por tools/emit.mjs, e a união de
-  // projeto não cria o mesmo conflito perigoso (nenhum pacote publicado
-  // tem dois papéis com posturas de rede incompatíveis).
+test('claude-code: TAREFA 30 separa dívida nossa (not_emitted) de limite do runtime (loses)', () => {
+  // Fix round 1 (2026-10-25) tinha movido execute.deny/read.database/
+  // approve para `loses`, junto com budget — e isso repetia, com a mesma
+  // palavra, o próprio erro que corrigia: "loses" não distinguia entre
+  // "o Claude Code não tem onde guardar isto" (budget, context — campo
+  // ausente, confirmado por busca) e "o Claude Code TEM onde guardar e
+  // nós não geramos" (execute.deny, read.database, approve — mecanismo
+  // real, nomeado, só não emitido). Tarefa 30 resolve as três de forma
+  // diferente, verificando antes de decidir (ver claude-code.yml
+  // `source`):
+  //   - execute.deny: VERIFICADO que hooks por agente existem, escopados
+  //     a esse agente, e que PreToolUse pode negar — volta para
+  //     `translates`, de fato EMITIDO (tools/writers.mjs escreve
+  //     frontmatter.hooks).
+  //   - read.database e approve: mecanismo real, mas sem dado (servidor
+  //     MCP; padrão de comando) para escrever — vão para `not_emitted`,
+  //     não para `loses`: a lacuna é de dado/engenharia, não de runtime.
+  // budget continua em `loses` — a ausência de campo de custo não mudou.
   const b = carregar('claude-code.yml');
   assert.ok(b.loses.includes('budget'),
-    'Claude Code não tem teto por agente; a perda tem de estar declarada');
-  assert.ok(b.loses.includes('execute.deny'),
-    'o mecanismo existe no runtime, mas este emissor não o escreve — e uma emissão por união seria perigosa');
-  assert.ok(b.loses.includes('read.database'),
-    'nenhum AGENTS.md nomeia um servidor MCP para construir o mecanismo');
-  assert.ok(b.loses.includes('approve'),
-    'capabilities.approve não carrega o padrão de comando que permissions.ask exige');
+    'Claude Code não tem teto de custo por agente; a perda tem de estar declarada');
+  assert.ok('execute.deny' in b.translates,
+    'hooks por agente são mecanismo real e verificado — execute.deny volta a ser traduzido, de fato emitido');
+  assert.ok(!b.loses.includes('execute.deny'),
+    'execute.deny não pode estar em loses E em translates ao mesmo tempo');
+  assert.ok('read.database' in (b.not_emitted ?? {}),
+    'mecanismo real (mcp__<servidor>__<ferramenta>), mas nenhum AGENTS.md nomeia o servidor — dívida nossa, não limite do runtime');
+  assert.ok('approve' in (b.not_emitted ?? {}),
+    'permissions.ask é mecanismo real; capabilities.approve não carrega o padrão de comando nem amarra o signer');
+  assert.ok(!b.loses.includes('read.database') && !b.loses.includes('approve'),
+    'as duas saíram de loses — não podem continuar lá E em not_emitted');
   assert.ok('network.allowlist' in b.translates,
-    'este, ao contrário dos outros três, É de fato emitido — tools/emit.mjs escreve .claude/settings.json');
+    'network.allowlist continua de fato emitido — tools/emit.mjs escreve .claude/settings.json');
 });
 
 test('opencode foi MEDIDO em 2026-10-25 e deixou de ser "pendente de confirmação"', () => {
@@ -181,13 +210,17 @@ test('todo agente do acervo aplica em todo binding sem perda não declarada', ()
 //   - skills/memory: campo de frontmatter escrito direto de
 //     frontmatter.skills / metadata.memory.scope.
 //   - network.allowlist: .claude/settings.json escrito por tools/emit.mjs.
+//   - execute.deny (TAREFA 30): frontmatter.hooks.PreToolUse, escrito por
+//     tools/writers.mjs — ver test/emit.test.mjs "execute.deny vira hook".
 // Qualquer OUTRA chave de `translates` com destino vazio é suspeita por
 // definição — ou tem destino de ferramenta, ou é um dos mecanismos
 // especiais acima (com teste de emissão correspondente), ou não devia
 // estar em `translates`. Foi exatamente a ausência desta verificação que
 // deixou execute.deny/read.database/approve declarados como `translates`
-// sem o emissor escrever nada para os três.
-const MECANISMOS_ESPECIAIS_CLAUDE_CODE = new Set(['skills', 'memory', 'network.allowlist']);
+// sem o emissor escrever nada para os três, no fix round 1. MUTAÇÃO: se
+// execute.deny voltar para `translates` sem que writers.mjs o emita (ou
+// sair desta lista sem sair de `translates`), este teste tem de falhar.
+const MECANISMOS_ESPECIAIS_CLAUDE_CODE = new Set(['skills', 'memory', 'network.allowlist', 'execute.deny']);
 
 test('INVARIANTE: toda capacidade traduzida do claude-code é emitida ou é mecanismo especial testado — nunca nenhum dos dois', () => {
   const b = carregar('claude-code.yml');

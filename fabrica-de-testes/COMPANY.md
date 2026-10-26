@@ -30,9 +30,15 @@ metadata:
     - id: tocar-producao
       description: executar qualquer checagem contra ambiente de produção
       signer: pessoa nomeada no kickoff
+      triggers:
+        - "*producao*"
+        - "*production*"
     - id: carga-acima-do-acordado
       description: teste de carga acima do volume acordado
       signer: pessoa nomeada no kickoff
+      triggers:
+        - "k6 run*"
+        - "artillery run*"
     - id: divulgar-achado-de-seguranca
       description: divulgar achado de segurança fora da equipe
       signer: pessoa nomeada no kickoff
@@ -77,7 +83,11 @@ rajada, e teto mensal esconde a execução que custou dez vezes o normal.
 
 **Portões humanos.** Três: tocar produção, passar da carga acordada e
 divulgar achado de segurança. Os três são irreversíveis de maneiras
-diferentes, e nenhum é decisão de agente.
+diferentes, e nenhum é decisão de agente. `tocar-producao` e
+`carga-acima-do-acordado` declaram `triggers` — o glob de comando que pede
+confirmação antes de rodar; `divulgar-achado-de-seguranca` não tem padrão
+de comando (é decisão de divulgação, não de execução) e por isso não
+declara nenhum.
 
 **Ritual.** `tasks/` carrega a revisão do plano contra o risco corrente.
 Plano de teste que não muda quando o produto muda testa o produto do

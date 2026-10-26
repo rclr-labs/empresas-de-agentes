@@ -92,42 +92,50 @@ translates:
   delegate: []
 preserves: []
 loses:
-  # approve: FIX ROUND 1 — movido de translates para loses, mesma
-  # auditoria que corrigiu claude-code.yml. O efeito `ask` (resource =
-  # texto de comando) é mecanismo real, mas buildPermissions() (tools/
-  # bindings.mjs) nunca escreve uma regra `ask` — e, como no Claude Code,
-  # não haveria dado no pacote para construir o `resource` certo:
-  # capabilities.approve referencia `human_gates[].id`, não um padrão de
-  # comando. "Allow always" e a ausência de signer nomeado (mesma
-  # ressalva de approve.signer do claude-code.yml) ficam documentados
-  # aqui em prosa, não como chave própria do vocabulário.
-  - approve
   # budget: busca em Config.Info, ConfigAgent.Info e `gh api search/code`
   # por budget/monthly_cap/spend_limit/cost_cap/spending_limit no repo
   # inteiro — zero ocorrência em todo o schema do runtime. Existe
   # `policies` (allow/deny binário de provider/tool/integration), mas não
   # tem moeda, teto nem alerta.
   - budget
-  # read.database: `read` é ação só de sistema de arquivo (resource =
-  # caminho). O único jeito de alcançar um banco é via servidor MCP, cuja
-  # ação é `<server>_<tool>` com resource `*` — concede/nega a TOOL
-  # inteira, sem distinguir SELECT de DROP TABLE. Mais grosso que a
-  # capacidade, não equivalente a ela.
-  - read.database
-  # skills: ConfigAgent.Info (agent.ts) não tem campo `skills`. Existe uma
-  # ação de PERMISSÃO chamada `skill` (resource = skill ID) em
-  # permission.ts, mas essa ação controla se o agente PODE invocar uma
-  # skill já carregada — não é o mecanismo de DECLARAR quais skills o
-  # papel preload no startup, que é o que este acervo expressa. Usar a
-  # ação `skill` aqui seria emprestar um mecanismo de controle de acesso
-  # como se fosse o de carregamento — o mesmo tipo de erro que motivou
-  # esta tarefa inteira.
+  # skills: ausência confirmada em ConfigAgent.Info (agent.ts) — não tem
+  # campo `skills`. Existe uma ação de PERMISSÃO chamada `skill`
+  # (resource = skill ID) em permission.ts, mas essa ação controla se o
+  # agente PODE invocar uma skill já carregada — não é o mecanismo de
+  # DECLARAR quais skills o papel preload no startup, que é o que este
+  # acervo expressa. Usar a ação `skill` aqui seria emprestar um
+  # mecanismo de controle de acesso como se fosse o de carregamento — o
+  # mesmo tipo de erro que motivou a tarefa 27 inteira.
   - skills
   # memory: nenhum campo em Config.Info nem ConfigAgent.Info.
   - memory
   # context: nenhum campo correspondente — ausência confirmada junto com
   # memory, mesma leitura de agent.ts.
   - context
+not_emitted:
+  # approve: TAREFA 30 — sai de `loses`, entra aqui. O efeito `ask`
+  # (resource = texto de comando) é mecanismo real, mas buildPermissions()
+  # (tools/bindings.mjs) nunca escreve uma regra `ask` — e, como no Claude
+  # Code, não haveria dado no pacote para construir o `resource` certo:
+  # capabilities.approve referencia `human_gates[].id`, não um padrão de
+  # comando. Diferente do Claude Code, este binding NÃO ganhou emissão de
+  # human_gates[].triggers na tarefa 30 (fora do escopo declarado — ver
+  # SCHEMA.md §8); a lacuna aqui é só a de engenharia (não emitimos),
+  # nunca a de dado (triggers existiria se escrevêssemos o código).
+  approve:
+    mechanism: "ação ask (packages/schema/src/permission.ts), resource = texto do comando"
+    falta: "buildPermissions() não escreve regra ask; capabilities.approve não carrega o padrão de comando que ela exigiria; o signer nomeado também não é modelado em capabilities/v1"
+  # read.database: TAREFA 30 — sai de `loses`, entra aqui. `read` é ação
+  # só de sistema de arquivo (resource = caminho); o único jeito de
+  # alcançar um banco é via servidor MCP, cuja ação é `<server>_<tool>`
+  # com resource `*` — concede/nega a TOOL inteira, sem distinguir SELECT
+  # de DROP TABLE. Essa coarseza é real, mas não é o que bloqueia a
+  # emissão: mesmo a regra grosseira exigiria nomear o servidor, e nenhum
+  # AGENTS.md do acervo declara qual servidor MCP expõe o banco — mesma
+  # lacuna de dado do Claude Code.
+  read.database:
+    mechanism: "ação <server>_<tool> (permissions.mdx), allow/deny da ferramenta MCP inteira"
+    falta: "o pacote não declara qual servidor MCP expõe o banco; mesmo com o nome, a ação só concede/nega a ferramenta inteira, sem distinguir leitura de escrita dentro dela"
 citations:
   read.repository:
     inferido: true
@@ -158,12 +166,14 @@ citations:
     source: "alcance geral mapeado para a mesma ação webfetch/websearch de read.web — V2 não distingue 'tem rede' de 'tem busca'"
   network.allowlist: "permissions.mdx — ação `webfetch`, resource = URL requisitada, lido 2026-10-25; EMITIDO em tools/bindings.mjs (fix round 1) como deny-geral + allow por domínio, dentro do frontmatter de cada agente"
   delegate: "agents.mdx — ação `subagent`, resource = id do agente alvo, lido 2026-10-25"
-  approve: "permissions.mdx — efeito `ask` é mecanismo real, mas NÃO emitido (fix round 1): buildPermissions() não escreve regra ask, e capabilities.approve não carrega o padrão de comando que ela exigiria"
+  approve: "permissions.mdx — efeito `ask` é mecanismo real, mas NÃO emitido (tarefa 30, not_emitted): buildPermissions() não escreve regra ask, e capabilities.approve não carrega o padrão de comando que ela exigiria"
   budget:
     inferido: true
     source: "ausência confirmada por gh api search/code em anomalyco/opencode por budget|monthly_cap|spend_limit|cost_cap|spending_limit — zero ocorrência, lido 2026-10-25"
-  read.database: "permissions.mdx — ação `read` é só caminho de arquivo; `<server>_<tool>` é grosseiro demais, lido 2026-10-25"
-  skills: "packages/schema/src/config/agent.ts (ConfigAgent.Info sem campo skills) + permissions.mdx (ação `skill` é controle de acesso, não declaração), lidos 2026-10-25"
+  read.database: "permissions.mdx — ação `read` é só caminho de arquivo; `<server>_<tool>` é grosseiro demais e, de qualquer forma, NÃO emitido (tarefa 30, not_emitted): nenhum AGENTS.md nomeia o servidor, lido 2026-10-25"
+  skills:
+    inferido: true
+    source: "ausência confirmada em packages/schema/src/config/agent.ts (ConfigAgent.Info sem campo skills) + permissions.mdx (ação `skill` é controle de acesso, não declaração), lidos 2026-10-25"
   memory: "packages/schema/src/config/agent.ts — ausência confirmada, lido 2026-10-25"
   context: "packages/schema/src/config/agent.ts — ausência confirmada, lido 2026-10-25"
 unsupported: []

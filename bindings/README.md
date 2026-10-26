@@ -15,9 +15,9 @@ Cada binding é um arquivo `.yml` nesta pasta, carregado por
 pelo Studio (que importa o mesmo módulo puro no browser para o preview de
 emissão).
 
-## 2. Três estados, não dois
+## 2. Quatro estados, não dois
 
-Até esta versão, uma capacidade só podia estar `map`eada (traduzida para
+Até a tarefa 27, uma capacidade só podia estar `map`eada (traduzida para
 ferramenta do runtime) ou `unsupported` (perdida). Isso é binário, e o
 binário não consegue expressar o meio do caminho: um arquivo que **sobrevive
 intacto** na emissão, mas que o runtime **não age** sobre — Paperclip copia
@@ -27,20 +27,35 @@ logo o runtime não aplica teto nenhum. Chamar isso de "sem perda" é mentira
 por omissão: tão governança quanto dizer que o runtime enforce o que ele só
 guarda.
 
-Por isso todo binding desta pasta declara `translates`, `preserves` e
-`loses`:
+A tarefa 30 soma um quarto estado: até então, `loses` também carregava duas
+coisas diferentes com o mesmo nome — a capacidade que o runtime **não tem
+onde guardar** (`budget` no Claude Code: zero campo de custo, confirmado
+por busca) e a que ele **tem onde guardar e o emissor simplesmente não
+gera** (`execute.deny`, antes do fix de hooks por agente; `read.database`,
+que exige um servidor MCP que o pacote não declara). Misturar as duas
+esconde dívida de engenharia detrás do limite de um terceiro — e ninguém
+fatura o terceiro pela dívida que é nossa.
+
+Por isso todo binding desta pasta declara `translates`, `preserves`,
+`loses` **e** `not_emitted`:
 
 | Estado | Significa |
 |---|---|
-| `translates` | O runtime **honra** a capacidade; a chave nomeia o mecanismo concreto |
+| `translates` | O runtime **honra** a capacidade; a chave nomeia o mecanismo concreto, e ele é de fato emitido |
 | `preserves` | O dado **sobrevive** no arquivo emitido; o runtime **não age** sobre ele |
-| `loses` | Nem sobrevive, nem é honrado |
+| `loses` | O runtime **não tem onde guardar** a capacidade — nem sobrevive, nem é honrado |
+| `not_emitted` | O mecanismo **existe** e está nomeado (`mechanism`), mas este emissor **ainda não o gera** (`falta` diz o que falta) — dívida nossa, não limite do runtime |
+
+Ordem de resolução de uma capacidade: `translates` → `preserves` →
+`loses` → `not_emitted` → nenhum dos quatro é defeito do binding,
+reportado como perda não declarada.
 
 `map` e `unsupported` continuam funcionando como **alias de leitura** de
 `translates`/`loses` — um binding de terceiro escrito no formato antigo
 ainda carrega, com o mesmo texto de motivo ("declarado em unsupported") que
-sempre teve. Todo binding novo, e toda revisão de um existente, usa os três
-nomes novos.
+sempre teve. Não existe alias antigo para `not_emitted`: é estado novo, sem
+formato anterior a compatibilizar. Todo binding novo, e toda revisão de um
+existente, usa os quatro nomes.
 
 ## 3. `rule_order` e `allowlist_scope`
 
@@ -70,9 +85,9 @@ Toda capacidade que o acervo realmente usa — cada `capabilities.read`,
 `capabilities.write`, `execute.allow`/`deny`, `network`,
 `network.allowlist`, `delegate`, `budget`, `approve`, e também os campos de
 topo `skills`, `memory`, `context` (ver §5) — tem de aparecer em
-`translates`, `preserves` **ou** `loses` de todo binding desta pasta. Não
-existe quarta opção, e "esqueci de declarar" é o próprio defeito que este
-mecanismo existe para impedir.
+`translates`, `preserves`, `loses` **ou** `not_emitted` de todo binding
+desta pasta. Não existe quinta opção, e "esqueci de declarar" é o próprio
+defeito que este mecanismo existe para impedir.
 
 A razão é a mesma que justifica a existência do `lost` em `applyBinding`:
 perda silenciosa de fronteira é pior que fronteira ausente, porque cria a
@@ -136,13 +151,19 @@ Cinco campos são obrigatórios em todo arquivo desta pasta:
 | `format` | A chave que `tools/writers.mjs` usa para escolher o escritor (`claude-code`, `opencode`, `identity`, `portable`) |
 | `map` | O dicionário capacidade → ferramenta(s) do runtime. Chave ausente de `map` e de `unsupported` é defeito do binding, detectado em `applyBinding` como perda "não declarada" |
 
-Campos adicionais do esquema de três estados:
+Campos adicionais do esquema de quatro estados:
 
 - `preserves` — lista de chaves de capacidade cujo dado sobrevive no
   arquivo emitido, mas que o runtime não aplica.
-- `loses` — lista de chaves cuja capacidade nem sobrevive nem é honrada.
-  Substitui `unsupported` nos bindings novos; `unsupported` continua
-  funcionando como alias de leitura.
+- `loses` — lista de chaves cuja capacidade o runtime não tem onde
+  guardar — nem sobrevive, nem é honrada. Substitui `unsupported` nos
+  bindings novos; `unsupported` continua funcionando como alias de
+  leitura.
+- `not_emitted` — dicionário `chave → { mechanism, falta }`: o mecanismo
+  do runtime existe e está nomeado em `mechanism`, mas este emissor ainda
+  não o gera — `falta` diz o que falta para gerá-lo (um dado que o pacote
+  não declara, uma implementação que ainda não existe). As duas chaves são
+  obrigatórias em toda célula; sem `mechanism`, é perda com outro nome.
 - `rule_order` — obrigatório quando o binding emite lista de regra
   (`first-match` ou `last-match`).
 - `allowlist_scope` — obrigatório quando o binding traduz

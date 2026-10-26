@@ -125,6 +125,28 @@ test('nenhum pacote do acervo produz E14 — approve sempre concorda com o signe
   }
 });
 
+test('TAREFA 30: só os portões com padrão de comando real declaram triggers', () => {
+  // human_gates[].triggers é opcional e aditivo — um portão sem padrão de
+  // comando (contato com cliente, divulgar achado de segurança, gasto
+  // acima do teto) não pode ganhar um glob inventado só para preencher o
+  // campo. software-house: deploy-producao e remocao-de-dado-de-producao
+  // têm; fabrica-de-testes: tocar-producao e carga-acima-do-acordado têm.
+  const COM_TRIGGERS = new Set(['deploy-producao', 'remocao-de-dado-de-producao',
+    'tocar-producao', 'carga-acima-do-acordado']);
+  for (const nome of listPackages(RAIZ)) {
+    const pkg = loadPackage(join(RAIZ, nome));
+    for (const g of pkg.company.frontmatter.metadata?.human_gates ?? []) {
+      if (typeof g === 'string') continue;
+      const temTriggers = Array.isArray(g.triggers) && g.triggers.length > 0;
+      if (COM_TRIGGERS.has(g.id)) {
+        assert.ok(temTriggers, `${nome}: "${g.id}" deveria declarar triggers`);
+      } else {
+        assert.ok(!temTriggers, `${nome}: "${g.id}" não tem padrão de comando real — não deveria declarar triggers`);
+      }
+    }
+  }
+});
+
 test('todo papel que abre pull request consegue dar push', () => {
   for (const nome of listPackages(RAIZ)) {
     for (const a of loadPackage(join(RAIZ, nome)).agents) {

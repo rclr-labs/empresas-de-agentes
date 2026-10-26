@@ -31,12 +31,98 @@ function disallowedTools(agent) {
   return allow.length === 0 && deny.length > 0 ? ['Bash'] : [];
 }
 
+// execute.deny → hook PreToolUse por agente, TAREFA 30. VERIFICADO antes
+// de escrever uma linha disto (code.claude.com/docs/en/sub-agents, seção
+// "Hooks in subagent frontmatter"): o frontmatter de sub-agente aceita um
+// campo `hooks` próprio, escopado a ESSE agente só — "These hooks only
+// run while that specific subagent is active and are cleaned up when it
+// finishes". É esse escopo por agente que resolve o que tornou a união
+// por projeto perigosa (bindings/claude-code.yml, `source`): o hook de
+// `desenvolvimento` nunca entra em conflito com o de `revisao`, porque
+// cada um vive só no próprio arquivo.
+//
+// O comando do hook lê `tool_input.command` do JSON em stdin (confirmado
+// em code.claude.com/docs/en/hooks) e sai com código 2 — "a PreToolUse
+// hook blocks the tool call" — quando o comando casa um dos globs de
+// `execute.deny` DESTE agente. Os padrões viajam como argumentos
+// posicionais de um `sh -c` interno (`"$@"`), não interpolados direto na
+// string do script: interpolar direto abriria injeção de shell se um
+// glob um dia carregasse aspas ou `;` — passar por argv com quoting de
+// cada padrão fecha essa classe de defeito.
+function escapeShellSingleQuote(valor) {
+  return `'${String(valor).replace(/'/g, "'\\''")}'`;
+}
+
+function denyHookCommand(patterns) {
+  const args = patterns.map(escapeShellSingleQuote).join(' ');
+  const script =
+    'cmd=$(cat | jq -r ".tool_input.command // empty"); ' +
+    'for p in "$@"; do case "$cmd" in $p) ' +
+    'echo "Blocked: execute.deny nega o padrao: $p" >&2; exit 2;; esac; ' +
+    'done; exit 0';
+  return `sh -c '${script}' sh ${args}`;
+}
+
+function executeDenyHooks(agent) {
+  const cap = agent.frontmatter.metadata?.capabilities ?? {};
+  const deny = cap.execute?.deny ?? [];
+  if (!deny.length) return null;
+  return {
+    PreToolUse: [
+      {
+        matcher: 'Bash',
+        hooks: [{ type: 'command', command: denyHookCommand(deny) }],
+      },
+    ],
+  };
+}
+
+// human_gates[].triggers → permissions.ask, TAREFA 30. Escopo de EMPRESA
+// (todo o pacote), não de agente — ao contrário de execute.deny. É a
+// escolha certa aqui, não o mesmo risco: um portão humano existe para
+// QUALQUER agente do pacote que tente o comando, não para um papel só, e
+// `ask` apenas PAUSA para confirmação — não nega como `deny` — então não
+// há como a união de gatilhos bloquear o que outro papel tem permissão
+// explícita para fazer (a razão pela qual a união de `execute.deny` foi
+// rejeitada em bindings/claude-code.yml `source`). Só os portões que
+// DECLARAM `triggers` contribuem; um portão sem gatilho de comando
+// (contato com cliente, divulgar achado de segurança) não inventa um glob
+// — fica em not_emitted (ver applyBinding, chave `approve`).
+//
+// Converte o glob de shell deste acervo ("terraform apply*") para a
+// sintaxe de regra do Claude Code (code.claude.com/docs/en/permissions:
+// "Bash(terraform apply:*)") — troca o `*` final por `:*`, a forma que a
+// doc usa para "este prefixo, com qualquer coisa depois".
+function globParaRegraBash(glob) {
+  const prefixo = glob.endsWith('*') ? glob.slice(0, -1).trimEnd() : glob;
+  return `Bash(${prefixo}:*)`;
+}
+
+export function buildAskRules(pkg) {
+  const gates = pkg.company?.frontmatter?.metadata?.human_gates ?? [];
+  const regras = [];
+  const vistas = new Set();
+  for (const gate of gates) {
+    for (const glob of gate?.triggers ?? []) {
+      const regra = globParaRegraBash(glob);
+      if (!vistas.has(regra)) { vistas.add(regra); regras.push(regra); }
+    }
+  }
+  return regras;
+}
+
 export const writers = {
   'claude-code': (agent, applied) => {
     const meta = agent.frontmatter.metadata ?? {};
     const skills = agent.frontmatter.skills ?? [];
     const memoryScope = meta.memory?.scope;
     const negadas = disallowedTools(agent);
+    const hooks = executeDenyHooks(agent);
+    // budget.max_turns: proxy de TURNO, nunca de GASTO — `budget`
+    // continua perdido de verdade (bindings/claude-code.yml `loses`); o
+    // campo novo, opcional, só emite quando o papel declara um número
+    // explícito, e o nome do campo já avisa o operador do que é.
+    const maxTurns = meta.capabilities?.budget?.max_turns;
     const frontmatter = {
       name: agent.slug,
       description: descricao(agent),
@@ -48,6 +134,8 @@ export const writers = {
     if (skills.length) frontmatter.skills = skills.join(', ');
     if (memoryScope) frontmatter.memory = memoryScope;
     if (negadas.length) frontmatter.disallowedTools = negadas.join(', ');
+    if (maxTurns != null) frontmatter.maxTurns = maxTurns;
+    if (hooks) frontmatter.hooks = hooks;
     return {
       path: `${agent.slug}.md`,
       content: toMarkdown({ frontmatter, body: agent.body }),

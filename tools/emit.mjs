@@ -6,7 +6,7 @@ import yaml from 'js-yaml';
 import { loadPackage } from './schema.mjs';
 import { validatePackage } from './rules.mjs';
 import { applyBinding } from './bindings.mjs';
-import { writers, portableManifest } from './writers.mjs';
+import { writers, portableManifest, buildAskRules } from './writers.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -49,6 +49,7 @@ if (todosErros.length) {
 
 mkdirSync(out, { recursive: true });
 const perdas = [];
+const naoEmitidas = [];
 const preservadas = [];
 const avisos = [];
 const aplicados = [];
@@ -57,6 +58,7 @@ for (const agente of pkg.agents) {
   const applied = applyBinding(agente, binding, pkg);
   aplicados.push({ agente, applied });
   for (const l of applied.lost) perdas.push({ slug: agente.slug, ...l });
+  for (const n of applied.not_emitted ?? []) naoEmitidas.push({ slug: agente.slug, ...n });
   for (const p of applied.preserved) preservadas.push({ slug: agente.slug, ...p });
   for (const w of applied.warnings) avisos.push({ slug: agente.slug, ...w });
 }
@@ -100,17 +102,29 @@ if (binding.format === 'portable') {
   // `.claude/settings.json` com `sandbox.network.allowedDomains`, união
   // dos domínios de `capabilities.network` de todo agente do pacote.
   // Escopo de PROJETO, não por agente — ver o caveat em
-  // bindings/claude-code.yml (allowlist_scope). Escrito só quando há ao
-  // menos um domínio a declarar; pacote sem nenhum papel com allowlist
-  // de rede não ganha um settings.json vazio.
+  // bindings/claude-code.yml (allowlist_scope).
+  //
+  // human_gates[].triggers (TAREFA 30): mesmo arquivo, segunda chave —
+  // `permissions.ask`, união dos gatilhos de todo portão da EMPRESA que
+  // declara `triggers` (buildAskRules, em tools/writers.mjs, puro).
+  // Escopo de empresa também, e de propósito: ver o comentário em
+  // buildAskRules sobre por que a união é segura aqui e não era para
+  // execute.deny.
+  //
+  // O arquivo só é escrito quando ao menos UMA das duas chaves tem
+  // conteúdo — pacote sem allowlist de rede e sem portão com gatilho não
+  // ganha um settings.json vazio.
   if (binding.format === 'claude-code') {
     const dominios = new Set();
     for (const agente of pkg.agents) {
       const cap = agente.frontmatter?.metadata?.capabilities ?? {};
       if (Array.isArray(cap.network)) for (const d of cap.network) dominios.add(d);
     }
-    if (dominios.size) {
-      const settings = { sandbox: { network: { allowedDomains: [...dominios].sort() } } };
+    const askRules = buildAskRules(pkg);
+    const settings = {};
+    if (dominios.size) settings.sandbox = { network: { allowedDomains: [...dominios].sort() } };
+    if (askRules.length) settings.permissions = { ask: askRules };
+    if (Object.keys(settings).length) {
       const destino = join(out, '.claude', 'settings.json');
       mkdirSync(dirname(destino), { recursive: true });
       writeFileSync(destino, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
@@ -120,23 +134,28 @@ if (binding.format === 'portable') {
 
 console.log(`${pkg.slug} → ${runtime}: ${pkg.agents.length} agente(s) em ${out}`);
 
-// Três saídas distintas, de propósito: PRESERVADA não é perdida (o dado
-// sobrevive no arquivo, só não é agido pelo runtime) e PERDIDA não é
-// preservada (nem sobrevive, nem é honrada) — tratar as duas como a
-// mesma coisa é exatamente o "no loss" que a tarefa 27 existe para
-// corrigir, porque "paperclip copia byte a byte" e "claude-code aplica a
-// permissão" não são a mesma garantia.
+// QUATRO saídas distintas, de propósito (TAREFA 30 generaliza para a
+// quarta o que a tarefa 27 fez para a primeira três): PRESERVADA não é
+// perdida (o dado sobrevive no arquivo, só não é agido pelo runtime),
+// PERDIDA não é preservada (nem sobrevive, nem é honrada), e NÃO EMITIDA
+// não é PERDIDA — o runtime TEM onde guardar a capacidade, o mecanismo
+// está nomeado, só não geramos ainda. Misturar PERDIDA com NÃO EMITIDA é
+// exatamente o defeito que esta tarefa existe para corrigir: esconde
+// dívida de engenharia (não emitimos) detrás do limite de um terceiro
+// (o runtime não tem onde guardar) — e ninguém fatura o terceiro pela
+// dívida que é nossa.
 //
 // Fix round 1 (achado 2 da auditoria): PRESERVADA agrega por MOTIVO, não
-// por papel × capacidade. Quando toda capacidade de um pacote some sob o
-// mesmo motivo (identidade/portable: a spec base não define a maioria),
-// listar papel × capacidade produz 49, 66, 72 linhas carregando uma
-// única informação — o sinal real (as poucas perdas nomeadas de
-// claude-code/opencode) passa a competir com ruído, e um operador que
-// aprende a pular esse bloco aprende a pular a parte que importa. PERDIDA
-// continua item a item, sempre: perda é rara e específica, cada uma
-// nomeia uma lacuna diferente — agregar aqui esconderia exatamente o que
-// a tarefa 27 existe para não esconder.
+// por papel × capacidade — listar papel × capacidade produz 49, 66, 72
+// linhas carregando uma única informação. TAREFA 30 estende a mesma
+// agregação a PERDIDA e a NÃO EMITIDA: depois que execute.deny deixou de
+// ser perda (passou a hook emitido) e approve/read.database deixaram de
+// ser perda (passaram a não-emitida), o que resta em PERDIDA (budget,
+// context) é uniforme por desenho — o MESMO motivo vale para todo agente
+// do pacote, porque a citação vem do binding, não do papel. Agregar aqui
+// não esconde diferença nenhuma entre papéis, porque não há diferença
+// nenhuma a esconder; continua existindo a saída --verbose para quem
+// quer o detalhe item a item de qualquer uma das quatro listas.
 function agruparPorMotivo(itens) {
   const grupos = new Map();
   for (const it of itens) {
@@ -146,16 +165,19 @@ function agruparPorMotivo(itens) {
   return grupos;
 }
 
+function papeisDe(itens) {
+  const slugsUnicos = [...new Set(itens.map((i) => i.slug))];
+  return slugsUnicos.length === pkg.agents.length
+    ? `todos os ${pkg.agents.length}`
+    : slugsUnicos.join(', ');
+}
+
 if (preservadas.length) {
   const grupos = agruparPorMotivo(preservadas);
   console.log(`\nAVISO — ${preservadas.length} capacidade(s) PRESERVADA(S) mas não aplicada(s), por ${grupos.size} motivo(s):`);
   for (const [motivo, itens] of grupos) {
-    const slugsUnicos = [...new Set(itens.map((i) => i.slug))];
-    const papeis = slugsUnicos.length === pkg.agents.length
-      ? `todos os ${pkg.agents.length}`
-      : slugsUnicos.join(', ');
     console.log(`  [${itens.length}] ${motivo}`);
-    console.log(`       papéis: ${papeis}`);
+    console.log(`       papéis: ${papeisDe(itens)}`);
   }
   if (verbose) {
     console.log('\n  Detalhe por papel:');
@@ -166,11 +188,37 @@ if (preservadas.length) {
 }
 
 if (perdas.length) {
-  console.log(`\nAVISO — ${perdas.length} capacidade(s) PERDIDA(S):`);
-  for (const p of perdas) {
-    console.log(`  ${p.slug}: ${p.capability} — ${p.reason}`);
+  const grupos = agruparPorMotivo(perdas);
+  console.log(`\nPERDIDO — ${grupos.size} capacidade(s) que o runtime não tem onde guardar:`);
+  for (const [motivo, itens] of grupos) {
+    const caps = [...new Set(itens.map((i) => i.capability))].join(', ');
+    console.log(`  ${papeisDe(itens)}: ${caps} — ${motivo}`);
+  }
+  if (verbose) {
+    console.log('\n  Detalhe por papel:');
+    for (const p of perdas) console.log(`    ${p.slug}: ${p.capability} — ${p.reason}`);
+  } else {
+    console.log('\n  Detalhe por papel: --verbose');
   }
   console.log('\nA fronteira perdida continua escrita no pacote e precisa ser aplicada fora do runtime.');
+}
+
+if (naoEmitidas.length) {
+  const grupos = agruparPorMotivo(naoEmitidas);
+  console.log(`\nNÃO EMITIDO — ${grupos.size} capacidade(s) que o mecanismo existe e nós ainda não geramos:`);
+  for (const [, itens] of grupos) {
+    const caps = [...new Set(itens.map((i) => i.capability))].join(', ');
+    const { mechanism, falta } = itens[0];
+    console.log(`  ${papeisDe(itens)}: ${caps} — mecanismo: ${mechanism}`);
+    console.log(`              falta: ${falta}`);
+  }
+  if (verbose) {
+    console.log('\n  Detalhe por papel:');
+    for (const n of naoEmitidas) console.log(`    ${n.slug}: ${n.capability} — ${n.reason}`);
+  } else {
+    console.log('\n  Detalhe por papel: --verbose');
+  }
+  console.log('\nDívida nossa, não limite do runtime — nomear o mecanismo é o que diferencia isto de uma perda.');
 }
 
 if (avisos.length) {

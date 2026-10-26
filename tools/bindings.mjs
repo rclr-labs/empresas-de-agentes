@@ -97,17 +97,34 @@ function checkAllowlistScope(agent, binding, warnings) {
 }
 
 /**
- * Traduz as capacidades de um agente para o runtime do binding, em três
+ * Traduz as capacidades de um agente para o runtime do binding, em QUATRO
  * estados: `translated` (o runtime honra, e a ferramenta/mecanismo está
  * nomeado), `preserved` (o dado sobrevive no arquivo emitido, mas o
- * runtime não age sobre ele) e `lost` (nem sobrevive, nem é honrado).
- * Capacidade fora dos três é defeito do binding, não silêncio: entra em
- * `lost` com motivo "não declarada".
+ * runtime não age sobre ele), `lost` (nem sobrevive, nem é honrado — o
+ * RUNTIME não tem onde guardar a capacidade) e `not_emitted` (o mecanismo
+ * EXISTE no runtime, está nomeado, mas ESTE EMISSOR não o escreve ainda —
+ * dívida nossa, não limite de terceiro). Capacidade fora dos quatro é
+ * defeito do binding, não silêncio: entra em `lost` com motivo "não
+ * declarada".
+ *
+ * A distinção entre `lost` e `not_emitted` existe para não repetir o erro
+ * que a Fase D-bis corrigiu: chamar as duas de "perdida" esconde dívida de
+ * engenharia (`not_emitted`) detrás da limitação de um terceiro (`lost`) —
+ * e dívida escondida assim é a mais confortável de existir, porque
+ * ninguém fatura o terceiro por ela. Toda entrada de `not_emitted` tem de
+ * nomear `mechanism` (o mecanismo real que resolveria) e `falta` (o que
+ * falta para gerá-lo) — sem isso, "não emitido" é só "perdido" com outro
+ * nome.
+ *
+ * Ordem de resolução: `translates` → `preserves` → `loses` →
+ * `not_emitted` → nenhum dos quatro é defeito do binding, reportado como
+ * antes.
  *
  * Mantém `map`/`unsupported`/`unsupported_metadata` como alias de leitura
  * de `translates`/`loses`, com motivo textual idêntico ao antigo, para que
  * um binding de terceiro escrito no formato binário anterior continue
- * carregando.
+ * carregando. Não existe alias antigo para `not_emitted` — é estado novo,
+ * sem formato anterior a compatibilizar.
  */
 export function applyBinding(agent, binding, pkg) {
   const cap = agent.frontmatter?.metadata?.capabilities ?? {};
@@ -117,11 +134,13 @@ export function applyBinding(agent, binding, pkg) {
   const losesNovo = new Set(binding.loses ?? []);
   const unsupportedAntigo = new Set(binding.unsupported ?? []);
   const unsupportedMetadataAntigo = new Set(binding.unsupported_metadata ?? []);
+  const notEmitted = binding.not_emitted ?? {};
 
   const tools = [];
   const translated = [];
   const preserved = [];
   const lost = [];
+  const naoEmitida = [];
   const warnings = [];
   const visto = new Set();
 
@@ -175,6 +194,19 @@ export function applyBinding(agent, binding, pkg) {
       continue;
     }
 
+    if (chave in notEmitted) {
+      const info = notEmitted[chave] ?? {};
+      naoEmitida.push({
+        capability: chave,
+        value: valor,
+        mechanism: info.mechanism,
+        falta: info.falta,
+        reason: `mecanismo: ${info.mechanism ?? '(não nomeado — defeito do binding)'} — ` +
+          `falta: ${info.falta ?? '(não declarado — defeito do binding)'}`,
+      });
+      continue;
+    }
+
     lost.push({
       capability: chave,
       value: valor,
@@ -188,7 +220,7 @@ export function applyBinding(agent, binding, pkg) {
   // Permissões brutas, para runtime que as expressa (ex.: opencode).
   const permissions = binding.permissions ? buildPermissions(cap) : null;
 
-  return { tools, permissions, translated, preserved, lost, warnings };
+  return { tools, permissions, translated, preserved, lost, not_emitted: naoEmitida, warnings };
 }
 
 /**

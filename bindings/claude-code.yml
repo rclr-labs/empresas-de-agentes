@@ -33,6 +33,72 @@ source: >-
   convivendo com um papel de outro escopo que precisasse de allowlist
   restrita no MESMO pacote) — `tools/emit.mjs` agora emite de fato um
   `.claude/settings.json` com `sandbox.network.allowedDomains`.
+
+  TAREFA 30 (2026-10-26): o fix round 1 cometeu uma TERCEIRA classe do
+  mesmo defeito — chamou de "perdida", com a mesma palavra, tanto a
+  capacidade que o Claude Code não tem onde guardar (`budget`, `context` —
+  ausência confirmada por busca) quanto a que ele TEM onde guardar e nós
+  simplesmente não geramos (`execute.deny`, `read.database`, `approve`).
+  Misturar as duas esconde dívida de engenharia (a segunda) detrás do
+  limite de um terceiro (a primeira) — ninguém fatura o terceiro pela
+  dívida que é nossa. Daí o quarto estado, `not_emitted`, que obriga a
+  nomear `mechanism` (o mecanismo real) e `falta` (o que falta para
+  gerá-lo). Três correções, uma por capacidade:
+
+  - `execute.deny` → `translates`, de verdade. VERIFIQUEI antes de mudar
+    (não aceitei a afirmação de um agente especializado que leu a doc sem
+    eu mesmo reler) que o frontmatter de sub-agente aceita um campo
+    `hooks` por agente — code.claude.com/docs/en/sub-agents, seção
+    "Hooks in subagent frontmatter": "Define hooks directly in the
+    subagent's markdown file. These hooks only run while that specific
+    subagent is active and are cleaned up when it finishes"; a tabela de
+    referência do frontmatter lista `hooks` como campo opcional, "scoped
+    to this subagent". Que um `PreToolUse` ali pode negar: code.claude.
+    com/docs/en/hooks, "Exit with code 2 to block the action... a
+    PreToolUse hook blocks the tool call" — lendo `tool_input.command` do
+    JSON em stdin para o tool `Bash`. E que o escopo é o AGENTE, não o
+    projeto — exatamente o que torna isso seguro onde a Opção A de
+    projeto não era: o hook de `desenvolvimento` nunca vê os padrões de
+    `revisao`, e vice-versa, porque cada um vive só no frontmatter do
+    próprio agente. `tools/writers.mjs` agora EMITE esse hook de verdade —
+    destino `[]` em `translates` porque o mecanismo vive em
+    `frontmatter.hooks`, não na lista `tools` (mesmo padrão de
+    `skills`/`memory`/`network.allowlist`).
+  - `read.database` → `not_emitted`: o mecanismo (composição de `tools:
+    mcp__<servidor>__<ferramenta>` + `disallowedTools: Bash`) é real e
+    nomeado, mas nenhum `AGENTS.md` do acervo declara qual servidor MCP
+    expõe o banco — o Claude Code TEM onde guardar isso; só não temos o
+    dado para escrever. Avaliei onde esse dado deveria morar:
+    `requirements` (campo de topo da spec base `agentcompanies/v1`, já
+    usado para `secrets`) é o lugar certo — é exatamente o padrão "o que
+    o cliente declara antes de rodar", e não exige crescer
+    `capabilities/v1` nem `metadata.*`. Nenhum pacote do acervo declara
+    isso hoje; nomear o lugar certo não é o mesmo que inventar o valor.
+  - `approve` → `not_emitted`: com `human_gates[].triggers` (tarefa 30,
+    §3), `permissions.ask` passa a ser DE FATO emitido — mas em escopo de
+    EMPRESA (`.claude/settings.json`, união dos gatilhos de todo
+    `human_gates` do pacote), não amarrado a `capabilities.approve` de
+    agente nenhum. `approve` continua sem lugar porque referencia
+    `human_gates[].id` para dizer "este papel PODE ASSINAR" — e nenhum
+    mecanismo do Claude Code expressa isso; `ask` pausa para QUALQUER
+    sessão confirmar, não registra QUEM é o signer. Nenhum papel real do
+    acervo declara `approve` não-vazio (E14 e a segregação de função do
+    `software-house`/`fabrica-de-testes` tornam isso certo por desenho) —
+    mas a célula continua coberta, porque "nenhum agente usa hoje" não é
+    "o binding não precisa declarar".
+
+  `budget` CONTINUA em `loses` — ausência de campo de custo confirmada por
+  busca, nenhuma mudança aqui. Mas `maxTurns` existe, é por agente, e é
+  proxy de TURNO, não de GASTO — decisão (critérios: o acervo não declara
+  número de turno em lugar nenhum hoje; proxy emitido sem o operador saber
+  que é proxy é pior que nenhum): ACRESCENTAR `budget.max_turns` opcional
+  (sub-campo de estrutura livre — `budget` já não é lista fechada, então
+  isto não cresce `capabilities/v1.mjs`) e EMITIR `maxTurns` quando
+  declarado. O nome do campo já avisa o operador que é turno, não
+  dinheiro — a ambiguidade que o segundo critério teme seria reescrever
+  `budget.monthly_cap` em turnos, não nomear um campo novo e distinto.
+  Nenhum papel do acervo declara `max_turns` hoje; a emissão é exercida só
+  por teste sintético, não por invenção num pacote real.
 emits: .claude/agents/<slug>.md
 format: claude-code
 # first-match (leitura honesta, não medição direta): a doc de permissões
@@ -92,49 +158,50 @@ translates:
   # aproximação do emissor, não medição. O CAMPO traduz; o valor fora de
   # "project" é aproximação assumida, não garantida.
   memory: []
+  # execute.deny: TAREFA 30 — volta de `loses` para `translates`, agora de
+  # fato EMITIDO. VERIFICADO (não assumido) que o frontmatter de
+  # sub-agente aceita `hooks` por agente, escopado a esse agente, e que um
+  # `PreToolUse` ali pode negar (ver `source` acima, citação completa em
+  # `citations.execute.deny`). `tools/writers.mjs` escreve
+  # `frontmatter.hooks.PreToolUse` com um hook `command` que lê
+  # `tool_input.command` do stdin e nega (`exit 2`) quando casa um dos
+  # globs de `execute.deny` DESTE agente. Destino `[]` pelo mesmo motivo
+  # de `skills`/`memory`/`network.allowlist`: o mecanismo não entra na
+  # lista `tools`, vive em campo de frontmatter próprio.
+  execute.deny: []
 preserves: []
 loses:
   # budget: sem teto de moeda em lugar nenhum da configuração do Claude
   # Code (frontmatter de sub-agente ou settings.json) — busca feita em
   # code.claude.com/docs/en/sub-agents e code.claude.com/docs/en/settings
   # não encontrou campo de custo. `maxTurns` existe (confirmado,
-  # sub-agents) mas é teto de QUANTIDADE DE TURNO, não de GASTO.
+  # sub-agents) e É EMITIDO (tarefa 30) como `budget.max_turns` — campo
+  # OPCIONAL, novo, que nomeia explicitamente que é proxy de TURNO, não de
+  # GASTO; `budget` (o teto de custo) continua perdido de verdade, porque
+  # a ausência do campo de custo em si não mudou.
   - budget
-  # execute.deny: FIX ROUND 1 — movido de translates para loses. O
-  # mecanismo citado (disallowedTools nome puro + permissions.deny de
-  # projeto + hook PreToolUse/agent_type) é real, mas este emissor não
-  # produz nenhum dos dois últimos, e o primeiro só dispara no caso raro
-  # em que execute.allow está vazio (nenhum papel do acervo hoje). Pior:
-  # uma emissão por união de projeto (a alternativa óbvia) seria ATIVA-
-  # MENTE ERRADA aqui — software-house/desenvolvimento declara
-  # `execute.allow: [..., "git push*", "git commit*", ...]`, e QUATRO
-  # outros papéis do mesmo pacote declaram esses mesmos padrões em
-  # `execute.deny`; como o Claude Code resolve deny-sempre-vence
-  # independente de escopo, uma lista de projeto feita da união dos
-  # `execute.deny` bloquearia o `git push`/`git commit` que
-  # desenvolvimento precisa e tem permissão explícita para usar. Perder
-  # é mais honesto do que "traduzir" de um jeito que quebra o papel que
-  # mais precisa do `execute.allow` correspondente.
-  - execute.deny
-  # read.database: FIX ROUND 1 — movido de translates para loses. O
-  # mecanismo (tool do servidor MCP + disallowedTools: Bash) é real, mas
-  # exige nomear um servidor MCP concreto que nenhum AGENTS.md do acervo
-  # declara — não há dado para o emissor escrever, e inventar um nome de
-  # servidor seria fabricar informação que o papel não forneceu.
-  - read.database
-  # approve: FIX ROUND 1 — movido de translates para loses.
-  # `permissions.ask` é mecanismo real, mas `capabilities.approve`
-  # referencia `human_gates[].id` (ex.: "deploy-producao"), não um
-  # padrão de comando Bash — não há dado no pacote para construir o
-  # `resource` (`"Bash(terraform apply:*)"`) que a regra `ask` exige.
-  # Sem esse padrão, não há o que escrever. approve.signer (ressalva do
-  # assinante nomeado, que o mecanismo também não cobre) continua
-  # documentado em prosa aqui, não como chave própria — crescer o
-  # vocabulário é mudança de capabilities/v2, fora do escopo deste fix.
-  - approve
   # context: nenhum campo correspondente na frontmatter de sub-agente
   # documentada.
   - context
+not_emitted:
+  # read.database: TAREFA 30 — sai de `loses`, entra aqui. O Claude Code
+  # TEM onde guardar isso (mcp__<servidor>__<ferramenta> é um nome de
+  # tool real, e disallowedTools: Bash reforça em profundidade) — só não
+  # temos o dado para escrever, porque nenhum AGENTS.md do acervo declara
+  # qual servidor MCP expõe o banco. `requirements` (campo de topo da spec
+  # base, já usado para `secrets`) é a resposta avaliada para onde esse
+  # dado deveria morar — ver `source` acima.
+  read.database:
+    mechanism: "tools: mcp__<servidor>__<ferramenta> + disallowedTools: Bash"
+    falta: "o pacote não declara qual servidor MCP expõe o banco (ex.: em requirements)"
+  # approve: TAREFA 30 — sai de `loses`, entra aqui. `permissions.ask` é
+  # mecanismo real e, com `human_gates[].triggers`, É de fato emitido em
+  # `.claude/settings.json` — mas em escopo de EMPRESA, não amarrado a
+  # `capabilities.approve` de nenhum agente: o mecanismo pausa para
+  # qualquer sessão confirmar, não registra QUEM pode assinar.
+  approve:
+    mechanism: "permissions.ask, emitido em .claude/settings.json a partir de human_gates[].triggers"
+    falta: "capabilities.approve referencia human_gates[].id, não um padrão de comando; o ask emitido é de empresa, não amarrado a qual agente aprova, e não registra o signer nomeado"
 citations:
   read.repository: "code.claude.com/docs/en/tools-reference — nomes de tool confirmados (lido em 2026-10-24)"
   read.documentation: "code.claude.com/docs/en/tools-reference"
@@ -156,10 +223,10 @@ citations:
   memory: "code.claude.com/docs/en/sub-agents — campo `memory` (user|project|local), lido 2026-10-25; EMITIDO em tools/writers.mjs; vocabulário de valor não confirmado 1:1 com este acervo"
   budget:
     inferido: true
-    source: "ausência confirmada por busca em code.claude.com/docs/en/sub-agents e /settings — nenhum campo de custo/teto encontrado; maxTurns existe mas é proxy de turno, não de gasto"
-  execute.deny: "code.claude.com/docs/en/sub-agents (disallowedTools) + code.claude.com/docs/en/permissions (permissions.deny), lidos 2026-10-25 — mecanismo real, NÃO emitido por este emissor (fix round 1); união de projeto seria ativamente errada, ver `source` do arquivo"
-  read.database: "code.claude.com/docs/en/permissions (mcp__<server>__<tool>) + code.claude.com/docs/en/sub-agents (disallowedTools), lidos 2026-10-25 — mecanismo real, NÃO emitido (fix round 1): nenhum AGENTS.md nomeia um servidor MCP"
-  approve: "code.claude.com/docs/en/permissions — ask rules, lido 2026-10-25 — mecanismo real, NÃO emitido (fix round 1): capabilities.approve não carrega padrão de comando"
+    source: "ausência de campo de custo confirmada por busca em code.claude.com/docs/en/sub-agents e /settings — nenhum campo de custo/teto encontrado. maxTurns existe (sub-agents) e É emitido como budget.max_turns (tarefa 30) — proxy de turno, não de gasto; o nome do campo novo já avisa o operador disso"
+  execute.deny: "code.claude.com/docs/en/sub-agents, seção \"Hooks in subagent frontmatter\" (hooks por agente, escopados a esse agente) + code.claude.com/docs/en/hooks (exit code 2 bloqueia o PreToolUse), lidos e RE-VERIFICADOS em 2026-10-26 — mecanismo real E EMITIDO (tarefa 30) em tools/writers.mjs, por agente"
+  read.database: "code.claude.com/docs/en/permissions (mcp__<server>__<tool>) + code.claude.com/docs/en/sub-agents (disallowedTools), lidos 2026-10-25 — mecanismo real, NÃO emitido (tarefa 30, not_emitted): nenhum AGENTS.md nomeia um servidor MCP"
+  approve: "code.claude.com/docs/en/permissions — ask rules, lido 2026-10-25 — mecanismo real e, com human_gates[].triggers, EMITIDO em escopo de empresa (tarefa 30); mas not_emitted por agente: capabilities.approve não carrega padrão de comando nem é o que o ask emitido amarra"
   context:
     inferido: true
     source: "nenhum campo 'context' na frontmatter de sub-agente documentada — ausência confirmada por leitura de code.claude.com/docs/en/sub-agents"

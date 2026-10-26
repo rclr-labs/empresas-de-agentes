@@ -23,9 +23,12 @@ function emitir(args) {
 
 test('claude-code: emite um .md por agente, com name, description e tools', () => {
   const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
+  // Tarefa 30: software-house agora também ganha `.claude/` (settings.json
+  // com permissions.ask, dos gatilhos de human_gates) — por isso o
+  // diretório não é só os cinco .md.
   const arquivos = readdirSync(out).sort();
   assert.deepEqual(arquivos, [
-    'coordenacao.md', 'desenvolvimento.md', 'portao-qualidade.md',
+    '.claude', 'coordenacao.md', 'desenvolvimento.md', 'portao-qualidade.md',
     'revisao.md', 'tech-lead.md',
   ]);
   const { frontmatter, body } = parseMarkdown(readFileSync(join(out, 'tech-lead.md'), 'utf8'));
@@ -102,13 +105,122 @@ test('claude-code: a persona NÃO vai para o corpo, só a headline na descriptio
   rmSync(out, { recursive: true, force: true });
 });
 
-test('claude-code: avisa a perda de budget E de execute.deny — fix round 1 reverteu a tradução não emitida', () => {
-  // Fix round 1: execute.deny voltou a ser perda, porque o emissor não
-  // escreve o mecanismo (ver nota em bindings-arquivos.test.mjs).
+test('claude-code: avisa a perda de budget — e NÃO avisa execute.deny como perda, tarefa 30 corrigiu isso', () => {
+  // Tarefa 30: execute.deny deixou de ser perda — é hook emitido de
+  // verdade agora (ver teste de emissão abaixo). budget continua
+  // perdido, porque a ausência de campo de custo não mudou.
   const { out, stdout } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
   assert.match(stdout, /budget/);
-  assert.match(stdout, /execute\.deny/);
-  assert.match(stdout, /perdid|n[ãa]o expressa/i);
+  assert.match(stdout, /PERDIDO/);
+  assert.ok(!/execute\.deny/.test(stdout.split('PERDIDO')[1]?.split(/N[ÃA]O EMITIDO/)[0] ?? ''),
+    'execute.deny não pode aparecer no bloco PERDIDO — virou translates, de fato emitido');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: NÃO EMITIDO separa read.database e approve — dívida nossa, não limite do runtime', () => {
+  const { out, stdout } = emitir(['--package', 'fabrica-de-testes', '--binding', 'claude-code']);
+  assert.match(stdout, /N[ÃA]O EMITIDO/);
+  assert.match(stdout, /read\.database/);
+  assert.match(stdout, /mecanismo:/);
+  assert.match(stdout, /falta:/);
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: execute.deny vira hook PreToolUse no frontmatter, escopado ao agente', () => {
+  // VERIFICADO (não assumido): code.claude.com/docs/en/sub-agents confirma
+  // hooks por agente, escopados a esse agente; code.claude.com/docs/en/
+  // hooks confirma que exit 2 bloqueia PreToolUse. tech-lead declara
+  // execute.deny: ["git push*", "git merge*", "sudo *"].
+  const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
+  const { frontmatter } = parseMarkdown(readFileSync(join(out, 'tech-lead.md'), 'utf8'));
+  assert.ok(frontmatter.hooks, 'tech-lead tem execute.deny — tem de ganhar hooks');
+  const pre = frontmatter.hooks.PreToolUse;
+  assert.ok(Array.isArray(pre) && pre.length === 1);
+  assert.equal(pre[0].matcher, 'Bash');
+  const comando = pre[0].hooks[0].command;
+  assert.equal(pre[0].hooks[0].type, 'command');
+  assert.match(comando, /git push\*/);
+  assert.match(comando, /git merge\*/);
+  assert.match(comando, /sudo \*/);
+  assert.match(comando, /exit 2/);
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: hook de execute.deny NÃO vaza padrão de outro papel — escopo é o agente', () => {
+  // software-house/desenvolvimento declara execute.allow com "git push*" e
+  // "git commit*" — exatamente a razão pela qual a união por projeto foi
+  // rejeitada (bindings/claude-code.yml `source`). Quatro outros papéis
+  // negam "git push*"/"git commit*" explicitamente. Cada hook tem de
+  // carregar só os PRÓPRIOS padrões de deny do agente — o de
+  // desenvolvimento (git push --force*, git merge*, kubectl *, helm *,
+  // terraform *, sudo *) nunca pode conter o bare "git push*"/"git
+  // commit*" que bloquearia o que ele tem permissão explícita de fazer.
+  const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
+  const { frontmatter: dev } = parseMarkdown(readFileSync(join(out, 'desenvolvimento.md'), 'utf8'));
+  const comandoDev = dev.hooks.PreToolUse[0].hooks[0].command;
+  assert.ok(!/'git push\*'/.test(comandoDev),
+    'desenvolvimento não pode herdar o "git push*" bare que outros papéis negam — ele tem allow explícito para isso');
+  assert.ok(!/'git commit\*'/.test(comandoDev),
+    'mesma razão para "git commit*"');
+  assert.match(comandoDev, /git push --force\*/, 'o próprio deny de desenvolvimento sobrevive');
+  const { frontmatter: rev } = parseMarkdown(readFileSync(join(out, 'revisao.md'), 'utf8'));
+  assert.match(rev.hooks.PreToolUse[0].hooks[0].command, /git commit\*/,
+    'revisao nega git commit* de verdade — e só revisao, não todo papel do pacote');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: budget.max_turns emite maxTurns — proxy de turno, não de gasto', () => {
+  // Nenhum papel real do acervo declara max_turns hoje (o acervo não tem
+  // número de turno em lugar nenhum) — exercitado com agente sintético.
+  const agent = {
+    slug: 'sintetico4', body: '\n# Sintético\n',
+    frontmatter: {
+      name: 'Sintético 4', title: 'Sintético 4', slug: 'sintetico4', skills: [],
+      metadata: { capabilities: { budget: { max_turns: 12 } } },
+    },
+  };
+  const { content } = writers['claude-code'](agent, { tools: [] });
+  const { frontmatter } = parseMarkdown(content);
+  assert.equal(frontmatter.maxTurns, 12);
+});
+
+test('claude-code: sem budget.max_turns declarado, maxTurns não aparece', () => {
+  const agent = {
+    slug: 'sintetico5', body: '\n# Sintético\n',
+    frontmatter: {
+      name: 'Sintético 5', title: 'Sintético 5', slug: 'sintetico5', skills: [],
+      metadata: { capabilities: { budget: { monthly_cap: 100 } } },
+    },
+  };
+  const { content } = writers['claude-code'](agent, { tools: [] });
+  const { frontmatter } = parseMarkdown(content);
+  assert.equal(frontmatter.maxTurns, undefined);
+});
+
+test('claude-code: human_gates[].triggers emite permissions.ask com os globs; portão sem triggers não inventa nenhum', () => {
+  // software-house: deploy-producao e remocao-de-dado-de-producao têm
+  // triggers; gasto-acima-do-teto e contato-com-cliente não têm.
+  const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
+  const settings = JSON.parse(readFileSync(join(out, '.claude', 'settings.json'), 'utf8'));
+  assert.ok(Array.isArray(settings.permissions.ask));
+  assert.ok(settings.permissions.ask.includes('Bash(kubectl apply:*)'));
+  assert.ok(settings.permissions.ask.includes('Bash(helm upgrade:*)'));
+  assert.ok(settings.permissions.ask.includes('Bash(terraform apply:*)'));
+  // nenhum glob fabricado para os portões sem triggers — a lista não
+  // cresce um item por portão, só por glob declarado.
+  const portoes = 4;
+  assert.ok(settings.permissions.ask.length < portoes * 3,
+    'a lista não pode ter crescido um glob fantasma por portão sem triggers');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('claude-code: NÃO emite settings.json quando nenhum papel declara allowlist E nenhum portão declara gatilho', () => {
+  // operacao-de-conhecimento: human_gates sem nenhum padrão de comando
+  // (publicar-para-fora, gasto-acima-do-teto, contato-com-cliente) e
+  // nenhum papel com network como lista de domínio.
+  const { out } = emitir(['--package', 'operacao-de-conhecimento', '--binding', 'claude-code']);
+  assert.ok(!existsSync(join(out, '.claude', 'settings.json')),
+    'operacao-de-conhecimento não tem allowlist de rede nem portão com gatilho de comando');
   rmSync(out, { recursive: true, force: true });
 });
 
@@ -124,10 +236,18 @@ test('claude-code: emite .claude/settings.json com sandbox.network.allowedDomain
   rmSync(out, { recursive: true, force: true });
 });
 
-test('claude-code: NÃO emite settings.json quando nenhum papel do pacote declara allowlist de rede', () => {
+test('claude-code: software-house GANHA settings.json pelos gatilhos de portão — mesmo sem allowlist de rede', () => {
+  // TAREFA 30 muda este caso: antes, software-house não tinha allowlist
+  // de rede nenhuma e por isso não ganhava settings.json. Agora
+  // deploy-producao e remocao-de-dado-de-producao declaram triggers, e
+  // isso sozinho já é motivo para o arquivo existir — ver o teste de
+  // permissions.ask acima. sandbox.network não aparece, porque nenhum
+  // papel do pacote declara allowlist.
   const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
-  assert.ok(!existsSync(join(out, '.claude', 'settings.json')),
+  const settings = JSON.parse(readFileSync(join(out, '.claude', 'settings.json'), 'utf8'));
+  assert.equal(settings.sandbox, undefined,
     'software-house não tem nenhum papel com capabilities.network como lista de domínio');
+  assert.ok(settings.permissions.ask.length > 0);
   rmSync(out, { recursive: true, force: true });
 });
 

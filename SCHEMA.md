@@ -311,27 +311,36 @@ doc=$(grep -ohE "E[0-9]{2}" SCHEMA.md | sort -u)
 diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
 ```
 
-## 8. Bindings: três estados, não dois
+## 8. Bindings: quatro estados, não dois
 
 `bindings/*.yml` traduz `metadata.capabilities` (e os campos de topo
 `skills`/`memory`/`context`) para o vocabulário de um runtime concreto.
 Até 2026-10-25 essa tradução era binária: `map` (traduzido) ou
 `unsupported` (perdido). O binário não consegue expressar o meio do
 caminho — um dado que **sobrevive no arquivo emitido** sem que o runtime
-**aja** sobre ele. `tools/bindings.mjs` (`applyBinding`) resolve toda
-capacidade em um de três estados:
+**aja** sobre ele — e, descoberto na tarefa 30, também não consegue
+distinguir dois tipos de perda que a tarefa 27 ainda chamava pelo mesmo
+nome: a capacidade que o runtime **não tem onde guardar** (limite de
+terceiro) e a que ele **tem onde guardar e nós simplesmente não geramos**
+(dívida nossa). Misturar as duas esconde a segunda detrás da primeira —
+e ninguém fatura o terceiro pela dívida que é nossa. `tools/bindings.mjs`
+(`applyBinding`) resolve toda capacidade em um de QUATRO estados, nesta
+ordem de resolução — `translates` → `preserves` → `loses` →
+`not_emitted` → nenhum dos quatro é defeito do binding, reportado como
+perda não declarada:
 
 | Estado | Significa | Exemplo medido |
 |---|---|---|
-| `translates` | O runtime **honra** a capacidade; a célula nomeia o mecanismo | `execute.deny` no Claude Code: `disallowedTools` + `permissions.deny` + hook `PreToolUse`/`agent_type` |
+| `translates` | O runtime **honra** a capacidade; a célula nomeia o mecanismo, e ele é de fato emitido | `execute.deny` no Claude Code: hook `PreToolUse` no frontmatter do próprio agente, negando (`exit 2`) os padrões daquele papel |
 | `preserves` | O dado **sobrevive** no arquivo; o runtime **não age** sobre ele | `budget` no Paperclip: a spec base não define orçamento (§15 — extensão de fornecedor), mas a cópia byte a byte preserva o campo |
-| `loses` | Nem sobrevive, nem é honrado | `budget` no Claude Code e no OpenCode: nenhum campo de custo existe em nenhum dos dois |
+| `loses` | O runtime **não tem onde guardar** a capacidade — nem sobrevive, nem é honrado | `budget` no Claude Code e no OpenCode: nenhum campo de custo existe em nenhum dos dois |
+| `not_emitted` | O mecanismo **existe** no runtime e está nomeado (`mechanism`), mas este emissor **ainda não o gera** (`falta` diz o que falta) | `read.database` no Claude Code: `tools: mcp__<servidor>__<ferramenta>` é mecanismo real, mas nenhum `AGENTS.md` do acervo nomeia o servidor |
 
-Capacidade fora dos três estados é **defeito do binding** — `applyBinding`
+Capacidade fora dos quatro estados é **defeito do binding** — `applyBinding`
 reporta como perda com motivo "não declarada", nunca em silêncio.
 `map`/`unsupported`/`unsupported_metadata` continuam carregando como alias
 de leitura de `translates`/`loses`, para binding de terceiro escrito no
-formato antigo.
+formato antigo. Não há alias antigo para `not_emitted` — é estado novo.
 
 Duas propriedades adicionais mudam o RESULTADO da tradução, não só o
 vocabulário:
@@ -355,26 +364,36 @@ Célula sem citação é inferência não declarada.
 ### 8.1 A tabela medida dos quatro bindings
 
 Medição de **2026-10-25**
-(`agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md`) — tabela
+(`agent-studio/docs/pesquisa/2026-10-25-runtimes-medidos.md`), revisada na
+**tarefa 30 (2026-10-26)** para separar `loses` de `not_emitted` — tabela
 envelhece sem avisar se a data não acompanhar; ao reler este arquivo
 depois de uma nova medição, atualizar a data junto com as células.
 
 | Capacidade | claude-code | opencode (V2) | paperclip | portable |
 |---|---|---|---|---|
-| `execute.deny` | **traduz**, com ressalva de escopo (`disallowedTools`/`permissions.deny`/hook) | **traduz** (`shell`, last-match) | preserva (§15, extensão de fornecedor) | preserva (desenho próprio) |
+| `execute.deny` | **traduz, de fato emitido** — hook `PreToolUse` no frontmatter do agente, verificado em code.claude.com/docs/en/sub-agents e /hooks | **traduz** (`shell`, last-match) | preserva (§15, extensão de fornecedor) | preserva (desenho próprio) |
 | `network.allowlist` | **traduz** (`sandbox.network.allowedDomains`, SO — cobre shell cru) | **traduz**, mas void se o papel também tem shell (`fetch-only`) | preserva (§15) | preserva |
-| `budget` | **perde** (sem campo de custo; `maxTurns` é proxy de turno, não de gasto) | **perde** (zero ocorrência no schema) | preserva (§15) | preserva |
-| `read.database` | **traduz** (composição: tool do servidor MCP + `disallowedTools: Bash`) | **perde** (`read` é só caminho de arquivo; MCP tool é grosseiro demais) | preserva (§5–§13, não é campo base) | preserva |
-| `approve` | **traduz o portão** (`permissions.ask`), perde o signer nomeado | **traduz o portão** (`ask`), perde o signer nomeado | preserva (§15) | preserva |
+| `budget` | **perde** (sem campo de custo); `budget.max_turns` **traduz** à parte (`maxTurns`, proxy de turno, não de gasto) | **perde** (zero ocorrência no schema) | preserva (§15) | preserva |
+| `read.database` | **não emitido** — mecanismo real (`tools: mcp__<servidor>__<ferramenta>`), mas nenhum `AGENTS.md` nomeia o servidor | **não emitido** — mecanismo real (`<server>_<tool>`), mesma lacuna de dado | preserva (§5–§13, não é campo base) | preserva |
+| `approve` | **não emitido** por agente — `permissions.ask` **traduz em escopo de empresa** via `human_gates[].triggers`, mas não amarra qual agente aprova nem o signer | **não emitido** — `ask` é mecanismo real, mas `buildPermissions()` não o emite (sem a emissão de triggers que claude-code ganhou) | preserva (§15) | preserva |
 | `skills` | **traduz** (campo de frontmatter documentado) | **perde** (ausente de `ConfigAgent.Info`; ação `skill` é controle de acesso, não declaração) | **traduz** (§5, único ponto da spec base que a tabela cobre) | preserva |
 | `memory`/`context` | `memory` traduz (campo existe, vocabulário de valor não 1:1); `context` perde | ambos perdem (ausentes de `ConfigAgent.Info`) | ambos preservam (§5–§13) | ambos preservam |
 
-A contabilidade de perda mudou de forma qualitativa, não só quantitativa:
-antes da medição, `claude-code.yml` declarava quatro perdas por
-inferência errada (`network.allowlist`, `execute.deny`, `read.database`,
-`approve`) que na verdade são tradução — e `skills` não tinha estado
-nenhum em binding nenhum. Depois: só `budget` perde de verdade no Claude
-Code, e `paperclip`/`portable` deixaram de se chamar "zero perda" sem
+A contabilidade mudou de forma qualitativa duas vezes, não só
+quantitativa. Antes da medição de 2026-10-25, `claude-code.yml` declarava
+quatro perdas por inferência errada que na verdade eram tradução, e
+`skills` não tinha estado nenhum em binding nenhum. O fix round 1
+corrigiu isso devolvendo `execute.deny`/`read.database`/`approve` para
+`loses` — mas aí cometeu a classe de defeito que a tarefa 30 existe para
+corrigir: chamou de "perdida", com a mesma palavra, tanto a capacidade
+sem onde guardar (`budget`) quanto a que tinha mecanismo real e só não
+era gerada (as três). Depois da tarefa 30: `execute.deny` saiu de `loses`
+**por mérito** (hooks por agente, verificados e emitidos de verdade);
+`read.database` e `approve` saíram de `loses` **por reclassificação**
+(entraram em `not_emitted` — a lacuna de engenharia continua existindo,
+só deixou de ser chamada de limite do runtime). Só `budget` (o teto de
+custo em si) continua perdido de verdade no Claude Code e no OpenCode.
+`paperclip`/`portable` continuam sem se chamar "zero perda" sem
 qualificação — preservam tudo, mas não aplicam a maior parte, porque a
 spec base `agentcompanies/v1` não define a maior parte (ver
 `bindings/paperclip.yml` §15).
@@ -390,3 +409,41 @@ organograma = um Mission", sem garantia de que é 1:1. A pendência
 "promover `portable` → `janus`" registrada em `bindings/portable.yml`
 `source` não é "escrever um mapa" — é a decisão, do Rafael, de se janus
 deveria ganhar o conceito de papel persistente.
+
+### 8.3 `human_gates[].triggers` — gatilho de comando, aditivo
+
+`human_gates[]` ganhou, na tarefa 30, um campo opcional: `triggers`, lista
+de glob de comando (mesma sintaxe de `execute.allow`/`execute.deny`) que
+dispara o portão.
+
+```yaml
+human_gates:
+  - id: deploy-producao
+    description: deploy em produção
+    signer: pessoa nomeada no kickoff
+    triggers:
+      - "kubectl apply*"
+      - "helm upgrade*"
+      - "terraform apply*"
+```
+
+- **Opcional e aditivo**, sob `metadata` como todo o resto desta extensão.
+  O validador **não exige** o campo: um portão sem `triggers` continua
+  válido, porque muitos são legítimos sem padrão de comando nenhum —
+  contato com cliente, divulgação de achado de segurança, estouro de teto
+  avaliado por número, não por comando.
+- Quando presente, o emissor do Claude Code gera `permissions.ask` em
+  `.claude/settings.json`, união dos gatilhos de todo portão da empresa
+  que os declara (`tools/writers.mjs`, `buildAskRules`, função pura).
+  Escopo de EMPRESA, não de agente — ao contrário de `execute.deny`: um
+  `ask` só PAUSA para confirmação, nunca bloqueia, então a união não
+  corre o risco que rejeitou a união de `execute.deny` (ver §8.1 e
+  `bindings/claude-code.yml` `source`).
+- Quando ausente, a capacidade `approve` permanece em `not_emitted` com
+  `falta` nomeando que o portão referenciado não declara gatilho de
+  comando.
+- `software-house` declara `triggers` em `deploy-producao` e
+  `remocao-de-dado-de-producao`; `fabrica-de-testes`, em `tocar-producao`
+  e `carga-acima-do-acordado`. Os demais portões dos dois pacotes — gasto
+  acima do teto, contato com cliente, divulgar achado de segurança — não
+  têm padrão de comando real e por isso não declaram `triggers`.
