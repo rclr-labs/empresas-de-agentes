@@ -372,13 +372,27 @@ test('produto-e-design: nenhum papel escreve código', () => {
   }
 });
 
-test('produto-e-design: só pesquisa-ux fala com usuário, e isso é portão humano', () => {
+test('produto-e-design: só pesquisa-ux condiciona o contato com usuário ao portão — os outros dois negam sem condição', () => {
+  // O teste anterior só verificava que o portão `contato-com-usuario`
+  // existe e que o `cannot` de pesquisa-ux menciona usuário — mas
+  // descoberta-de-produto e design-ui também negam "falar diretamente
+  // com usuário" no `cannot`, então o mesmo regex casaria com qualquer
+  // um dos três e "só pesquisa-ux" podia ser falso sem o teste notar.
+  // A fronteira que de fato distingue: só a cláusula de pesquisa-ux é
+  // CONDICIONADA ao portão ("sem portão humano") — as outras duas
+  // proíbem sem exceção, porque não têm o portão como válvula.
   const { pkg } = relatorio('produto-e-design');
-  const ux = pkg.agents.find((a) => a.slug === 'pesquisa-ux');
   const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
   assert.ok(ids.includes('contato-com-usuario'),
     'falar com usuário real é portão humano: tem gente de verdade do outro lado');
-  assert.ok(ux.frontmatter.metadata.boundary.cannot.some((t) => /usu[áa]rio/i.test(t)));
+  const condicionamPeloPortao = pkg.agents
+    .filter((a) => a.frontmatter.metadata.boundary.cannot.some(
+      (t) => /usu[áa]rio/i.test(t) && /portão humano/i.test(t)))
+    .map((a) => a.slug)
+    .sort();
+  assert.deepEqual(condicionamPeloPortao, ['pesquisa-ux'],
+    'só pesquisa-ux condiciona o contato com usuário ao portão; se descoberta-de-produto ou ' +
+    'design-ui ganhassem a mesma válvula, ou se pesquisa-ux a perdesse, a exclusividade colapsa');
 });
 
 test('seguranca-ofensiva: cinco papéis, liderança na raiz', () => {
@@ -580,7 +594,25 @@ test('PAR DE RISCO: suporte-nivel-2 reproduz, triagem só roteia', () => {
   const t = relatorio('operacao-de-conhecimento').pkg.agents.find((a) => a.slug === 'triagem');
   assert.ok(s.frontmatter.metadata.boundary.can.some((x) => /reproduz/i.test(x)));
   assert.ok(t.frontmatter.metadata.boundary.cannot.some((x) => /responder/i.test(x)));
-  assert.notDeepEqual(s.frontmatter.metadata.capabilities, t.frontmatter.metadata.capabilities);
+  // `assert.notDeepEqual(capabilities, capabilities)` passaria mesmo se
+  // só o `budget` diferisse enquanto a fronteira real (o que cada um lê
+  // e executa) tivesse colapsado — campo irrelevante para o par de
+  // risco mascarando a convergência que o teste deveria pegar. O que de
+  // fato separa os dois: suporte-nivel-2 lê `database` (acesso a
+  // produção pelo portão, com caso aberto) e roda `kubectl`/`psql`;
+  // triagem não lê banco e só tem leitura de repositório.
+  assert.ok(s.frontmatter.metadata.capabilities.read.includes('database'),
+    'suporte-nivel-2 lê database: reproduzir o caso exige olhar o dado por trás dele');
+  assert.ok(!t.frontmatter.metadata.capabilities.read.includes('database'),
+    'triagem classifica e roteia — não lê banco');
+  assert.ok(s.frontmatter.metadata.capabilities.execute.allow.some((g) => /^(kubectl|psql)/.test(g)),
+    'suporte-nivel-2 roda kubectl/psql para reproduzir o caso');
+  assert.ok(!t.frontmatter.metadata.capabilities.execute.allow.some((g) => /^(kubectl|psql)/.test(g)),
+    'triagem não alcança log de produção nem banco');
+  assert.notDeepEqual(s.frontmatter.metadata.capabilities.read, t.frontmatter.metadata.capabilities.read,
+    'backstop: se a fronteira de leitura colapsar por qualquer outro caminho, isto também acusa');
+  assert.notDeepEqual(s.frontmatter.metadata.capabilities.execute, t.frontmatter.metadata.capabilities.execute,
+    'backstop: se a fronteira de execução colapsar por qualquer outro caminho, isto também acusa');
 });
 
 test('documentacao-e-suporte: nenhum papel fala com cliente sem portão', () => {
@@ -591,4 +623,26 @@ test('documentacao-e-suporte: nenhum papel fala com cliente sem portão', () => 
     assert.ok(a.frontmatter.metadata.boundary.cannot.some((t) => /cliente|usu[áa]rio/i.test(t)),
       `${a.slug} tem de negar contato direto na prosa`);
   }
+});
+
+test('ROSTER: 42 papéis, nome ASCII, ícone único, sobrenome único', () => {
+  const nomes = new Map(); const icones = new Map(); const sobrenomes = new Map();
+  let total = 0;
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const p = a.frontmatter.metadata.persona;
+      total++;
+      assert.match(p.display_name, /^[A-Za-z][A-Za-z ]+$/,
+        `${a.slug}: "${p.display_name}" não é ASCII puro`);
+      const sobrenome = p.display_name.split(' ').at(-1);
+      for (const [mapa, chave, rotulo] of [
+        [nomes, p.display_name, 'nome'], [icones, p.icon, 'ícone'], [sobrenomes, sobrenome, 'sobrenome'],
+      ]) {
+        assert.ok(!mapa.has(chave),
+          `${rotulo} "${chave}" repetido: ${mapa.get(chave)} e ${nome}/${a.slug}`);
+        mapa.set(chave, `${nome}/${a.slug}`);
+      }
+    }
+  }
+  assert.equal(total, 42, 'o acervo publica 42 papéis');
 });

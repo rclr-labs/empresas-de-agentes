@@ -33,9 +33,17 @@ começar de uma folha em branco.
 
 | Pacote | O que é |
 |---|---|
-| [`software-house/`](software-house/) | Casa de software: coordenação, tech lead, desenvolvimento, revisão e portão de qualidade |
+| [`software-house/`](software-house/) | Casa de software governada por agentes: coordenação, desenho técnico, implementação, revisão adversarial e portão de qualidade |
 | [`fabrica-de-testes/`](fabrica-de-testes/) | Fábrica de testes governada: gerente de teste, especialistas por tipo, evidência verificável e veredito de release |
 | [`operacao-de-conhecimento/`](operacao-de-conhecimento/) | Operação de pesquisa, redação e triagem: curadoria, pesquisa com fonte citável, redação com público declarado e triagem de entrada |
+| [`seguranca-ofensiva/`](seguranca-ofensiva/) | Avaliação de segurança sob autorização escrita: modelo de ameaça, teste de intrusão com escopo nomeado, revisão de código, cadeia de suprimentos e configuração de nuvem |
+| [`engenharia-de-dados/`](engenharia-de-dados/) | Organograma de dado: contrato, modelagem, pipeline, qualidade contínua e análise, com definição única de métrica e nenhuma escrita em produção |
+| [`plataforma-e-operacao/`](plataforma-e-operacao/) | Plataforma, entrega e confiabilidade: infraestrutura declarada, mudança reversível, orçamento de erro e resposta a incidente, com aplicação de mudança sempre por portão humano |
+| [`produto-e-design/`](produto-e-design/) | Descoberta e desenho de produto: problema antes de solução, usuário real antes de opinião, e superfície desenhada antes de implementada |
+| [`documentacao-e-suporte/`](documentacao-e-suporte/) | Documentação de produto e suporte técnico: referência que acompanha o código, base de conhecimento nascida de ticket recorrente e diagnóstico com reprodução |
+
+Os pacotes são arquétipos. Um time real quase sempre mistura papéis de mais
+de um — o Agent Studio existe para isso.
 
 ## Como usar
 
