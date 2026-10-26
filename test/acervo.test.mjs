@@ -246,7 +246,7 @@ test('fabrica-de-testes: zero aviso', () => {
   assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
 });
 
-test('fabrica-de-testes: só polaris é raiz; os cinco especialistas reportam a ela', () => {
+test('fabrica-de-testes: só polaris é raiz; os oito especialistas reportam a ela', () => {
   const { pkg } = relatorio('fabrica-de-testes');
   const raizes = pkg.agents.filter((a) => a.frontmatter.reportsTo == null);
   assert.deepEqual(raizes.map((a) => a.slug), ['polaris']);
@@ -265,12 +265,47 @@ test('fabrica-de-testes: nenhum especialista pode emitir veredito', () => {
   }
 });
 
-test('fabrica-de-testes: só polaris delega, e para os cinco especialistas', () => {
+test('fabrica-de-testes: nove papéis depois da expansão', () => {
   const { pkg } = relatorio('fabrica-de-testes');
-  const polaris = pkg.agents.find((a) => a.slug === 'polaris');
-  assert.deepEqual(polaris.frontmatter.metadata.capabilities.delegate.sort(), [
-    'acessibilidade', 'contrato-api', 'exploratorio', 'integridade-de-dados', 'privacidade',
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(), [
+    'acessibilidade', 'api-funcional', 'automacao-e2e', 'contrato-api',
+    'desempenho-e-carga', 'exploratorio', 'integridade-de-dados',
+    'polaris', 'privacidade',
   ]);
+});
+
+test('fabrica-de-testes: automacao-e2e é o único especialista que escreve código', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const escrevemCodigo = pkg.agents
+    .filter((a) => (a.frontmatter.metadata.capabilities.write ?? []).includes('code'))
+    .map((a) => a.slug);
+  assert.deepEqual(escrevemCodigo, ['automacao-e2e'],
+    'manter a suíte de regressão é escrever código; executar checagem não é');
+});
+
+test('fabrica-de-testes: contrato-api e api-funcional têm fronteiras distintas', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const c = pkg.agents.find((a) => a.slug === 'contrato-api').frontmatter.metadata;
+  const f = pkg.agents.find((a) => a.slug === 'api-funcional').frontmatter.metadata;
+  assert.notDeepEqual(c.capabilities, f.capabilities,
+    'contrato valida forma, funcional exercita comportamento — se as capacidades convergirem, é um papel só');
+  assert.ok((c.capabilities.write ?? []).includes('test_evidence'));
+  assert.ok(f.boundary.can.some((t) => /dado de teste|cen[áa]rio/i.test(t)),
+    'o funcional declara que cria dado de teste; o de contrato não');
+});
+
+test('fabrica-de-testes: desempenho-e-carga exige portão humano de carga', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const d = pkg.agents.find((a) => a.slug === 'desempenho-e-carga');
+  assert.ok(d.frontmatter.metadata.boundary.cannot.some((t) => /carga|volume/i.test(t)),
+    'passar da carga acordada é portão humano, não decisão do agente');
+});
+
+test('fabrica-de-testes: polaris delega para os oito especialistas', () => {
+  const { pkg } = relatorio('fabrica-de-testes');
+  const p = pkg.agents.find((a) => a.slug === 'polaris');
+  assert.equal(p.frontmatter.metadata.capabilities.delegate.length, 8);
+  assert.ok(!p.frontmatter.metadata.capabilities.delegate.includes('polaris'));
 });
 
 test('fabrica-de-testes: nenhum especialista lê database sem portão humano declarado', () => {

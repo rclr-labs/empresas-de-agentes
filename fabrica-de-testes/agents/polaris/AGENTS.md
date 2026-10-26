@@ -38,7 +38,7 @@ metadata:
       allow: ["git log*", "git diff*"]
       deny: ["kubectl *", "helm *", "terraform *", "sudo *"]
     network: false
-    delegate: [acessibilidade, contrato-api, exploratorio, integridade-de-dados, privacidade]
+    delegate: [acessibilidade, api-funcional, automacao-e2e, contrato-api, desempenho-e-carga, exploratorio, integridade-de-dados, privacidade]
     budget:
       currency: BRL
       monthly_cap: 500.00

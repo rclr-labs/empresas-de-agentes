@@ -74,9 +74,9 @@ não reproduz não é achado, é opinião caríssima.
 
 ## As quatro decisões, tomadas
 
-**Organograma.** Um gerente de teste (`polaris`) e especialistas por tipo.
-O gerente não executa checagem; o especialista não decide escopo de
-release.
+**Organograma.** Um gerente de teste (`polaris`) e oito especialistas por
+tipo de risco. O gerente não executa checagem; o especialista não decide
+escopo de release.
 
 **Orçamento.** Teto **por execução**, não por mês — teste é trabalho em
 rajada, e teto mensal esconde a execução que custou dez vezes o normal.
@@ -107,3 +107,12 @@ nao_coberto: carga acima de 200 req/s, fluxo de pagamento recusado
 
 `nao_coberto` existe porque o risco que você não mediu é o risco que o
 cliente encontra primeiro. Veredito sem essa linha afirma mais do que sabe.
+
+## Adaptando
+
+Comece discordando. O organograma é um ponto de partida defensável, não
+uma recomendação universal:
+
+- **Time sem suíte de regressão própria:** corte `automacao-e2e`. Ele é o
+  único especialista que escreve código, e sem suíte para manter o papel
+  fica sem trabalho.
