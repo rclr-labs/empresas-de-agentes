@@ -346,7 +346,34 @@ test('operacao-de-conhecimento: nenhum papel escreve código', () => {
   }
 });
 
-test('o acervo publica os três arquétipos', () => {
-  assert.deepEqual(listPackages(RAIZ).sort(),
-    ['fabrica-de-testes', 'operacao-de-conhecimento', 'software-house']);
+test('produto-e-design: três papéis, descoberta na raiz', () => {
+  const { pkg } = relatorio('produto-e-design');
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(),
+    ['descoberta-de-produto', 'design-ui', 'pesquisa-ux']);
+  assert.deepEqual(
+    pkg.agents.filter((a) => a.frontmatter.reportsTo == null).map((a) => a.slug),
+    ['descoberta-de-produto']);
+});
+
+test('produto-e-design: zero erro e zero aviso', () => {
+  const { errors, warnings } = relatorio('produto-e-design');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('produto-e-design: nenhum papel escreve código', () => {
+  const { pkg } = relatorio('produto-e-design');
+  for (const a of pkg.agents) {
+    assert.ok(!(a.frontmatter.metadata.capabilities.write ?? []).includes('code'),
+      `${a.slug} não implementa — desenho e implementação são pacotes diferentes`);
+  }
+});
+
+test('produto-e-design: só pesquisa-ux fala com usuário, e isso é portão humano', () => {
+  const { pkg } = relatorio('produto-e-design');
+  const ux = pkg.agents.find((a) => a.slug === 'pesquisa-ux');
+  const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
+  assert.ok(ids.includes('contato-com-usuario'),
+    'falar com usuário real é portão humano: tem gente de verdade do outro lado');
+  assert.ok(ux.frontmatter.metadata.boundary.cannot.some((t) => /usu[áa]rio/i.test(t)));
 });
