@@ -470,3 +470,46 @@ test('EMISSÃO: opencode avisa que a allowlist do pentest é decorativa (fetch-o
   assert.ok(translated.includes('network.allowlist'),
     'claude-code traduz a allowlist de verdade (sandbox.network.allowedDomains)');
 });
+
+test('plataforma-e-operacao: quatro papéis, liderança na raiz', () => {
+  const { pkg } = relatorio('plataforma-e-operacao');
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(), [
+    'confiabilidade-sre', 'lideranca-de-plataforma',
+    'plataforma-e-entrega', 'resposta-a-incidente',
+  ]);
+  assert.deepEqual(
+    pkg.agents.filter((a) => a.frontmatter.reportsTo == null).map((a) => a.slug),
+    ['lideranca-de-plataforma']);
+});
+
+test('plataforma-e-operacao: zero erro e zero aviso', () => {
+  const { errors, warnings } = relatorio('plataforma-e-operacao');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('REGRA DO PACOTE: nenhum papel aplica mudança em ambiente', () => {
+  const { pkg } = relatorio('plataforma-e-operacao');
+  for (const a of pkg.agents) {
+    for (const g of a.frontmatter.metadata.capabilities.execute?.allow ?? []) {
+      assert.ok(!/(apply|upgrade|destroy|rollout restart|delete)/i.test(g),
+        `${a.slug}: "${g}" aplica mudança. plan, template e diff são de agente; apply é portão humano`);
+    }
+  }
+});
+
+test('plataforma-e-operacao: aplicar mudança e deploy são portões humanos nomeados', () => {
+  const { pkg } = relatorio('plataforma-e-operacao');
+  const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
+  assert.ok(ids.includes('aplicar-mudanca-em-ambiente'));
+  assert.ok(ids.includes('acesso-a-dado-de-producao'));
+});
+
+test('plataforma-e-operacao: só resposta-a-incidente lê produção, e por portão', () => {
+  const { pkg } = relatorio('plataforma-e-operacao');
+  const comProducao = pkg.agents.filter((a) =>
+    (a.frontmatter.metadata.capabilities.read ?? []).includes('database'));
+  assert.deepEqual(comProducao.map((a) => a.slug), ['resposta-a-incidente']);
+  assert.ok(comProducao[0].frontmatter.metadata.capabilities.approve.length === 0,
+    'ele usa o portão, não o assina');
+});
