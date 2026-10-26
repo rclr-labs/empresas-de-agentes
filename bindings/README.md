@@ -97,7 +97,7 @@ agente emitido com menos fronteira do que o pacote descreve, e ninguém
 percebe até o papel fazer algo que devia ter sido negado.
 
 `test/bindings-arquivos.test.mjs` tem um teste nomeado exatamente "REGRA
-CENTRAL" que varre os três pacotes, calcula toda capacidade em uso via
+CENTRAL" que varre os oito pacotes, calcula toda capacidade em uso via
 `capabilityKeys`, e falha nomeando a capacidade que qualquer binding deixou
 descoberta. Esse teste é o portão: nenhum binding novo, e nenhuma mudança a
 um existente, entra sem passar por ele.
@@ -184,5 +184,5 @@ Campos anteriores, mantidos como alias de leitura:
 
 Ao escrever um binding novo, rode `node --test test/bindings-arquivos.test.mjs`
 antes de qualquer commit: a regra de cobertura total e a prova de que nenhum
-agente real produz perda não declarada rodam ali, contra os três pacotes
+agente real produz perda não declarada rodam ali, contra os oito pacotes
 publicados.

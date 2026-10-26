@@ -15,6 +15,26 @@ function relatorio(nome) {
   return { pkg, ...validatePackage(pkg) };
 }
 
+// Lista NOMEADA de comandos capazes de rede usados neste acervo — derivada,
+// não enumerada do zero a cada achado. Esta é a quinta vez que o defeito
+// "enumerar em vez de derivar" aparece neste repo (achado Important 6 da
+// revisão da Fase F): o teste original só conhecia curl/wget/http, e por
+// isso não pegou `npm audit*` sem `network` declarada em
+// seguranca-ofensiva/cadeia-de-suprimentos. `npm audit` consulta a base de
+// advisory do registry por desenho — não há `npm audit` inteiramente
+// local. `semgrep` fica fora, apesar de aparecer no mesmo achado: a única
+// invocação deste acervo é `semgrep --config=./*` (regra local, ver
+// seguranca-ofensiva/revisao-de-codigo-seguro), e o padrão abaixo exclui
+// essa forma explicitamente — adicionar de volta um `semgrep` sem
+// `--config=./` em qualquer papel volta a casar, e quebra o teste.
+const COMANDOS_DE_REDE = [
+  /^curl\s/i,
+  /^wget\s/i,
+  /^http\s/i,
+  /^npm audit\b/i,
+  /^semgrep(?!\s+--config=\.\/)/i,
+];
+
 test('software-house: zero erro', () => {
   const { errors } = relatorio('software-house');
   assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
@@ -82,17 +102,22 @@ test('software-house: nenhum papel de dev amarra stack no slug', () => {
   }
 });
 
-test('software-house: toda persona tem nome, ícone, pronomes e histórico', () => {
-  const { pkg } = relatorio('software-house');
-  for (const a of pkg.agents) {
-    const p = a.frontmatter.metadata.persona;
-    assert.ok(p.display_name, `${a.slug} sem display_name`);
-    assert.ok(p.icon, `${a.slug} sem icon`);
-    assert.ok(p.pronouns, `${a.slug} sem pronouns`);
-    assert.match(p.display_name, /^[A-Za-z][A-Za-z ]+$/,
-      `${a.slug}: "${p.display_name}" tem diacrítico ou caractere não-ASCII. O nome tem de funcionar em pt-BR e em inglês`);
-    assert.ok(Array.isArray(p.background) && p.background.length >= 2,
-      `${a.slug} precisa de ao menos 2 linhas de histórico`);
+test('todo pacote do acervo: toda persona tem nome, ícone, pronomes e histórico de 3 linhas', () => {
+  // Era só software-house (achado Important 7 da revisão da Fase F): os
+  // 20 papéis novos em cinco pacotes novos ficavam sem esta guarda. E o
+  // limiar de `background` sobe de ">= 2" para "== 3", que é a regra
+  // escrita do plano (fase-f-constraints.md, regra 4 de persona).
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const p = a.frontmatter.metadata.persona;
+      assert.ok(p.display_name, `${nome}/${a.slug} sem display_name`);
+      assert.ok(p.icon, `${nome}/${a.slug} sem icon`);
+      assert.ok(p.pronouns, `${nome}/${a.slug} sem pronouns`);
+      assert.match(p.display_name, /^[A-Za-z][A-Za-z ]+$/,
+        `${nome}/${a.slug}: "${p.display_name}" tem diacrítico ou caractere não-ASCII. O nome tem de funcionar em pt-BR e em inglês`);
+      assert.ok(Array.isArray(p.background) && p.background.length === 3,
+        `${nome}/${a.slug} precisa de exatamente 3 linhas de histórico, tem ${p.background?.length ?? 0}`);
+    }
   }
 });
 
@@ -113,28 +138,34 @@ test('todo pacote do acervo: ícone único entre os declarados', () => {
   }
 });
 
-test('software-house: nenhuma chave de topo nova — só o que a spec permite', () => {
-  const { pkg } = relatorio('software-house');
+test('todo pacote do acervo: nenhuma chave de topo nova — só o que a spec permite', () => {
+  // Era só software-house (achado Important 7). PERMITIDAS é a mesma
+  // lista, testada agora contra os oito pacotes.
   const PERMITIDAS = new Set([
     'name', 'title', 'slug', 'description', 'schema', 'kind', 'version',
     'license', 'authors', 'goals', 'tags', 'requirements', 'reportsTo',
     'skills', 'metadata', 'manager', 'includes', 'assignee', 'recurring',
     'allowed-tools',
   ]);
-  for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
-    for (const chave of Object.keys(arquivo.frontmatter)) {
-      assert.ok(PERMITIDAS.has(chave),
-        `chave de topo "${chave}" em ${arquivo.path} não é da spec; extensão vai sob metadata.*`);
+  for (const nome of listPackages(RAIZ)) {
+    const pkg = loadPackage(join(RAIZ, nome));
+    for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
+      for (const chave of Object.keys(arquivo.frontmatter)) {
+        assert.ok(PERMITIDAS.has(chave),
+          `chave de topo "${chave}" em ${arquivo.path} não é da spec; extensão vai sob metadata.*`);
+      }
     }
   }
 });
 
-test('software-house: a persona não vaza para o corpo do agente', () => {
-  const { pkg } = relatorio('software-house');
-  for (const a of pkg.agents) {
-    const nome = a.frontmatter.metadata.persona.display_name;
-    assert.ok(!a.body.includes(nome),
-      `${a.slug}: "${nome}" aparece no corpo. A persona não entra no prompt — custa token em toda chamada`);
+test('todo pacote do acervo: a persona não vaza para o corpo do agente', () => {
+  // Era só software-house (achado Important 7).
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const nomePersona = a.frontmatter.metadata.persona.display_name;
+      assert.ok(!a.body.includes(nomePersona),
+        `${nome}/${a.slug}: "${nomePersona}" aparece no corpo. A persona não entra no prompt — custa token em toda chamada`);
+    }
   }
 });
 
@@ -200,16 +231,32 @@ test('TAREFA 30: só os portões com padrão de comando real declaram triggers',
   }
 });
 
-test('todo papel que abre pull request consegue dar push', () => {
+test('todo papel que abre pull request consegue dar push, e vice-versa', () => {
+  // Bidirecional de propósito (achado Critical 3 e mecanismo aprovado na
+  // revisão da Fase F): a regra escrita a partir do PRINCÍPIO é "as duas
+  // metades nomeiam a mesma capacidade" — prosa/máquina concordam nas
+  // duas direções, não só na que o teste original cobria
+  // (write: pull_request ⇒ git push). A direção inversa (git push/gh pr
+  // create em execute.allow ⇒ write inclui pull_request) é a que teria
+  // pego engenharia-de-dados/qualidade-de-dados na hora da escrita: o
+  // papel tinha `gh pr create*` e `git push*` em allow, e `boundary.can`
+  // prometia abrir pull request, mas `write` não incluía `pull_request`.
   for (const nome of listPackages(RAIZ)) {
     for (const a of loadPackage(join(RAIZ, nome)).agents) {
       const cap = a.frontmatter.metadata?.capabilities ?? {};
-      if (!(cap.write ?? []).includes('pull_request')) continue;
       const allow = cap.execute?.allow ?? [];
-      assert.ok(allow.some((g) => /^git push/.test(g)),
-        `${nome}/${a.slug} declara write: [pull_request] mas não tem git push em execute.allow — capacidade inalcançável`);
-      assert.ok((cap.execute?.deny ?? []).some((g) => /force/.test(g)),
-        `${nome}/${a.slug} pode dar push e tem de negar push --force explicitamente`);
+      const write = cap.write ?? [];
+      const abrePR = allow.some((g) => /^gh pr create/.test(g) || /^git push/.test(g));
+      if (write.includes('pull_request')) {
+        assert.ok(allow.some((g) => /^git push/.test(g)),
+          `${nome}/${a.slug} declara write: [pull_request] mas não tem git push em execute.allow — capacidade inalcançável`);
+        assert.ok((cap.execute?.deny ?? []).some((g) => /force/.test(g)),
+          `${nome}/${a.slug} pode dar push e tem de negar push --force explicitamente`);
+      }
+      if (abrePR) {
+        assert.ok(write.includes('pull_request'),
+          `${nome}/${a.slug} tem git push ou gh pr create em execute.allow mas write não inclui pull_request — a metade legível por máquina nega o que a metade legível por humano concede`);
+      }
     }
   }
 });
@@ -219,8 +266,9 @@ test('nenhum papel declara alcance que não tem', () => {
   // direções: ler "web" sem nenhum mecanismo de rede é alcance
   // inalcançável; e um comando de rede em execute.allow com
   // network: false é a contradição inversa — a capacidade promete
-  // silêncio e o comando promete saída.
-  const COMANDOS_DE_REDE = [/^curl\s/i, /^wget\s/i, /^http\s/i];
+  // silêncio e o comando promete saída. COMANDOS_DE_REDE é a lista
+  // nomeada no topo do arquivo — ver o comentário ali para o porquê de
+  // cada entrada.
   for (const nome of listPackages(RAIZ)) {
     for (const a of loadPackage(join(RAIZ, nome)).agents) {
       const cap = a.frontmatter.metadata?.capabilities ?? {};
@@ -420,14 +468,17 @@ test('seguranca-ofensiva: autorização escrita é portão humano com assinante 
   assert.ok(autorizacao.signer, 'e tem assinante nomeado');
 });
 
-test('seguranca-ofensiva: só pentest sai para a rede, e com allowlist de domínio', () => {
+test('seguranca-ofensiva: só pentest e cadeia-de-suprimentos saem para a rede, cada um com allowlist de domínio nomeando a própria função', () => {
   const { pkg } = relatorio('seguranca-ofensiva');
   const comRede = pkg.agents.filter((a) => a.frontmatter.metadata.capabilities.network !== false);
-  assert.deepEqual(comRede.map((a) => a.slug), ['pentest-aplicacao'],
-    'concentrar a saída externa num papel é o que torna a fronteira auditável');
-  assert.ok(Array.isArray(comRede[0].frontmatter.metadata.capabilities.network),
-    'network é lista de domínio autorizado, nunca true — true é a internet inteira');
-  assert.ok(comRede[0].frontmatter.metadata.capabilities.network.length > 0);
+  assert.deepEqual(comRede.map((a) => a.slug).sort(), ['cadeia-de-suprimentos', 'pentest-aplicacao'],
+    'nomear a rede pela função de cada papel é o que torna a fronteira auditável — nenhum outro papel deste pacote sai para a rede');
+  for (const a of comRede) {
+    const network = a.frontmatter.metadata.capabilities.network;
+    assert.ok(Array.isArray(network),
+      `${a.slug}: network é lista de domínio autorizado, nunca true — true é a internet inteira`);
+    assert.ok(network.length > 0, `${a.slug}: lista de domínio não pode ser vazia`);
+  }
 });
 
 test('seguranca-ofensiva: nenhum papel aplica mudança em ambiente', () => {
@@ -625,10 +676,12 @@ test('documentacao-e-suporte: nenhum papel fala com cliente sem portão', () => 
   }
 });
 
-test('ROSTER: 42 papéis, nome ASCII, ícone único, sobrenome único', () => {
+test('ROSTER: 8 pacotes, 42 papéis, nome ASCII, ícone único, sobrenome único', () => {
   const nomes = new Map(); const icones = new Map(); const sobrenomes = new Map();
   let total = 0;
-  for (const nome of listPackages(RAIZ)) {
+  const pacotes = listPackages(RAIZ);
+  assert.equal(pacotes.length, 8, 'o acervo publica 8 pacotes');
+  for (const nome of pacotes) {
     for (const a of loadPackage(join(RAIZ, nome)).agents) {
       const p = a.frontmatter.metadata.persona;
       total++;

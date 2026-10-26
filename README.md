@@ -33,7 +33,7 @@ começar de uma folha em branco.
 
 | Pacote | O que é |
 |---|---|
-| [`software-house/`](software-house/) | Casa de software governada por agentes: coordenação, desenho técnico, implementação, revisão adversarial e portão de qualidade |
+| [`software-house/`](software-house/) | Casa de software governada por agentes: dono de produto, coordenação, desenho técnico, implementação por perfil de stack, revisão adversarial e portão de qualidade |
 | [`fabrica-de-testes/`](fabrica-de-testes/) | Fábrica de testes governada: gerente de teste, especialistas por tipo, evidência verificável e veredito de release |
 | [`operacao-de-conhecimento/`](operacao-de-conhecimento/) | Operação de pesquisa, redação e triagem: curadoria, pesquisa com fonte citável, redação com público declarado e triagem de entrada |
 | [`seguranca-ofensiva/`](seguranca-ofensiva/) | Avaliação de segurança sob autorização escrita: modelo de ameaça, teste de intrusão com escopo nomeado, revisão de código, cadeia de suprimentos e configuração de nuvem |

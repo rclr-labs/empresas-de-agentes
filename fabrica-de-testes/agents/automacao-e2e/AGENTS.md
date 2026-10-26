@@ -39,7 +39,7 @@ metadata:
     execute:
       allow: ["npx playwright*", "npx cypress*", "npm test*", "npm run e2e*", "git add*", "git commit*", "git push*", "git diff*", "gh pr create*"]
       deny: ["git push --force*", "git merge*", "kubectl *", "helm *", "terraform *", "sudo *"]
-    network: ["api-staging.exemplo.com.br"]
+    network: ["api-staging.exemplo.com.br", "github.com"]
     delegate: []
     budget:
       currency: BRL
@@ -99,10 +99,15 @@ segunda vez. Deixar na suíte sem quarentena nem registro é o jeito mais
 rápido de uma suíte deixar de ser lida — o dia em que ninguém confia no
 vermelho é o dia em que a suíte para de proteger qualquer coisa.
 
-O domínio em `capabilities.network` (`api-staging.exemplo.com.br`) é
-placeholder de pacote público, o mesmo ambiente de staging contra o qual
-`api-funcional` e `desempenho-e-carga` também operam — na adaptação, ele é
-substituído pelo host real do cliente.
+`capabilities.network` declara dois domínios, com funções diferentes.
+`api-staging.exemplo.com.br` é placeholder de pacote público, o mesmo
+ambiente de staging contra o qual `api-funcional` e `desempenho-e-carga`
+também operam — na adaptação, ele é substituído pelo host real do
+cliente. `github.com` é real, não placeholder: `execute.allow` concede
+`git push*` e `gh pr create*`, e sem `github.com` na lista a emissão para
+Claude Code bloquearia a própria função declarada deste papel (abrir
+pull request), porque o sandbox nega por padrão todo host fora da
+allowlist.
 
 **A allowlist acima é fronteira de verdade só dependendo do runtime**, e
 este é o papel com a maior superfície de execução dos três — `execute.allow`
@@ -111,13 +116,14 @@ Code**, o sandbox de sistema operacional intercepta toda saída de rede do
 processo (`allowlist_scope: os`, medido em 2026-10-25:
 `sandbox.network.allowedDomains`, code.claude.com/docs/en/sandboxing), e
 isso cobre `git push*` e `gh pr create*` do mesmo jeito que cobre
-`playwright`/`cypress`. **No OpenCode V2 e no janus com provider
-`kind=cli`**, a allowlist cobre só a chamada de busca da própria ferramenta
-(`allowlist_scope: fetch-only`) — `git push*` e `gh pr create*` alcançam
-qualquer host, não só `api-staging.exemplo.com.br`, porque `shell`/CLI não
-passa por ela. Fora do Claude Code, a restrição real sobre para onde este
-papel pode empurrar código ou abrir PR tem de vir de rede ou proxy, nunca
-só da allowlist declarada aqui.
+`playwright`/`cypress` — é por isso que `github.com` precisa estar na
+lista, e não só `api-staging.exemplo.com.br`. **No OpenCode V2 e no janus
+com provider `kind=cli`**, a allowlist cobre só a chamada de busca da
+própria ferramenta (`allowlist_scope: fetch-only`) — `git push*` e
+`gh pr create*` alcançam qualquer host, não só os dois domínios
+declarados, porque `shell`/CLI não passa por ela. Fora do Claude Code, a
+restrição real sobre para onde este papel pode empurrar código ou abrir
+PR tem de vir de rede ou proxy, nunca só da allowlist declarada aqui.
 
 ## O que você não faz
 

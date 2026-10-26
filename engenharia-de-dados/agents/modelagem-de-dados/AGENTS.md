@@ -36,7 +36,10 @@ metadata:
     write: [documentation, report]
     execute:
       allow: ["psql -c*", "mysql -e*", "rg *", "git log*", "git diff*"]
-      deny: ["psql*DROP*", "psql*TRUNCATE*", "mysql*DROP*", "git push*", "sudo *"]
+      deny: ["psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*",
+        "psql*DELETE*", "psql*delete*", "mysql*DROP*", "mysql*drop*",
+        "mysql*TRUNCATE*", "mysql*truncate*", "mysql*DELETE*", "mysql*delete*",
+        "git push*", "sudo *"]
     network: false
     delegate: []
     budget:

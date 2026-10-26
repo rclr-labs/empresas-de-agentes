@@ -58,13 +58,15 @@ entre os dois não é de intenção, é de assinatura.
 ameaça, publica o escopo autorizado e despacha os quatro especialistas
 dentro dele; `pentest-aplicacao` prova exploração em aplicação;
 `revisao-de-codigo-seguro` procura classe de vulnerabilidade em código
-estático; `cadeia-de-suprimentos` verifica dependência e integridade de
-artefato; `configuracao-de-nuvem` lê infraestrutura declarada. Só
-`pentest-aplicacao` sai para a rede, e com **lista de domínio**, nunca
-`network: true` — concentrar a saída externa num papel só é o que torna a
-fronteira auditável, e é a decisão que faz este pacote ser o único do
-acervo com `capabilities.network` como allowlist de domínio em vez de
-booleano.
+estático, inteiramente local; `cadeia-de-suprimentos` verifica
+dependência e integridade de artefato; `configuracao-de-nuvem` lê
+infraestrutura declarada. Dois papéis saem para a rede, cada um com
+**lista de domínio** nomeando só o que a própria função exige, nunca
+`network: true`: `pentest-aplicacao` alcança o alvo autorizado pelo
+cliente, `cadeia-de-suprimentos` alcança o registry de pacote que
+`npm audit` consulta para cruzar vulnerabilidade conhecida. Nomear a
+rede pela função, em vez de conceder acesso irrestrito, é o que torna a
+fronteira auditável nos dois.
 
 **Orçamento.** Teto mensal em `metadata.budget`, com teto por papel
 proporcional ao custo de execução: `pentest-aplicacao` carrega o maior
@@ -121,9 +123,12 @@ avaliação sem a assinatura da liderança.
 - **Avaliação só defensiva (sem teste de intrusão):** corta
   `pentest-aplicacao` e mantém os três papéis estáticos
   (`revisao-de-codigo-seguro`, `cadeia-de-suprimentos`,
-  `configuracao-de-nuvem`), que não precisam de rede nem do portão
-  `teste-contra-producao` — o único deste pacote que exige saída externa e
-  alvo vivo deixa de existir, e o escopo fica mais simples de autorizar.
+  `configuracao-de-nuvem`), que não precisam do portão
+  `teste-contra-producao` nem de alvo vivo — `cadeia-de-suprimentos`
+  ainda alcança `registry.npmjs.org` para `npm audit`, mas isso é consulta
+  de base de advisory, não teste contra ambiente autorizado. O único
+  deste pacote que exige alvo vivo e escopo assinado deixa de existir, e
+  o escopo fica mais simples de autorizar.
 - **Os domínios de `pentest-aplicacao` são exemplo.** `staging.exemplo.com.br`
   e `api-staging.exemplo.com.br` existem só para o papel ser válido e
   emitível neste acervo público. Na adaptação, a lista é substituída

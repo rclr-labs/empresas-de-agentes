@@ -25,7 +25,7 @@ metadata:
       - definir e priorizar o valor da demanda
       - escrever o critério de aceite de cada item
       - recusar escopo sem critério verificável
-      - aceitar ou rejeitar entrega contra o critério que ele mesmo escreveu
+      - aceitar ou rejeitar entrega contra o critério que ela mesma escreveu
     cannot:
       - priorizar capacidade do time, fila ou orçamento
       - escolher a solução técnica

@@ -125,6 +125,20 @@ rule_order: first-match
 # lida. É alargamento de fronteira para o papel `network: false`, não
 # estreitamento — documentado aqui, não escondido.
 allowlist_scope: os
+# Direção de ESTREITAMENTO (oposta ao alargamento documentado acima): como
+# o `.claude/settings.json` emitido é de escopo de projeto, a união sobe —
+# nunca desce — quando um papel do pacote declara domínio. Logo, o único
+# estreitamento disponível para quem quer manter `network: false` verdade
+# literal apesar de um colega de pacote ter domínio declarado não é de
+# binding: é de `execute.allow` na origem. Caso real desta onda —
+# `seguranca-ofensiva/revisao-de-codigo-seguro`, que mantém `network:
+# false` ao lado de `cadeia-de-suprimentos` (`registry.npmjs.org`) na
+# allowedDomains unida do pacote — não estreita o domínio (não há como,
+# aqui), estreita o COMANDO: nunca ganhou `npm audit*` em `execute.allow`,
+# e `semgrep` foi restrito a `--config=./*` (regra local, sem registry de
+# regra). O papel não toca a rede não porque o binding o isole — ele
+# compartilha a mesma allowedDomains alargada que `cadeia-de-suprimentos`
+# — mas porque nenhum comando que ele tem permissão de rodar precisa dela.
 translates:
   read.repository: [Read, Grep, Glob]
   read.documentation: [Read, Grep, Glob]

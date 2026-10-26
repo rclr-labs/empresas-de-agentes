@@ -114,9 +114,13 @@ todo dia.
 
 ## O que este pacote deliberadamente não faz
 
-Não escreve em base de produção — nenhum papel tem `DROP`, `TRUNCATE`,
-`DELETE` ou qualquer escrita de produção em `execute.allow`, e a escrita
-em produção sempre espera o portão `escrever-em-producao`. Não acessa
+Não escreve em produção sem o portão `escrever-em-producao` — esse portão,
+não a ausência de `DROP`/`TRUNCATE`/`DELETE` em `execute.allow`, é a
+fronteira real. `psql -c*` e `mysql -e*` admitem qualquer SQL por
+construção, `DROP` incluído; o `deny` de palavra-chave em cada papel é
+defesa em profundidade sobre esse allow largo, não a fronteira em si — e
+por isso cobre as três palavras, nos clientes que o papel permite, em
+maiúscula e minúscula. Não acessa
 dado pessoal identificável sem o portão `acesso-a-dado-pessoal`. Não
 redefine métrica publicada fora do portão `alterar-definicao-de-metrica`.
 

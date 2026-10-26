@@ -453,14 +453,16 @@ test('recusa emitir pacote inválido', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test('VOLUME: saída padrão (sem --verbose) de um pacote de 6 agentes fica sob 40 linhas, em todo binding', () => {
+test('VOLUME: saída padrão (sem --verbose) de um pacote de 9 agentes fica sob 40 linhas, em todo binding', () => {
   // Achado 2 da auditoria (fix round 1): paperclip/portable chegavam a
-  // 69/75 linhas para fabrica-de-testes (6 agentes) porque listavam
-  // PRESERVADA por papel × capacidade em vez de por motivo — 66/72
-  // linhas carregando 1-2 fatos. Threshold justificado pelo pior caso
-  // LEGÍTIMO medido: opencode, que não agrega perda (perda é item a
-  // item por desenho), fica em 33 linhas para 6 agentes — 40 dá margem
-  // sem esconder uma regressão de volume que volte a listar por papel.
+  // 69/75 linhas para fabrica-de-testes (então 6 agentes) porque
+  // listavam PRESERVADA por papel × capacidade em vez de por motivo —
+  // 66/72 linhas carregando 1-2 fatos. A Task 20 expandiu o pacote para
+  // 9 agentes; remedido em 2026-10-26: claude-code 17, opencode 24,
+  // paperclip 9, portable 7 linhas — pior caso (opencode, que não
+  // agrega perda, pois perda é item a item por desenho) em 24 linhas
+  // para 9 agentes. 40 dá margem sem esconder uma regressão de volume
+  // que volte a listar por papel.
   for (const binding of ['claude-code', 'opencode', 'paperclip', 'portable']) {
     const { out, stdout } = emitir(['--package', 'fabrica-de-testes', '--binding', binding]);
     const linhas = stdout.trim().split('\n').length;
@@ -480,7 +482,7 @@ test('VOLUME: --verbose devolve o detalhe por papel que o padrão esconde', () =
     '--verbose lista o detalhe por papel que a agregação por motivo esconde no padrão');
 });
 
-test('PROVA DE AGNOSTICISMO: os três pacotes compilam para os quatro bindings', () => {
+test('PROVA DE AGNOSTICISMO: os oito pacotes compilam para os quatro bindings', () => {
   for (const pacote of listPackages(RAIZ)) {
     for (const binding of ['claude-code', 'opencode', 'paperclip', 'portable']) {
       const { out } = emitir(['--package', pacote, '--binding', binding]);

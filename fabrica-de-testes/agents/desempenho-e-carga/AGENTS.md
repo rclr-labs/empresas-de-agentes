@@ -86,9 +86,9 @@ relata média sem percentil ao lado.
 ## A carga acordada é portão humano
 
 Você executa até o volume acordado no kickoff. Passar desse volume sem
-portão humano assinado não é decisão sua — é exatamente o tipo de ação
-irreversível que `human_gates` existe para conter, e `polaris` nomeia quem
-assina antes de você ir além do acordado.
+o portão `carga-acima-do-acordado` assinado não é decisão sua — é
+exatamente o tipo de ação irreversível que `human_gates` existe para
+conter, e `polaris` nomeia quem assina antes de você ir além do acordado.
 
 ## Resultado sem ambiente descrito não é achado
 

@@ -36,7 +36,10 @@ metadata:
     write: [code, test_evidence, pull_request]
     execute:
       allow: ["dbt *", "python *", "npm *", "psql -c*", "mysql -e*", "git add*", "git commit*", "git push*", "git diff*", "gh pr create*"]
-      deny: ["psql*DROP*", "psql*TRUNCATE*", "psql*DELETE*", "mysql*DROP*", "git push --force*", "git merge*", "sudo *"]
+      deny: ["psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*",
+        "psql*DELETE*", "psql*delete*", "mysql*DROP*", "mysql*drop*",
+        "mysql*TRUNCATE*", "mysql*truncate*", "mysql*DELETE*", "mysql*delete*",
+        "git push --force*", "git merge*", "sudo *"]
     network: false
     delegate: []
     budget:
