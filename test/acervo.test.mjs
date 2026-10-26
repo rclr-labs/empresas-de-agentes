@@ -513,3 +513,49 @@ test('plataforma-e-operacao: só resposta-a-incidente lê produção, e por port
   assert.ok(comProducao[0].frontmatter.metadata.capabilities.approve.length === 0,
     'ele usa o portão, não o assina');
 });
+
+test('engenharia-de-dados: cinco papéis, liderança na raiz', () => {
+  const { pkg } = relatorio('engenharia-de-dados');
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(), [
+    'analytics-bi', 'lideranca-de-dados', 'modelagem-de-dados',
+    'pipeline-de-dados', 'qualidade-de-dados',
+  ]);
+  assert.deepEqual(
+    pkg.agents.filter((a) => a.frontmatter.reportsTo == null).map((a) => a.slug),
+    ['lideranca-de-dados']);
+});
+
+test('engenharia-de-dados: zero erro e zero aviso', () => {
+  const { errors, warnings } = relatorio('engenharia-de-dados');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('PAR DE RISCO: qualidade-de-dados constrói checagem, integridade-de-dados verifica release', () => {
+  const q = relatorio('engenharia-de-dados').pkg.agents.find((a) => a.slug === 'qualidade-de-dados');
+  const i = relatorio('fabrica-de-testes').pkg.agents.find((a) => a.slug === 'integridade-de-dados');
+  assert.ok((q.frontmatter.metadata.capabilities.write ?? []).includes('code'),
+    'o de engenharia escreve a checagem');
+  assert.ok(!(i.frontmatter.metadata.capabilities.write ?? []).includes('code'),
+    'o da fábrica só produz evidência');
+  assert.notDeepEqual(q.frontmatter.metadata.capabilities, i.frontmatter.metadata.capabilities);
+});
+
+test('engenharia-de-dados: nenhum papel escreve em base de produção', () => {
+  const { pkg } = relatorio('engenharia-de-dados');
+  for (const a of pkg.agents) {
+    assert.ok(a.frontmatter.metadata.boundary.cannot.some((t) => /produ[çc][ãa]o/i.test(t)),
+      `${a.slug} tem de negar produção na prosa`);
+    for (const g of a.frontmatter.metadata.capabilities.execute?.allow ?? []) {
+      assert.ok(!/(DROP|TRUNCATE|DELETE)/i.test(g), `${a.slug}: "${g}" destrói dado`);
+    }
+  }
+});
+
+test('engenharia-de-dados: analytics-bi não escreve pipeline e pipeline não define métrica', () => {
+  const { pkg } = relatorio('engenharia-de-dados');
+  const bi = pkg.agents.find((a) => a.slug === 'analytics-bi');
+  const pl = pkg.agents.find((a) => a.slug === 'pipeline-de-dados');
+  assert.ok(!(bi.frontmatter.metadata.capabilities.write ?? []).includes('code'));
+  assert.ok(pl.frontmatter.metadata.boundary.cannot.some((t) => /m[ée]trica|defini[çc][ãa]o/i.test(t)));
+});
