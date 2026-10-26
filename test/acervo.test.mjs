@@ -559,3 +559,36 @@ test('engenharia-de-dados: analytics-bi não escreve pipeline e pipeline não de
   assert.ok(!(bi.frontmatter.metadata.capabilities.write ?? []).includes('code'));
   assert.ok(pl.frontmatter.metadata.boundary.cannot.some((t) => /m[ée]trica|defini[çc][ãa]o/i.test(t)));
 });
+
+test('documentacao-e-suporte: três papéis, documentação na raiz', () => {
+  const { pkg } = relatorio('documentacao-e-suporte');
+  assert.deepEqual(pkg.agents.map((a) => a.slug).sort(),
+    ['base-de-conhecimento', 'documentacao-tecnica', 'suporte-nivel-2']);
+  assert.deepEqual(
+    pkg.agents.filter((a) => a.frontmatter.reportsTo == null).map((a) => a.slug),
+    ['documentacao-tecnica']);
+});
+
+test('documentacao-e-suporte: zero erro e zero aviso', () => {
+  const { errors, warnings } = relatorio('documentacao-e-suporte');
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
+  assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
+});
+
+test('PAR DE RISCO: suporte-nivel-2 reproduz, triagem só roteia', () => {
+  const s = relatorio('documentacao-e-suporte').pkg.agents.find((a) => a.slug === 'suporte-nivel-2');
+  const t = relatorio('operacao-de-conhecimento').pkg.agents.find((a) => a.slug === 'triagem');
+  assert.ok(s.frontmatter.metadata.boundary.can.some((x) => /reproduz/i.test(x)));
+  assert.ok(t.frontmatter.metadata.boundary.cannot.some((x) => /responder/i.test(x)));
+  assert.notDeepEqual(s.frontmatter.metadata.capabilities, t.frontmatter.metadata.capabilities);
+});
+
+test('documentacao-e-suporte: nenhum papel fala com cliente sem portão', () => {
+  const { pkg } = relatorio('documentacao-e-suporte');
+  const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
+  assert.ok(ids.includes('responder-ao-cliente'));
+  for (const a of pkg.agents) {
+    assert.ok(a.frontmatter.metadata.boundary.cannot.some((t) => /cliente|usu[áa]rio/i.test(t)),
+      `${a.slug} tem de negar contato direto na prosa`);
+  }
+});
