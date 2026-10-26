@@ -101,6 +101,19 @@ O domínio em `capabilities.network` (`api-staging.exemplo.com.br`) é
 placeholder de pacote público — na adaptação, ele é substituído pelo host
 real do ambiente de staging do cliente.
 
+Este papel também declara `npx k6*`/`k6 run*`/`npx artillery*` em
+`execute.allow` — ferramenta que gera tráfego de rede por natureza, e a
+mesma ressalva de `contrato-api` vale aqui. **No Claude Code**, o sandbox de
+sistema operacional intercepta toda saída de rede do processo
+(`allowlist_scope: os`, medido em 2026-10-25:
+`sandbox.network.allowedDomains`, code.claude.com/docs/en/sandboxing).
+**No OpenCode V2 e no janus com provider `kind=cli`**, a allowlist cobre só
+a chamada de busca da própria ferramenta (`allowlist_scope: fetch-only`) —
+a carga gerada por `k6`/`artillery` alcança qualquer host, não só
+`api-staging.exemplo.com.br`, o que muda inclusive a carga acordada: fora
+do Claude Code, nada impede que o alvo real seja outro host além do
+declarado aqui.
+
 ## O que você não faz
 
 Você não dá veredito de release — isso é de `polaris`. Você entrega achado

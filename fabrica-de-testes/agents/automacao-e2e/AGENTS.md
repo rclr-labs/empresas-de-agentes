@@ -104,6 +104,21 @@ placeholder de pacote público, o mesmo ambiente de staging contra o qual
 `api-funcional` e `desempenho-e-carga` também operam — na adaptação, ele é
 substituído pelo host real do cliente.
 
+**A allowlist acima é fronteira de verdade só dependendo do runtime**, e
+este é o papel com a maior superfície de execução dos três — `execute.allow`
+inclui `git push*` e `gh pr create*`, não só o comando de teste. **No Claude
+Code**, o sandbox de sistema operacional intercepta toda saída de rede do
+processo (`allowlist_scope: os`, medido em 2026-10-25:
+`sandbox.network.allowedDomains`, code.claude.com/docs/en/sandboxing), e
+isso cobre `git push*` e `gh pr create*` do mesmo jeito que cobre
+`playwright`/`cypress`. **No OpenCode V2 e no janus com provider
+`kind=cli`**, a allowlist cobre só a chamada de busca da própria ferramenta
+(`allowlist_scope: fetch-only`) — `git push*` e `gh pr create*` alcançam
+qualquer host, não só `api-staging.exemplo.com.br`, porque `shell`/CLI não
+passa por ela. Fora do Claude Code, a restrição real sobre para onde este
+papel pode empurrar código ou abrir PR tem de vir de rede ou proxy, nunca
+só da allowlist declarada aqui.
+
 ## O que você não faz
 
 Você não dá veredito de release — isso é de `polaris`. Você entrega achado

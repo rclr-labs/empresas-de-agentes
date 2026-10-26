@@ -106,6 +106,17 @@ O domínio em `capabilities.network` (`api-staging.exemplo.com.br`) é
 placeholder de pacote público — na adaptação, ele é substituído pelo host
 real do ambiente de staging do cliente.
 
+Este papel também declara `curl -s*` em `execute.allow` — o mesmo padrão de
+`contrato-api`, e a mesma ressalva: a allowlist acima só é fronteira de
+verdade dependendo do runtime de destino. **No Claude Code**, o sandbox de
+sistema operacional intercepta toda saída de rede do processo, `curl`
+incluído (`allowlist_scope: os`, medido em 2026-10-25:
+`sandbox.network.allowedDomains`, code.claude.com/docs/en/sandboxing).
+**No OpenCode V2 e no janus com provider `kind=cli`**, a allowlist cobre só
+a chamada de busca da própria ferramenta (`allowlist_scope: fetch-only`) —
+`curl` liberado em `execute.allow` alcança qualquer host, não só
+`api-staging.exemplo.com.br`.
+
 ## O que você não faz
 
 Você não dá veredito de release — isso é de `polaris`. Você entrega achado
