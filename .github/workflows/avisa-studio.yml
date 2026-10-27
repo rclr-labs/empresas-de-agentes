@@ -1,0 +1,45 @@
+name: avisa a vitrine
+
+# O acervo não sabe nada sobre a vitrine além de um nome de repo: ele toca o
+# sino e vai embora. Quem decide o que publicar é a vitrine, lendo o ref de
+# vitrine.json — por isso este workflow NÃO manda SHA, branch nem payload
+# nenhum. Payload é campo que o emissor escolhe; se a vitrine publicasse o que
+# chega aqui, este arquivo passaria a ser o lugar de onde se escolhe o que vai
+# pro ar.
+on:
+  push:
+    branches: [main]
+    paths:
+      # Só o que muda o catálogo derivado. Mexer em docs/ ou no README não
+      # republica a vitrine — sino que toca sem motivo é sino que se ignora.
+      - 'pacotes/**'
+      - 'bindings/**'
+      - 'tools/catalog.mjs'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispara o deploy da vitrine
+        # PRÉ-REQUISITO AINDA NÃO ATENDIDO (2026-10-27): o segredo
+        # STUDIO_DISPATCH_TOKEN não existe neste repo. Precisa ser um token com
+        # permissão de escrita em rclr-labs/agent-studio — só `contents:write`,
+        # que é o mínimo que o endpoint de dispatch aceita.
+        #
+        # O GITHUB_TOKEN padrão NÃO serve: ele é escopado a ESTE repositório e
+        # não alcança o Studio. Cruzar repo exige credencial própria, e é isso
+        # que torna o gatilho um passo de dashboard e não de código.
+        env:
+          GH_TOKEN: ${{ secrets.STUDIO_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "STUDIO_DISPATCH_TOKEN ausente — a vitrine não foi avisada."
+            echo "Enquanto o segredo não existir, republicar é manual:"
+            echo "  gh workflow run vitrine -R rclr-labs/agent-studio"
+            exit 1
+          fi
+          gh api repos/rclr-labs/agent-studio/dispatches \
+            -f event_type=acervo-atualizado
