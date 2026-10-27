@@ -64,24 +64,21 @@ function erro(code, rule, where, message) {
  * e cópia de lista é como a guarda de alcance ficou cega para `npm audit`
  * e `semgrep` até 2026-10-26. Uma lista, dois consumidores.
  *
- * `nmap`/`nuclei`/`ffuf` entraram em 2026-10-27, fix-round 1 da Task 1: a
- * revisão achou que a lista original (curl/wget/http/npm audit/semgrep)
- * não reconhecia as três ferramentas de scan que `seguranca-ofensiva/
- * pentest-aplicacao` já usa — sexta aparição do defeito "enumerar em vez
- * de derivar". Não é falso negativo vivo hoje (aquele papel já declara
- * `network` não-falso), mas deixaria passar em silêncio um papel futuro
- * que listasse só essas três com `network: false`.
+ * `nmap`/`nuclei`/`ffuf` entraram em 2026-10-27, fix-round 1 da Task 1.
+ * `k6`/`artillery` entraram no fix-round 2, pela mesma classe de lacuna.
  *
- * O critério de pertencimento aqui é "o alvo é um domínio que o operador
- * escolhe e declara em `capabilities.network`" — scanner/cliente HTTP
- * genérico, ou consulta que só existe contra registry ao vivo (`npm
- * audit`). Ferramenta que fala com um endpoint PRÉ-CONFIGURADO (remote
- * git, API do GitHub, cluster k8s, provider de nuvem, conexão de banco)
- * não entra aqui — ver `COMANDOS_LOCAIS` e a classificação completa no
- * relatório da Task 1.
+ * O critério de pertencimento aqui é **o alvo vem como ARGUMENTO da
+ * própria invocação** — um host ou domínio que quem chama escolhe na hora,
+ * forma de `curl`/`nmap`/`nuclei`/`ffuf`/`k6`/`artillery` — ou é consulta
+ * que só existe contra registry ao vivo, fora do controle do chamador
+ * (`npm audit`). Ferramenta cujo alvo é configurado por ARQUIVO ou
+ * CREDENCIAL (`.npmrc`, `pip.conf`, `~/.docker/config.json`, remote do
+ * git, kubeconfig) não entra aqui — ver `COMANDOS_LOCAIS` e a
+ * classificação completa no relatório da Task 1.
  */
 export const COMANDOS_DE_REDE = Object.freeze([
   /^curl\s/i, /^wget\s/i, /^http\s/i, /^nmap\s/i, /^nuclei\s/i, /^ffuf\s/i,
+  /^k6\b/i, /^artillery\b/i,
   /^npm audit\b/i, /^semgrep(?!\s+--config=\.\/)/i,
 ]);
 
@@ -91,35 +88,104 @@ export const COMANDOS_DE_REDE = Object.freeze([
  * por derivação, que todo comando que já aparece em algum `execute.allow`
  * do acervo esteja classificado num dos dois lados, nunca ausente dos
  * dois: ausente dos dois é exatamente como a lacuna de nmap/nuclei/ffuf
- * ficou invisível até a revisão de 2026-10-27 — de novo, enumerar sem
- * derivar. Comando novo que não bater aqui nem em COMANDOS_DE_REDE falha
- * o teste de derivação, nomeado, pedindo classificação explícita.
+ * (fix-round 1) e, antes dela, de k6/artillery embrulhados em `npx`
+ * (fix-round 2) ficaram invisíveis — de novo, enumerar sem derivar.
+ * Comando novo que não bater aqui nem em COMANDOS_DE_REDE falha o teste de
+ * derivação, nomeado, pedindo classificação explícita.
  *
- * `git` e `gh` ficam aqui mesmo `git push`/`gh pr create` alcançando rede:
- * o alvo é o remote/API do GitHub já configurado, não um domínio que
+ * O critério de pertencimento aqui é o espelho do de `COMANDOS_DE_REDE`:
+ * **o alvo é configurado por ARQUIVO ou CREDENCIAL**, nunca passado como
+ * domínio na própria invocação. `git`/`gh` ficam aqui mesmo `git push`/
+ * `gh pr create` alcançando rede: o alvo é o remote/API do GitHub já
+ * configurado (`.git/config`, token do `gh`), não um domínio que
  * `capabilities.network` declara — essa contradição específica (push/PR
  * sem `write` incluir `pull_request`) é o ângulo da E16 (próxima tarefa),
  * não de E15. `kubectl`/`helm`/`terraform` ficam aqui pela mesma razão:
- * falam com cluster/provider via credencial pré-configurada, não domínio
- * declarado. `mysql`/`psql` ficam aqui porque o alvo é conexão de banco já
- * configurada, governada por `capabilities.read/write` de `database`, não
- * por `network`. Gerenciador de pacote/build/teste (`npm`, `npx`, `pip`,
- * `yarn`, `pnpm`, `composer`, `mvn`, `gradle`, `dotnet`, `python`, `dbt`,
- * `great_expectations`, `docker`, `k6`) segue o precedente já existente de
- * `npm audit` — o próprio `npm` bare não entra em `COMANDOS_DE_REDE`, só a
- * forma que exige o registry ao vivo; o mesmo raciocínio deixa estas
- * ferramentas aqui, não lá.
+ * falam com cluster/provider via kubeconfig/credencial de provider
+ * pré-configurada, nunca um host passado na linha de comando. `mysql`/
+ * `psql` ficam aqui porque o alvo é conexão de banco já configurada,
+ * governada por `capabilities.read/write` de `database`, não por
+ * `network`. `npm`/`pip`/`yarn`/`pnpm`/`composer`/`mvn`/`gradle`/`dotnet`/
+ * `docker` ficam aqui porque o registry/repositório que alcançam é
+ * configurado em arquivo (`.npmrc`, `pip.conf`, `~/.m2/settings.xml`,
+ * `~/.docker/config.json`), nunca argumento da chamada — mesmo raciocínio
+ * do precedente já existente de `npm audit`/`npm` bare.
+ *
+ * Os nomes abaixo que seguem um RUNNER (`npx cypress`, `npx playwright`,
+ * `npx axe`, `npx @stoplight/spectral-cli`) são o comando REAL depois que
+ * `descascarRunner` remove o prefixo — nunca o runner em si. `npx`/
+ * `pnpm dlx`/`yarn dlx`/`bunx`/`pipx run`/`uvx`/`dotnet run --` não
+ * aparecem aqui como entrada própria: classificar pelo runner, e não pelo
+ * que ele executa, foi exatamente a lacuna do fix-round 2 (`npx artillery`
+ * saía classificado como local via `/^npx\s/i`, sem nunca testar
+ * `artillery`).
  */
 export const COMANDOS_LOCAIS = Object.freeze([
   /^rg\s/i, /^grep\s/i,
   /^git\s/i, /^gh\s/i,
   /^kubectl\s/i, /^helm\s/i, /^terraform\s/i, /^docker\s/i,
   /^mysql\b/i, /^psql\b/i,
-  /^npm\s/i, /^npx\s/i, /^pip\s/i, /^yarn\s/i, /^pnpm\s/i, /^composer\s/i,
+  /^npm\s/i, /^pip\s/i, /^yarn\s/i, /^pnpm\s/i, /^composer\s/i,
   /^mvn\s/i, /^gradle\s/i, /^dotnet\s/i, /^python\s/i,
-  /^dbt\s/i, /^great_expectations\s/i, /^k6\s/i,
+  /^dbt\s/i, /^great_expectations\s/i,
   /^semgrep\s+--config=\.\//i,
+  // Comando real por trás de um runner (ver comentário acima) — não o
+  // runner, que fica só em RUNNERS.
+  /^axe\b/i, /^cypress\b/i, /^playwright\b/i, /^@stoplight\/spectral-cli\b/i,
+  // `npx` bare SÓ para o caso degenerado de `descascarRunner` (`npx *`,
+  // sem sub-comando nomeado): seis papéis do acervo usam esse wildcard
+  // puro para "qualquer ferramenta do ecossistema npm", pelo mesmo
+  // precedente que já trata `npm *` bare como local. Nunca bate quando
+  // existe um comando real depois do runner — esse caso vai para o nome
+  // do comando, nunca para esta entrada.
+  /^npx\b/i,
 ]);
+
+/**
+ * Prefixos de runner conhecidos. Um runner não é um comando — é um
+ * carregador de outro comando — e por isso nunca entra em
+ * COMANDOS_DE_REDE/COMANDOS_LOCAIS diretamente: classificar `npx` sozinho
+ * foi exatamente como `npx artillery*` saiu "local" sem o E15 nunca olhar
+ * para `artillery`. `descascarRunner` usa esta lista para expor o comando
+ * real, que é então classificado pelas duas listas de sempre — nunca por
+ * um caminho paralelo.
+ */
+export const RUNNERS = Object.freeze([
+  /^npx\s+/i,
+  /^pnpm\s+dlx\s+/i,
+  /^yarn\s+dlx\s+/i,
+  /^bunx\s+/i,
+  /^pipx\s+run\s+/i,
+  /^uvx\s+/i,
+  /^dotnet\s+run\s+--\s+/i,
+]);
+
+/**
+ * Remove um prefixo de runner conhecido de `padrao`, expondo o comando
+ * real que ele carrega. Sem runner reconhecido, devolve `padrao` como veio
+ * — é por isso que todo chamador pode testar `descascarRunner(padrao)`
+ * direto contra COMANDOS_DE_REDE/COMANDOS_LOCAIS sem ramificar em "tem
+ * runner ou não".
+ *
+ * Caso degenerado: `npx *` (visto em seis papéis do acervo) não nomeia
+ * sub-comando nenhum — é wildcard puro. Não há "comando real" para
+ * classificar aí; a classificação cai no nome do PRÓPRIO runner (`npx`),
+ * que entra em COMANDOS_LOCAIS só para este caso, documentado onde a
+ * lista declara essa entrada. Isso não reabre a lacuna do fix-round 2: lá
+ * o defeito era um comando de rede REAL (`artillery`) escondido atrás do
+ * runner; aqui não existe comando real nenhum para esconder.
+ */
+export function descascarRunner(padrao) {
+  for (const runner of RUNNERS) {
+    const m = padrao.match(runner);
+    if (m) {
+      const resto = padrao.slice(m[0].length);
+      if (/^[\s*]*$/.test(resto)) return m[0].trim();
+      return resto;
+    }
+  }
+  return padrao;
+}
 
 function temRede(cap) {
   return cap.network === true || (Array.isArray(cap.network) && cap.network.length > 0);
@@ -393,7 +459,7 @@ export function validateGovernance(pkg) {
     // E15 — alcance declarado. Capacidade que nega a rede que o comando usa
     // é fronteira que não existe: o operador lê "sem rede" e o processo sai.
     const allow = cap.execute?.allow ?? [];
-    const cmdRede = allow.find((g) => COMANDOS_DE_REDE.some((re) => re.test(g)));
+    const cmdRede = allow.find((g) => COMANDOS_DE_REDE.some((re) => re.test(descascarRunner(g))));
     if (!temRede(cap)) {
       if ((cap.read ?? []).includes('web')) {
         erros.push(erro('E15', 'alcance-nao-declarado', where,
@@ -444,7 +510,7 @@ export function validateWarnings(pkg) {
     // com provider kind=cli, onde o shell escapa.
     const cap = meta.capabilities ?? {};
     if (Array.isArray(cap.network) && cap.network.length > 0
-        && (cap.execute?.allow ?? []).some((g) => COMANDOS_DE_REDE.some((re) => re.test(g)))
+        && (cap.execute?.allow ?? []).some((g) => COMANDOS_DE_REDE.some((re) => re.test(descascarRunner(g))))
         && !/allowlist_scope/.test(agente.body ?? '')) {
       avisos.push({ code: 'W05', path: agente.path,
         message: 'declara allowlist de domínio e comando capaz de rede, e o corpo não traz a ressalva de allowlist_scope: no Claude Code a allowlist é fronteira de SO, no OpenCode V2 e no janus kind=cli é fetch-only e o comando escapa' });

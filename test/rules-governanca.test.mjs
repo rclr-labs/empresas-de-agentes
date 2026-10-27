@@ -338,6 +338,24 @@ test('E15: nmap com network false também é erro — a lacuna de 2026-10-27', (
   assert.match(e15[0].message, /nmap -sV\*/);
 });
 
+test('E15: npx artillery com network false é erro — o runner não pode esconder o comando', () => {
+  // fix round 2 da revisão: k6/artillery entraram em COMANDOS_DE_REDE, mas
+  // o risco de verdade era o extrator de runner — `npx artillery*`
+  // classificava "local" porque `/^npx\s/i` batia primeiro, sem nunca
+  // testar "artillery". Este é o caso exato que passava verde antes da
+  // correção: execute.allow só com o comando embrulhado em npx.
+  const pkg = pacoteMinimo({
+    slug: 'carga', capabilities: {
+      read: ['repository'], write: ['report'],
+      execute: { allow: ['npx artillery*'], deny: ['sudo *'] },
+      network: false,
+    },
+  });
+  const e15 = validatePackage(pkg).errors.filter((e) => e.code === 'E15');
+  assert.equal(e15.length, 1, JSON.stringify(validatePackage(pkg).errors, null, 2));
+  assert.match(e15[0].message, /npx artillery\*/);
+});
+
 test('E15: o mesmo papel com domínio declarado passa', () => {
   const pkg = pacoteMinimo({
     slug: 'coleta', capabilities: {
