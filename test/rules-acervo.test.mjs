@@ -115,3 +115,71 @@ test('A01: verificados com um pacote só nomeia só esse um — não finge ver o
   ]);
   assert.deepEqual(verificados, ['um']);
 });
+
+// --- O comparador era cego a caixa, a acento e a espaço (T5 deferido,
+// medido na revisão ampla de 2026-10-27).
+//
+// `'Ana Vieira'` vs `'ana vieira'` dava ZERO erro de A01, e o
+// `/^[A-Za-z][A-Za-z ]*$/` de E18 aceita minúscula — logo nenhuma regra
+// pegava a colisão. O eixo do ESPAÇO NO FIM nem havia sido medido:
+// `'Ana Vieira '` não colidia com nenhuma das duas formas, e E18 também
+// o permite. Identidade de persona é o que a vitrine usa para distinguir
+// um papel de outro; duas identidades que só diferem em caixa ou espaço
+// são a MESMA identidade para quem lê o card.
+const EIXOS = {
+  caixa: 'ana vieira',
+  'espaço no fim': 'Ana Vieira ',
+  'espaço no início': ' Ana Vieira',
+  'espaço duplo': 'Ana  Vieira',
+  acento: 'Ana Viéira',
+  'caixa + espaço': 'ana  vieira ',
+};
+
+test('A01: os eixos de caixa, acento e espaço colidem com a grafia canônica', () => {
+  for (const [eixo, grafia] of Object.entries(EIXOS)) {
+    const erros = validateAcervo([
+      { slug: 'um', agents: [papel('a', 'Ana Vieira', '💡')] },
+      { slug: 'dois', agents: [papel('b', grafia, '⚙️')] },
+    ]).errors;
+    // Dois A01: nome e sobrenome, como na colisão literal — nenhum dos
+    // dois mascarando o outro.
+    assert.equal(erros.length, 2,
+      `eixo "${eixo}" (${JSON.stringify(grafia)}) deu ${erros.length} A01, esperado 2`);
+    assert.ok(erros.every((e) => e.code === 'A01'));
+    // A mensagem tem de mostrar a grafia do OUTRO papel — sem isso,
+    // "nome repetido" numa colisão que só a normalização vê é
+    // inacionável: as duas linhas parecem diferentes no arquivo.
+    assert.match(erros[0].message, /lá escrito/);
+  }
+});
+
+test('A01: sobrenome colide mesmo com espaço no fim do nome — era o eixo que escapava inteiro', () => {
+  // `'Ana Vieira '.split(' ').at(-1)` é `''`, descartado como ausência:
+  // antes da correção, este par passava limpo no eixo do sobrenome.
+  const erros = validateAcervo([
+    { slug: 'um', agents: [papel('a', 'Ana Vieira ', '💡')] },
+    { slug: 'dois', agents: [papel('b', 'Caio Vieira', '⚙️')] },
+  ]).errors;
+  assert.equal(erros.length, 1);
+  assert.match(erros[0].message, /sobrenome/);
+});
+
+test('A01: ícone segue comparado VERBATIM — emoji não dobra caixa nem decompõe acento', () => {
+  // Dois ícones distintos que só uma normalização aplicada a emoji
+  // poderia confundir. Normalizar ícone não tem sentido, e
+  // `.toLowerCase()` não é identidade em toda sequência Unicode.
+  assert.deepEqual(validateAcervo([
+    { slug: 'um', agents: [papel('a', 'Ana Vieira', '🅰️')] },
+    { slug: 'dois', agents: [papel('b', 'Caio Moraes', '🇦')] },
+  ]).errors, []);
+});
+
+test('A01: nomes de fato diferentes seguem sem colisão com a normalização ligada', () => {
+  // Contraponto positivo: a normalização não pode transformar o
+  // comparador num acusador de tudo.
+  assert.deepEqual(validateAcervo([
+    { slug: 'um', agents: [papel('a', 'Ana Vieira', '💡')] },
+    { slug: 'dois', agents: [papel('b', 'Ana Moraes', '⚙️')] },
+    { slug: 'tres', agents: [papel('c', 'Caio Vieiralves', '🧪')] },
+  ]).errors, []);
+});

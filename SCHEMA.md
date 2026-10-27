@@ -334,7 +334,7 @@ que recebe a LISTA de pacotes em vez de um pacote só.
 
 | Código | Regra (`rule`) | O que rejeita | Consequência sem a regra |
 |---|---|---|---|
-| A01 | `identidade-repetida` | Ícone, `display_name` ou sobrenome de `metadata.persona` repetido entre QUAISQUER dois papéis do acervo — do mesmo pacote ou de pacotes diferentes; campo ausente nunca entra na comparação | Dois papéis com a mesma identidade visual/nominal na vitrine — o humano não consegue distinguir quem é quem no card, e a unicidade que o acervo promete (42 papéis, 42 identidades) vira coincidência, não garantia |
+| A01 | `identidade-repetida` | Ícone, `display_name` ou sobrenome de `metadata.persona` repetido entre QUAISQUER dois papéis do acervo — do mesmo pacote ou de pacotes diferentes; campo ausente nunca entra na comparação. **`display_name` e sobrenome são comparados NORMALIZADOS** (caixa dobrada, diacrítico removido, pontas aparadas, espaço interno colapsado), e o sobrenome sai do nome já aparado; **`icon` é comparado VERBATIM** | Dois papéis com a mesma identidade visual/nominal na vitrine — o humano não consegue distinguir quem é quem no card, e a unicidade que o acervo promete (42 papéis, 42 identidades) vira coincidência, não garantia |
 
 **Quem chama:** o CLI (`tools/validate.mjs`), quando valida sem alvo
 explícito — o modo "acervo inteiro" que já carrega todos os pacotes via
@@ -369,6 +369,23 @@ não é teto.
 `undefined` — a ausência é `W03` (regra de pacote), nunca `A01`. Esta
 distinção é a cicatriz de 2026-10-24: um teste de unicidade escrito sem o
 filtro de ausência acusou repetição onde havia falta.
+
+**Nome e sobrenome são comparados normalizados; ícone, verbatim.** A
+comparação de `display_name` e de sobrenome dobra caixa, remove
+diacrítico, apara as pontas e colapsa espaço interno — medido em
+2026-10-27, `"Davi Neves"` vs `"davi neves"` dava zero erro, e
+`"Davi Neves "` (espaço no fim) não colidia com nenhuma das duas formas,
+enquanto o `/^[A-Za-z][A-Za-z ]*$/` de `E18` aceita as três. Duas
+identidades que só diferem em caixa ou espaço são a MESMA identidade para
+quem lê o card da vitrine. O sobrenome sai do nome JÁ aparado, senão
+`"Davi Neves ".split(" ").at(-1)` é `""` e o eixo escapa inteiro. `icon`
+fica fora da normalização de propósito: ícone é emoji, dobrar caixa e
+decompor acento não tem sentido ali, e `.toLowerCase()` não é identidade
+em toda sequência Unicode. A mensagem de erro mostra a grafia do outro
+papel quando ela DIFERE — sem isso, "nome repetido" numa colisão que só a
+normalização vê é inacionável, porque as duas linhas parecem diferentes
+no arquivo. Os 42 papéis do acervo seguem em zero colisão com a
+normalização ligada (re-derivado, não presumido).
 
 ### Verificação de completude do catálogo
 

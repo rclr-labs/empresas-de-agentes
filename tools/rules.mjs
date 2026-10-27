@@ -26,6 +26,41 @@ function mapaOuVazio(v) {
 }
 
 /**
+ * Forma de COMPARAÇÃO de um nome de persona para A01 — nunca a forma de
+ * exibição. Dobra caixa, decompõe e remove diacrítico, apara as pontas e
+ * colapsa espaço interno.
+ *
+ * Os três eixos foram medidos em 2026-10-27: `'Davi Neves'` vs
+ * `'davi neves'` dava ZERO erro de A01, `'Davi Neves '` (espaço no fim)
+ * não colidia com nenhum dos dois, e `'Davi  Neves'` (espaço duplo)
+ * tampouco — e o `/^[A-Za-z][A-Za-z ]*$/` de E18 aceita os três, então
+ * nenhuma outra regra os pegava. Acento é o único eixo que já estava
+ * coberto, porque E18 rejeita `display_name` acentuado de todo jeito;
+ * entra aqui mesmo assim, porque A01 não pode depender de E18 ter rodado
+ * (`validateAcervo` recebe pacotes, não vereditos) e porque a colisão que
+ * importa é de IDENTIDADE, não de ortografia.
+ *
+ * Re-derivado sobre o acervo real: os 42 papéis seguem em ZERO colisão
+ * com a normalização ligada.
+ *
+ * `icon` NÃO passa por aqui, de propósito: ícone é emoji, dobrar caixa e
+ * decompor acento não tem sentido ali, e `.toLowerCase()` não é
+ * identidade em toda sequência Unicode — ícone é comparado verbatim.
+ *
+ * Puro: `normalize`/`toLowerCase`/`\p{Diacritic}` são ECMAScript, não
+ * `node:*` — o módulo segue carregável no browser.
+ */
+function chaveDeIdentidade(v) {
+  if (typeof v !== 'string') return v;
+  return v
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
  * Reescreve chaves de alias pt-BR para o canônico em inglês, recursivamente.
  * Não muta a entrada. Canônico vence quando as duas chaves coexistem.
  */
@@ -1130,21 +1165,37 @@ export function validateAcervo(pkgs) {
       const p = a.frontmatter?.metadata?.persona;
       if (!p) continue;
 
+      const nome = typeof p.display_name === 'string' ? p.display_name : undefined;
+      // Sobrenome sai do nome JÁ aparado: `'Davi Neves '.split(' ').at(-1)`
+      // é `''` (descartado logo abaixo como ausência), e isso fazia
+      // `'Davi Neves '` não colidir no sobrenome com `'Luiza Neves'` —
+      // o mesmo eixo de espaço que a normalização fecha no nome.
+      const sobrenome = nome === undefined ? undefined : nome.trim().split(/\s+/).at(-1);
+
+      // Valor COMO ESCRITO para a mensagem; forma NORMALIZADA para a
+      // comparação. Ícone fica verbatim: emoji é o valor, e dobrar caixa
+      // ou decompor acento ali não tem sentido — `.toLowerCase()` não é
+      // identidade em toda sequência Unicode.
       const campos = {
-        icon: p.icon,
-        display_name: p.display_name,
-        sobrenome: typeof p.display_name === 'string' ? p.display_name.split(' ').at(-1) : undefined,
+        icon: { valor: p.icon, chave: p.icon },
+        display_name: { valor: nome, chave: chaveDeIdentidade(nome) },
+        sobrenome: { valor: sobrenome, chave: chaveDeIdentidade(sobrenome) },
       };
 
-      for (const [campo, valor] of Object.entries(campos)) {
+      for (const [campo, { valor, chave }] of Object.entries(campos)) {
         if (valor === undefined || valor === null || valor === '') continue;
         const onde = `${pkg.slug}/${a.slug}`;
-        const anterior = vistos[campo].get(valor);
+        const anterior = vistos[campo].get(chave);
         if (anterior) {
+          // Grafia do outro papel só entra na mensagem quando DIFERE —
+          // é o que torna acionável a colisão que só a normalização vê
+          // ("Davi Neves" vs "davi  neves"), sem poluir a colisão
+          // literal, que já se explica.
+          const grafiaAnterior = anterior.valor === valor ? '' : ` (lá escrito "${anterior.valor}")`;
           erros.push(erro('A01', 'identidade-repetida', a.path,
-            `${rotulo[campo]} "${valor}" repetido: ${anterior} e ${onde}. Identidade de persona (ícone, nome, sobrenome) é única em todo o acervo — renomeie um dos dois papéis, ou troque o ícone`));
+            `${rotulo[campo]} "${valor}" repetido: ${anterior.onde}${grafiaAnterior} e ${onde}. Identidade de persona (ícone, nome, sobrenome) é única em todo o acervo, e nome e sobrenome são comparados ignorando caixa, acento e espaço — renomeie um dos dois papéis, ou troque o ícone`));
         } else {
-          vistos[campo].set(valor, onde);
+          vistos[campo].set(chave, { onde, valor });
         }
       }
     }
