@@ -547,13 +547,26 @@ export function validateStructure(pkg) {
     verificarTiposDeCapacidade(cap, where, erros);
     if (meta.persona) verificarTiposDePersona(meta.persona, where, erros);
 
-    // E18 — persona por pacote. `display_name` é ASCII puro porque o nome
-    // tem de funcionar em pt-BR e em inglês; o corpo nunca o menciona
-    // porque o papel é o papel, não a pessoa; e `background` tem 3 linhas
-    // porque uma delas é a cicatriz que faz o modelo seguir a regra quando
-    // ela custa. Unicidade entre pacotes é validateAcervo (Task 5), não
-    // aqui — `validatePackage(pkg)` recebe um pacote só e não pode decidir
-    // unicidade global.
+    // E18 — persona por pacote: o que está DECLARADO e está ERRADO, nunca
+    // o que falta. `display_name` é ASCII puro porque o nome tem de
+    // funcionar em pt-BR e em inglês; o corpo nunca o menciona porque o
+    // papel é o papel, não a pessoa; e `background`, quando declarado, tem
+    // de ter 3 linhas porque uma delas é a cicatriz que faz o modelo
+    // seguir a regra quando ela custa. Unicidade entre pacotes é
+    // validateAcervo (Task 5), não aqui — `validatePackage(pkg)` recebe um
+    // pacote só e não pode decidir unicidade global.
+    //
+    // `background` AUSENTE não é E18 — é W03 (ruling de 2026-10-27,
+    // fix-round 2 da Task 4): a persona não entra no prompt, exceto
+    // `signature_question`; `background` e `headline` custam token em toda
+    // chamada e não mudam comportamento, servem o humano e a vitrine. Um
+    // papel sem `background` não mente sobre si — tem card pobre, a mesma
+    // degradação que falta de `icon`/`pronouns` já é. Por isso a checagem
+    // de 3 linhas só roda quando `p.background` já É uma lista de texto
+    // (`isListaDeTextoValida`, reaproveitado do guard de tipo — nenhum
+    // `listaDeTexto` aqui: o valor já está confirmado lista-de-texto, e
+    // refiltrar o que o guarda já confirmou é redundância que a revisão
+    // apontou no fix-round 1).
     //
     // Cada checagem só roda quando o TIPO do campo já está correto —
     // `verificarTiposDePersona` (E19) relata o resto. Sem essa guarda,
@@ -566,13 +579,9 @@ export function validateStructure(pkg) {
         erros.push(erro('E18', 'persona-invalida', where,
           `display_name "${p.display_name}" não é ASCII puro — o nome tem de funcionar em pt-BR e em inglês`));
       }
-      const backgroundTipoValido = p.background === undefined || isListaDeTextoValida(p.background);
-      if (backgroundTipoValido) {
-        const linhas = listaDeTexto(p.background);
-        if (linhas.length !== 3) {
-          erros.push(erro('E18', 'persona-invalida', where,
-            `background tem ${linhas.length} linha(s); a regra é 3, e ao menos uma é uma cicatriz`));
-        }
+      if (isListaDeTextoValida(p.background) && p.background.length !== 3) {
+        erros.push(erro('E18', 'persona-invalida', where,
+          `background tem ${p.background.length} linha(s); a regra é 3, e ao menos uma é uma cicatriz`));
       }
       if (typeof p.display_name === 'string' && p.display_name
           && (agente.body ?? '').includes(p.display_name)) {
@@ -957,10 +966,20 @@ export function validateWarnings(pkg) {
     // Ruling de 2026-10-27 (coordenador, fix-round 1 da Task 4): existência
     // de `icon` e `pronouns` entra aqui, ao lado de `display_name`, pela
     // mesma razão que `display_name` ausente já era aviso — degradação da
-    // vitrine, não defeito de governança. `E18` fica só para o que está
-    // DECLARADO e está ERRADO (ASCII, contagem de linhas, vazamento no
-    // corpo); persona ausente ou incompleta nunca é E18, mesmo que isso
-    // reprovasse pacote de terceiro que não se importa com esta vitrine.
+    // vitrine, não defeito de governança.
+    //
+    // `background` AUSENTE entra aqui também (ruling do fix-round 2,
+    // 2026-10-27, corrigindo uma lacuna do próprio ruling do round 1): a
+    // persona não entra no prompt, exceto `signature_question` —
+    // `background` custa token em toda chamada sem mudar comportamento,
+    // serve só o humano e a vitrine. Falta de `background` é card pobre,
+    // não papel que mente sobre si.
+    //
+    // `E18` fica só para o que está DECLARADO e está ERRADO (ASCII,
+    // contagem de linhas de um `background` que EXISTE, vazamento no
+    // corpo); persona ausente ou incompleta, em qualquer um dos quatro
+    // campos, nunca é E18 — mesmo que isso reprovasse pacote de terceiro
+    // que não se importa com esta vitrine.
     if (!meta.persona?.display_name) {
       avisos.push({ code: 'W03', path: agente.path,
         message: 'papel sem metadata.persona.display_name; o Studio vai mostrar o slug' });
@@ -972,6 +991,10 @@ export function validateWarnings(pkg) {
     if (meta.persona && !meta.persona.pronouns) {
       avisos.push({ code: 'W03', path: agente.path,
         message: 'papel sem metadata.persona.pronouns; o card da vitrine fica sem pronome' });
+    }
+    if (meta.persona && !meta.persona.background) {
+      avisos.push({ code: 'W03', path: agente.path,
+        message: 'papel sem metadata.persona.background; o card da vitrine fica sem histórico' });
     }
     if (!(agente.frontmatter?.skills ?? []).length) {
       avisos.push({ code: 'W04', path: agente.path,

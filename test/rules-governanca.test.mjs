@@ -290,6 +290,34 @@ test('W03: persona completa (display_name, icon, pronouns) não avisa', () => {
   assert.deepEqual(warnings.filter((w) => w.code === 'W03'), []);
 });
 
+// W03/E18 — ruling de 2026-10-27 (fix-round 2 da Task 4), corrigindo uma
+// lacuna do ruling do round 1: `background` AUSENTE é W03 (persona não
+// entra no prompt, exceto signature_question — background custa token e
+// não muda comportamento, serve só o humano e a vitrine), nunca E18.
+// `background` DECLARADO com contagem errada continua E18, nunca W03 — os
+// dois lados desta mesma separação, num par de testes.
+test('W03/E18: background ausente avisa (W03), zero E18', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código',
+    signature_question: 'E se faltar?' } });
+  const { errors, warnings } = validatePackage(pkg);
+  assert.deepEqual(errors.filter((e) => e.code === 'E18'), [],
+    `background ausente é W03, não E18: ${JSON.stringify(errors, null, 2)}`);
+  assert.ok(warnings.some((w) => w.code === 'W03' && /background/.test(w.message)));
+});
+
+test('W03/E18: background declarado com 2 linhas é E18, zero W03', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b'],
+    signature_question: 'E se faltar?' } });
+  const { errors, warnings } = validatePackage(pkg);
+  assert.equal(errors.filter((e) => e.code === 'E18').length, 1);
+  assert.deepEqual(warnings.filter((w) => w.code === 'W03' && /background/.test(w.message)), [],
+    `background declarado, mesmo com contagem errada, não é ausência: ${JSON.stringify(warnings, null, 2)}`);
+});
+
 test('W04: papel sem skills avisa', () => {
   const { warnings } = validatePackage(pacote({ agents: [{ slug: 'a', skills: [] }] }));
   assert.ok(warnings.some((w) => w.code === 'W04'));
