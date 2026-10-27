@@ -327,12 +327,26 @@ que recebe a LISTA de pacotes em vez de um pacote só.
 
 **Quem chama:** o CLI (`tools/validate.mjs`), quando valida sem alvo
 explícito — o modo "acervo inteiro" que já carrega todos os pacotes via
-`listPackages`; e a vitrine, que tem o acervo inteiro carregado em memória.
-Com `--package <alvo>` (um pacote só, de propósito), o CLI NÃO chama
-`validateAcervo` — ela decidiria unicidade sobre um recorte que o operador
-nunca pediu, e a pergunta "este pacote de terceiro é internamente
-consistente" já é respondida por `E01`–`E19` sem precisar do resto do
-acervo.
+`listPackages`; e a vitrine, hoje com o acervo inteiro carregado em memória,
+e na Fase 2 também validando o pacote em edição, um só. Com `--package
+<alvo>` (um pacote só, de propósito), o CLI NÃO chama `validateAcervo` — ela
+decidiria unicidade sobre um recorte que o operador nunca pediu, e a
+pergunta "este pacote de terceiro é internamente consistente" já é
+respondida por `E01`–`E19` sem precisar do resto do acervo.
+
+**Chamada parcial não é recusada — é declarada.** `validateAcervo(pkgs)`
+devolve `{ errors, verificados }`, onde `verificados` é a lista de slugs que
+de fato entraram na comparação. Fix-round 1 desta tarefa (2026-10-27,
+achado do coordenador): a vitrine da Fase 2 é exatamente o chamador que
+valida UM pacote, e `A01` passar verde ali teria a mesma cara de
+"unicidade do acervo inteiro confirmada" que `validatePackage` passar verde
+tem de "pacote correto" — o padrão de certificação incompleta que a Fase
+D-bis já corrigiu nos bindings (`preserves` não é `translates`). A correção
+não é guarda (não recusa, não infere o tamanho certo — isso engessaria um
+chamador legítimo): é visibilidade. Quem chama com 1 pacote lê
+`verificados: ['x']` e sabe que leu unicidade de 1, não de 8; quem chama com
+o acervo inteiro lê os 8 slugs e pode dizer "unicidade verificada em 8
+pacotes" em vez de só "verificada".
 
 **Lista vazia é recusada (lança), não aprovada.** `validateAcervo([])`
 nunca devolve `{ errors: [] }` — zero pacotes não é "zero colisão

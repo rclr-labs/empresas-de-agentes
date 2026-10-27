@@ -82,23 +82,6 @@ test('software-house: nenhum papel de dev amarra stack no slug', () => {
   }
 });
 
-test('todo pacote do acervo: ícone único entre os declarados', () => {
-  // Considera só ícone DECLARADO. Um agente ainda não migrado não tem
-  // persona, logo `icon` é undefined — e sem o filtro, dois agentes sem
-  // ícone colidem em `undefined` e o teste acusa repetição onde há
-  // ausência. A ausência já é coberta por W03 (papel sem persona) e pelo
-  // teste de roster da Task 26, que exige os 42 com ícone único.
-  const icones = new Map();
-  for (const nome of listPackages(RAIZ)) {
-    for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      const icone = a.frontmatter.metadata?.persona?.icon;
-      if (!icone) continue;
-      assert.ok(!icones.has(icone), `ícone ${icone} repetido: ${icones.get(icone)} e ${nome}/${a.slug}`);
-      icones.set(icone, `${nome}/${a.slug}`);
-    }
-  }
-});
-
 test('todo pacote do acervo: nenhuma chave de topo nova — só o que a spec permite', () => {
   // Era só software-house (achado Important 7). PERMITIDAS é a mesma
   // lista, testada agora contra os oito pacotes.

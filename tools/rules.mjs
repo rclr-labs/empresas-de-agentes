@@ -1032,17 +1032,20 @@ export function validateWarnings(pkg) {
  * ambiguidade é exatamente a classe de defeito que esta função existe
  * para não cometer.
  *
- * UM pacote só é aceito. Hoje nenhum chamador real faz essa chamada
- * parcial — o CLI só chama esta função no modo acervo-inteiro, que sempre
- * carrega todos via `listPackages`, e a vitrine, pela mesma razão
- * (contexto da tarefa), já carrega o acervo inteiro antes de chamar. A
- * função não tem como IMPOR o tamanho certo sem conhecer o acervo real de
- * fora — inventar essa imposição aqui seria construir guarda para um
- * chamador hipotético, a mesma classe de enumeração-sem-necessidade que
- * este módulo evita em outros lugares (ver COMANDOS_LOCAIS). O que ela
+ * UM pacote só é aceito — e a chamada parcial não é hipotética para
+ * sempre: a vitrine da Fase 2 valida o pacote em edição, um só, e `A01`
+ * passar verde ali teria cara de "unicidade do acervo inteira confirmada"
+ * sendo "unicidade deste pacote confirmada" — o mesmo padrão de
+ * certificação incompleta que a Fase D-bis corrigiu nos bindings
+ * (`preserves` não é `translates`). A correção aqui não é GUARDA — isto
+ * não recusa nem infere o tamanho certo, o que engessaria um chamador
+ * legítimo — é DECLARAÇÃO: o retorno inclui `verificados`, a lista de
+ * slugs que de fato entraram na comparação, para que quem chama possa
+ * dizer "unicidade verificada em 8 pacotes" em vez de só "verificada", e
+ * a cobertura parcial fique visível em vez de silenciosa. O que a função
  * garante, com um pacote ou com oito, é sempre o mesmo: reporta colisão
  * entre o que foi passado, nomeando os dois caminhos — nunca finge ter
- * visto o que não recebeu.
+ * visto o que não recebeu, e agora diz explicitamente o que viu.
  *
  * O mapa de "vistos" é ÚNICO por campo e NÃO é reiniciado por pacote — é
  * isso que pega colisão DENTRO do mesmo pacote (dois papéis do mesmo
@@ -1095,7 +1098,7 @@ export function validateAcervo(pkgs) {
       }
     }
   }
-  return { errors: erros };
+  return { errors: erros, verificados: pkgs.map((pkg) => pkg.slug) };
 }
 
 /** Ponto de entrada único — usado pelo CLI e pelo Studio. */

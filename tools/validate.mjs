@@ -89,11 +89,12 @@ for (const dir of dirs) {
 // pacote de fato carregou — validateAcervo lança sobre lista vazia de
 // propósito (ver tools/rules.mjs), em vez de certificar "zero colisão"
 // sobre zero pacotes.
-const acervoErros = (alvos.length === 0 && pkgsCarregados.length > 0)
-  ? validateAcervo(pkgsCarregados).errors
-  : [];
+const { errors: acervoErros, verificados: acervoVerificados } =
+  (alvos.length === 0 && pkgsCarregados.length > 0)
+    ? validateAcervo(pkgsCarregados)
+    : { errors: [], verificados: [] };
 relatorio.errors += acervoErros.length;
-relatorio.acervo = { errors: acervoErros };
+relatorio.acervo = { errors: acervoErros, verificados: acervoVerificados };
 
 if (json) {
   // `rewritten`: mesma verdade que a saída humana — contagem real de
@@ -109,7 +110,7 @@ if (json) {
   }
   if (alvos.length === 0 && pkgsCarregados.length > 0) {
     const status = acervoErros.length ? 'FALHOU' : 'ok';
-    console.log(`\nacervo: ${status}  (${acervoErros.length} erro — identidade de persona entre os ${pkgsCarregados.length} pacotes)`);
+    console.log(`\nacervo: ${status}  (${acervoErros.length} erro — identidade de persona verificada em ${acervoVerificados.length} pacotes: ${acervoVerificados.join(', ')})`);
     for (const e of acervoErros) console.log(`  ${e.code} ${e.where}\n       ${e.message}`);
   }
   console.log(`\ntotal: ${relatorio.errors} erro, ${relatorio.warnings} aviso`);

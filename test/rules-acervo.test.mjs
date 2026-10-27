@@ -94,3 +94,24 @@ test('A01: um pacote só, sem colisão interna, passa', () => {
     { slug: 'um', agents: [papel('a', 'Ana Vieira', '💡')] },
   ]).errors, []);
 });
+
+// Fix round 1 (coordenador): fechar o furo 2 sem guarda — declarando o que
+// foi verificado em vez de recusar ou inferir. `verificados` é a lista de
+// slugs que de fato entraram na comparação, para que quem chama com um
+// recorte (ex.: a vitrine validando o pacote em edição) possa dizer
+// "unicidade verificada em 1 pacote" em vez de deixar essa cobertura
+// parcial silenciosa atrás de um `{ errors: [] }` que parece completo.
+test('A01: verificados nomeia os pacotes que de fato entraram na checagem', () => {
+  const { verificados } = validateAcervo([
+    { slug: 'um', agents: [papel('a', 'Ana Vieira', '💡')] },
+    { slug: 'dois', agents: [papel('b', 'Caio Moraes', '⚙️')] },
+  ]);
+  assert.deepEqual(verificados, ['um', 'dois']);
+});
+
+test('A01: verificados com um pacote só nomeia só esse um — não finge ver o resto', () => {
+  const { verificados } = validateAcervo([
+    { slug: 'um', agents: [papel('a', 'Ana Vieira', '💡')] },
+  ]);
+  assert.deepEqual(verificados, ['um']);
+});
