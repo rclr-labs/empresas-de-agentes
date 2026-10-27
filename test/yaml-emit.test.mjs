@@ -35,6 +35,57 @@ test('não cita "#" quando não é precedido de espaço — C# do acervo real', 
   assert.ok(!emitYaml(obj).includes('"'));
 });
 
+// --- Fix round 2: chave de mapa nunca passava por escalar() (Critical 1
+// da revisão) e newline literal não era detectado nem escapado
+// corretamente (Critical 2). O consumidor que exercita esses shapes é o
+// editor da vitrine (Fase 2), gerando frontmatter a partir de
+// formulário — nenhum dos 42 papéis do acervo tem chave perigosa ou
+// newline em valor, por isso o teste de paridade sobre o acervo real não
+// cobria nenhum destes casos.
+
+test('chave de mapa com espaço+hash no meio não perde o par — "a #b" seria comentário YAML', () => {
+  const obj = { 'a #b': 1, outro: 2 };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('chave de mapa com espaço final não perde o espaço na releitura', () => {
+  const obj = { 'key ': 1 };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('chave de mapa com ": " não produz YAML inválido', () => {
+  const obj = { 'a: b': 1 };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('chave de mapa vazia não produz YAML inválido', () => {
+  const obj = { '': 1, x: 2 };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('chave de mapa com newline não produz YAML inválido', () => {
+  const obj = { 'a\nb': 1 };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('valor com newline sem outro gatilho de aspas não produz escalar plano cru', () => {
+  const obj = { h: 'linha um\nlinha dois' };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('valor com newline que também cairia em aspas por outro motivo (emoji) não sofre line folding', () => {
+  // "?" ou emoji já forçam aspas por SIMBOLO_AUTORAL; sem o fix, o YAML
+  // citado faz line folding do newline cru em espaço na releitura —
+  // perda silenciosa. O valor abaixo carrega "?" E newline.
+  const obj = { frase: 'Isso funciona?\nE se não funcionar?' };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
+test('newline no fim ou no início da string também sobrevive', () => {
+  const obj = { a: '\ninicio', b: 'fim\n', c: '\n' };
+  assert.deepEqual(recarregar(obj), obj);
+});
+
 test('preserva emoji e acento', () => {
   const obj = { icon: '🗂️', nome: 'Clara Mendes', frase: 'Como vamos saber que ficou pronto?' };
   assert.deepEqual(recarregar(obj), obj);

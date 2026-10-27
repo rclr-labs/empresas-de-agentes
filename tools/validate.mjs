@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { loadPackage, listPackages } from './schema.mjs';
+import { loadPackage, listPackages, parseMarkdown } from './schema.mjs';
 import { validatePackage, validateAcervo } from './rules.mjs';
 import { toMarkdown } from './serialize.mjs';
 
@@ -33,6 +33,40 @@ const relatorio = { packages: [], errors: 0, warnings: 0 };
 // mesma execução em que imprimira "--fix NÃO aplicado". Ferramenta que
 // mente sobre o que fez é pior que ferramenta que não faz.
 let reescritos = 0;
+// Guarda de sanidade pós-emissão: `toMarkdown` (navegador, sem parser) não
+// pode se auto-verificar, mas este CLI roda em Node e pode importar
+// js-yaml para reparsear o que acabou de emitir. Decisão do coordenador no
+// fix round 2: a guarda vive AQUI, no caminho de escrita do `--fix`, não
+// dentro de `toMarkdown` — verificar emissão exige parser, e serialize.mjs
+// tem de ficar livre de js-yaml porque o navegador o importa. O editor da
+// vitrine (Fase 2) vai precisar da mesma conferência com parser próprio;
+// isso é requisito dela, registrado, não resolvido aqui.
+let guardaFalhou = false;
+
+// Acha o primeiro caminho onde `a` e `b` divergem — usada para nomear o
+// campo na mensagem de erro da guarda, não para decidir se divergem (isso
+// é feito no caller comparando o retorno com `null`).
+function primeiraDiferenca(a, b, caminho = '$') {
+  if (a === b) return null;
+  if (typeof a !== typeof b || a === null || b === null) return caminho;
+  if (Array.isArray(a) !== Array.isArray(b)) return caminho;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return caminho;
+    for (let i = 0; i < a.length; i += 1) {
+      const d = primeiraDiferenca(a[i], b[i], `${caminho}[${i}]`);
+      if (d) return d;
+    }
+    return null;
+  }
+  if (typeof a === 'object') {
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const d = primeiraDiferenca(a[k], b[k], `${caminho}.${k}`);
+      if (d) return d;
+    }
+    return null;
+  }
+  return caminho;
+}
 
 // Pacotes que de fato carregaram, nesta execução. `validateAcervo` só pode
 // ser chamada sobre o que foi carregado — e só no modo acervo-inteiro
@@ -75,10 +109,38 @@ for (const dir of dirs) {
     console.error(`${pkg.slug}: --fix NÃO aplicado — o pacote tem ${todosErros.length} erro. Reescrever arquivo que o validador acabou de reprovar esconde o defeito atrás de uma mudança de formatação. Corrija os erros e rode de novo.`);
   } else if (fix && temAlias) {
     // O pkg já vem normalizado por loadPackage; reescrever o arquivo
-    // a partir dele é o próprio fix.
-    for (const arquivo of [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks]) {
-      writeFileSync(join(dir, arquivo.path), toMarkdown(arquivo), 'utf8');
-      reescritos += 1;
+    // a partir dele é o próprio fix. Antes de gravar QUALQUER arquivo do
+    // pacote, reparseia cada emissão e compara com o frontmatter de
+    // origem — se qualquer um divergir, nada deste pacote é gravado (tudo
+    // ou nada: um --fix parcialmente aplicado é pior que nenhum).
+    const arquivos = [pkg.company, ...pkg.agents, ...pkg.skills, ...pkg.teams, ...pkg.tasks];
+    const emissoes = [];
+    let falhouEstePkg = false;
+    for (const arquivo of arquivos) {
+      const emitido = toMarkdown(arquivo);
+      let reparsed;
+      try {
+        reparsed = parseMarkdown(emitido).frontmatter;
+      } catch (e) {
+        console.error(`${pkg.slug}: --fix NÃO aplicado — ${arquivo.path} emitiu YAML que nem reparseia (${e.message}). Bug do emissor, não do pacote; nada foi gravado.`);
+        falhouEstePkg = true;
+        break;
+      }
+      const campo = primeiraDiferenca(arquivo.frontmatter, reparsed);
+      if (campo) {
+        console.error(`${pkg.slug}: --fix NÃO aplicado — ${arquivo.path} mudaria de sentido na reemissão (campo ${campo} diverge do original). Bug do emissor, não do pacote; nada foi gravado.`);
+        falhouEstePkg = true;
+        break;
+      }
+      emissoes.push({ arquivo, emitido });
+    }
+    if (falhouEstePkg) {
+      guardaFalhou = true;
+    } else {
+      for (const { arquivo, emitido } of emissoes) {
+        writeFileSync(join(dir, arquivo.path), emitido, 'utf8');
+        reescritos += 1;
+      }
     }
   }
 }
@@ -121,4 +183,4 @@ if (json) {
   }
 }
 
-process.exit(relatorio.errors > 0 ? 1 : 0);
+process.exit(relatorio.errors > 0 || guardaFalhou ? 1 : 0);

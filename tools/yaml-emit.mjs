@@ -39,23 +39,66 @@ const SIMBOLO_AUTORAL = /[?*]|\p{Extended_Pictographic}/u;
 // mesmo domínio sai sem aspas (`ref: ../../COMPANY.md`), por isso o
 // ponto só pesa dentro de `[...]`.
 
+// Escapa para dentro de aspas duplas, nesta ORDEM exata: backslash
+// primeiro, newline depois, aspas por último. Inverter os dois primeiros
+// quebra: escapar "\n" (newline real → sequência "\n") ANTES de escapar
+// backslash faz o escape de backslash re-processar o backslash que o
+// passo anterior acabou de inserir, dobrando-o ("\n" viraria "\\n", que
+// religa como backslash+"n" literal, não newline). Medido reparseando os
+// dois caminhos com `yaml.load`: só backslash→newline→aspas fecha
+// `"a\nb"` de volta em "a\nb" (com newline real).
+function citar(s) {
+  return `"${s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/"/g, '\\"')}"`;
+}
+
+// Newline literal força aspas mesmo sem nenhum outro gatilho: um escalar
+// plano com "\n" dentro é YAML estruturalmente inválido ("a multiline key
+// may not be an implicit key"), e um escalar já citado por OUTRO motivo
+// que contenha newline cru sofre line folding do YAML citado — o
+// newline vira espaço na releitura, perda silenciosa de dado. Nenhum dos
+// 85 arquivos do acervo tem newline em valor de frontmatter; isto é
+// necessário para o editor da vitrine (Fase 2), que gera frontmatter a
+// partir de formulário.
+const TEM_NEWLINE = /\n/;
+
 function escalar(v) {
   if (v === null || v === undefined) return 'null';
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   if (typeof v === 'number') return String(v);
   const s = String(v);
-  if (RESERVADAS.test(s) || NUMERICA.test(s) || DATA.test(s) || PERIGOSO.test(s) || SIMBOLO_AUTORAL.test(s)) {
-    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  if (TEM_NEWLINE.test(s) || RESERVADAS.test(s) || NUMERICA.test(s) || DATA.test(s)
+    || PERIGOSO.test(s) || SIMBOLO_AUTORAL.test(s)) {
+    return citar(s);
   }
   return s;
 }
 
 function escalarEmFluxo(v) {
-  if (typeof v === 'string' && v.includes('.') && !RESERVADAS.test(v) && !NUMERICA.test(v)
-    && !DATA.test(v) && !PERIGOSO.test(v) && !SIMBOLO_AUTORAL.test(v)) {
-    return `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  if (typeof v === 'string' && v.includes('.') && !TEM_NEWLINE.test(v) && !RESERVADAS.test(v)
+    && !NUMERICA.test(v) && !DATA.test(v) && !PERIGOSO.test(v) && !SIMBOLO_AUTORAL.test(v)) {
+    return citar(v);
   }
   return escalar(v);
+}
+
+// Chave de mapa tem perigo que valor não tem, e perigo que valor também
+// tem (newline) — por isso é variante de escalar(), não a mesma função.
+// NÃO reaplica RESERVADAS/NUMERICA/DATA: uma chave YAML "true" ou "42"
+// sem aspas resolve para o escalar booleano/numérico correspondente,
+// mas ao entrar num objeto JS a propriedade é coagida de volta para a
+// MESMA string ("true", "42") — não há perda, então citar por isso seria
+// aspas cosméticas, não corretivas. O que É corretivo, medido ao vivo
+// pela revisão: "a #b" (espaço+hash no meio é comentário — o par some
+// inteiro, silencioso), "key " (espaço final — perdido na releitura,
+// silencioso), "a: b" (dois-pontos+espaço — chave YAML inválida, estoura
+// no reparse), "" (chave vazia — YAML inválido), e newline (mesma razão
+// do valor).
+function chaveEmYaml(chave) {
+  const s = String(chave);
+  if (TEM_NEWLINE.test(s) || PERIGOSO.test(s)) {
+    return citar(s);
+  }
+  return s;
 }
 
 const ehMapa = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -113,15 +156,16 @@ export function emitYaml(valor, indent = 0) {
 
   if (ehMapa(valor)) {
     for (const [chave, v] of Object.entries(valor)) {
+      const chaveEmitida = chaveEmYaml(chave);
       if (vazio(v)) {
-        linhas.push(`${pad}${chave}: ${Array.isArray(v) ? '[]' : '{}'}`);
+        linhas.push(`${pad}${chaveEmitida}: ${Array.isArray(v) ? '[]' : '{}'}`);
       } else if (Array.isArray(v) && CHAVES_EM_FLUXO.has(chave) && arrayEscalarEmFluxo(v)) {
-        linhas.push(`${pad}${chave}: [${v.map((item) => escalarEmFluxo(item)).join(', ')}]`);
+        linhas.push(`${pad}${chaveEmitida}: [${v.map((item) => escalarEmFluxo(item)).join(', ')}]`);
       } else if (Array.isArray(v) || ehMapa(v)) {
-        linhas.push(`${pad}${chave}:`);
+        linhas.push(`${pad}${chaveEmitida}:`);
         linhas.push(emitYaml(v, indent + 1).trimEnd());
       } else {
-        linhas.push(`${pad}${chave}: ${escalarDeChave(chave, v)}`);
+        linhas.push(`${pad}${chaveEmitida}: ${escalarDeChave(chave, v)}`);
       }
     }
     return `${linhas.join('\n')}\n`;
