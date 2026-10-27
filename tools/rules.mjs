@@ -1016,6 +1016,88 @@ export function validateWarnings(pkg) {
   return avisos;
 }
 
+/**
+ * Invariantes ENTRE pacotes — identidade de persona (ícone, display_name,
+ * sobrenome) única em TODO o acervo. Existe porque `validatePackage(pkg)`
+ * recebe um pacote só e não pode decidir unicidade global — fingir que
+ * pode seria regra que mente. A vitrine tem o acervo inteiro carregado,
+ * logo chama esta; o CLI chama no modo acervo-inteiro (sem alvo
+ * explícito — ver tools/validate.mjs).
+ *
+ * `pkgs` VAZIO é RECUSADO — lança, não devolve `{ errors: [] }`. Zero
+ * pacotes não tem "zero colisão" para certificar: tem carregamento
+ * incompleto (`listPackages` sem resultado, raiz errada) ou chamada de
+ * onde não devia. `{ errors: [] }` para lista vazia teria a MESMA cara de
+ * "acervo limpo" que `{ errors: [] }` para os 8 pacotes reais — e essa
+ * ambiguidade é exatamente a classe de defeito que esta função existe
+ * para não cometer.
+ *
+ * UM pacote só é aceito. Hoje nenhum chamador real faz essa chamada
+ * parcial — o CLI só chama esta função no modo acervo-inteiro, que sempre
+ * carrega todos via `listPackages`, e a vitrine, pela mesma razão
+ * (contexto da tarefa), já carrega o acervo inteiro antes de chamar. A
+ * função não tem como IMPOR o tamanho certo sem conhecer o acervo real de
+ * fora — inventar essa imposição aqui seria construir guarda para um
+ * chamador hipotético, a mesma classe de enumeração-sem-necessidade que
+ * este módulo evita em outros lugares (ver COMANDOS_LOCAIS). O que ela
+ * garante, com um pacote ou com oito, é sempre o mesmo: reporta colisão
+ * entre o que foi passado, nomeando os dois caminhos — nunca finge ter
+ * visto o que não recebeu.
+ *
+ * O mapa de "vistos" é ÚNICO por campo e NÃO é reiniciado por pacote — é
+ * isso que pega colisão DENTRO do mesmo pacote (dois papéis do mesmo
+ * pacote com o mesmo ícone) pela mesma lógica que pega colisão entre
+ * pacotes: não há caso especial para "mesmo pacote", há um mapa que não
+ * esquece o que já viu, pacote nenhum é tratado como fronteira.
+ *
+ * Persona ausente — ou campo individual ausente dela, como ícone sem o
+ * resto — nunca entra no mapa. É isso que distingue ausência de colisão:
+ * `undefined === undefined` colidindo foi o defeito literal de
+ * 2026-10-24, em que dois papéis sem ícone eram acusados de "repetir" um
+ * ícone que nenhum dos dois tem. Ausência é W03 (regra por pacote), nunca
+ * A01 — A01 só fala do que foi DECLARADO duas vezes.
+ */
+export function validateAcervo(pkgs) {
+  if (!Array.isArray(pkgs) || pkgs.length === 0) {
+    throw new Error(
+      'validateAcervo: lista de pacotes vazia. Isso normalmente indica ' +
+      'carregamento incompleto do acervo (listPackages sem resultado, raiz ' +
+      'errada), não ausência real de pacotes — "zero colisão" sobre zero ' +
+      'pacotes não é um acervo limpo para certificar. Garanta ao menos um ' +
+      'pacote carregado antes de chamar validateAcervo.');
+  }
+
+  const erros = [];
+  const vistos = { icon: new Map(), display_name: new Map(), sobrenome: new Map() };
+  const rotulo = { icon: 'ícone', display_name: 'nome', sobrenome: 'sobrenome' };
+
+  for (const pkg of pkgs) {
+    for (const a of pkg.agents ?? []) {
+      const p = a.frontmatter?.metadata?.persona;
+      if (!p) continue;
+
+      const campos = {
+        icon: p.icon,
+        display_name: p.display_name,
+        sobrenome: typeof p.display_name === 'string' ? p.display_name.split(' ').at(-1) : undefined,
+      };
+
+      for (const [campo, valor] of Object.entries(campos)) {
+        if (valor === undefined || valor === null || valor === '') continue;
+        const onde = `${pkg.slug}/${a.slug}`;
+        const anterior = vistos[campo].get(valor);
+        if (anterior) {
+          erros.push(erro('A01', 'identidade-repetida', a.path,
+            `${rotulo[campo]} "${valor}" repetido: ${anterior} e ${onde}. Identidade de persona (ícone, nome, sobrenome) é única em todo o acervo — renomeie um dos dois papéis, ou troque o ícone`));
+        } else {
+          vistos[campo].set(valor, onde);
+        }
+      }
+    }
+  }
+  return { errors: erros };
+}
+
 /** Ponto de entrada único — usado pelo CLI e pelo Studio. */
 export function validatePackage(pkg) {
   return {

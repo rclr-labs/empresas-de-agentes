@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { loadPackage, listPackages } from './schema.mjs';
-import { validatePackage } from './rules.mjs';
+import { validatePackage, validateAcervo } from './rules.mjs';
 import { toMarkdown } from './serialize.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,6 +34,14 @@ const relatorio = { packages: [], errors: 0, warnings: 0 };
 // mente sobre o que fez é pior que ferramenta que não faz.
 let reescritos = 0;
 
+// Pacotes que de fato carregaram, nesta execução. `validateAcervo` só pode
+// ser chamada sobre o que foi carregado — e só no modo acervo-inteiro
+// (`alvos.length === 0`): com alvo explícito, o CLI está validando UM
+// pacote de propósito, e validateAcervo lançaria sobre lista vazia (quando
+// o único alvo falha ao carregar) ou daria um veredito de unicidade sobre
+// um recorte que o operador nunca pediu.
+const pkgsCarregados = [];
+
 for (const dir of dirs) {
   let pkg;
   try {
@@ -51,6 +59,7 @@ for (const dir of dirs) {
     continue;
   }
 
+  pkgsCarregados.push(pkg);
   const { errors, warnings } = validatePackage(pkg);
   // pkg.problems: itens da coleção (um AGENTS.md malformado, por exemplo)
   // que loadPackage já isolou sem abortar o resto do pacote. Entram no
@@ -74,6 +83,18 @@ for (const dir of dirs) {
   }
 }
 
+// A01 — unicidade de identidade (ícone, nome, sobrenome) ENTRE pacotes.
+// `validatePackage(pkg)` não pode decidir isso: recebe um pacote só. Só
+// roda no modo acervo-inteiro (sem alvo explícito) e só quando ao menos um
+// pacote de fato carregou — validateAcervo lança sobre lista vazia de
+// propósito (ver tools/rules.mjs), em vez de certificar "zero colisão"
+// sobre zero pacotes.
+const acervoErros = (alvos.length === 0 && pkgsCarregados.length > 0)
+  ? validateAcervo(pkgsCarregados).errors
+  : [];
+relatorio.errors += acervoErros.length;
+relatorio.acervo = { errors: acervoErros };
+
 if (json) {
   // `rewritten`: mesma verdade que a saída humana — contagem real de
   // escrita, não a intenção de --fix. Um script que só lê o JSON merece
@@ -85,6 +106,11 @@ if (json) {
     console.log(`\n${p.slug}: ${status}  (${p.errors.length} erro, ${p.warnings.length} aviso)`);
     for (const e of p.errors) console.log(`  ${e.code} ${e.where}\n       ${e.message}`);
     for (const w of p.warnings) console.log(`  ${w.code} ${w.file ?? w.path}\n       ${w.message}`);
+  }
+  if (alvos.length === 0 && pkgsCarregados.length > 0) {
+    const status = acervoErros.length ? 'FALHOU' : 'ok';
+    console.log(`\nacervo: ${status}  (${acervoErros.length} erro — identidade de persona entre os ${pkgsCarregados.length} pacotes)`);
+    for (const e of acervoErros) console.log(`  ${e.code} ${e.where}\n       ${e.message}`);
   }
   console.log(`\ntotal: ${relatorio.errors} erro, ${relatorio.warnings} aviso`);
   if (fix) {

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { loadPackage, listPackages } from '../tools/schema.mjs';
-import { validatePackage, COMANDOS_DE_REDE, COMANDOS_LOCAIS, descascarRunner } from '../tools/rules.mjs';
+import { validatePackage, validateAcervo, COMANDOS_DE_REDE, COMANDOS_LOCAIS, descascarRunner } from '../tools/rules.mjs';
 import { applyBinding } from '../tools/bindings.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -602,26 +602,25 @@ test('documentacao-e-suporte: nenhum papel fala com cliente sem portão', () => 
   }
 });
 
-test('ROSTER: 8 pacotes, 42 papéis, nome ASCII, ícone único, sobrenome único', () => {
-  const nomes = new Map(); const icones = new Map(); const sobrenomes = new Map();
-  let total = 0;
-  const pacotes = listPackages(RAIZ);
-  assert.equal(pacotes.length, 8, 'o acervo publica 8 pacotes');
-  for (const nome of pacotes) {
-    for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      const p = a.frontmatter.metadata.persona;
-      total++;
-      assert.match(p.display_name, /^[A-Za-z][A-Za-z ]+$/,
-        `${a.slug}: "${p.display_name}" não é ASCII puro`);
-      const sobrenome = p.display_name.split(' ').at(-1);
-      for (const [mapa, chave, rotulo] of [
-        [nomes, p.display_name, 'nome'], [icones, p.icon, 'ícone'], [sobrenomes, sobrenome, 'sobrenome'],
-      ]) {
-        assert.ok(!mapa.has(chave),
-          `${rotulo} "${chave}" repetido: ${mapa.get(chave)} e ${nome}/${a.slug}`);
-        mapa.set(chave, `${nome}/${a.slug}`);
-      }
-    }
-  }
-  assert.equal(total, 42, 'o acervo publica 42 papéis');
+test('ROSTER: nenhuma identidade repetida em todo o acervo', () => {
+  // Esta era "ROSTER: 8 pacotes, 42 papéis, nome ASCII, ícone único,
+  // sobrenome único" — três afirmações, cada uma com destino diferente
+  // agora que o catálogo é editável pela vitrine (Task 5):
+  //
+  //   - contagem exata (8 pacotes, 42 papéis) SAI, sem substituto. O
+  //     catálogo passa a ser editável pela vitrine; afirmar 42 faria o
+  //     primeiro PR de quem adiciona um papel quebrar o CI sem haver
+  //     defeito nenhum. Estrutura fixa não é mais um invariante real.
+  //   - ASCII de display_name SAI daqui — já é E18
+  //     (validateStructure/E18 em tools/rules.mjs), checado por papel,
+  //     redundante com este teste de acervo. A regra cobre; este teste
+  //     não precisa duplicar.
+  //   - a unicidade feita à mão (três mapas, comparação ad-hoc) VIRA
+  //     `validateAcervo` — Task 5, código A01. É o invariante estrutural
+  //     que sobrevive: identidade de persona única em todo o acervo,
+  //     agora verificado pela função que a vitrine e o CLI também chamam,
+  //     não por uma guarda de teste que só existe aqui.
+  const pacotes = listPackages(RAIZ).map((nome) => loadPackage(join(RAIZ, nome)));
+  const { errors } = validateAcervo(pacotes);
+  assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
 });

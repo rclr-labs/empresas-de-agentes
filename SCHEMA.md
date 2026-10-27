@@ -309,11 +309,47 @@ CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 | W04 | Papel sem `skills` declaradas | Papel sem skill associada — não impede o pacote de validar, mas é informação incompleta |
 | W05 | `ressalva-de-allowlist-ausente` — papel declara domínio em `network` e comando de `COMANDOS_DE_REDE` em `execute.allow`, e o corpo não traz a ressalva `allowlist_scope` | Quem adapta o papel para um runtime onde a allowlist não é fronteira de SO (OpenCode V2, janus `kind=cli`) confia numa restrição que o comando atravessa |
 
+### Regras de acervo (`A01`) — o invariante que um pacote não pode decidir
+
+`validatePackage(pkg)` recebe **um** pacote e, por isso, não pode decidir
+nada que dependa de olhar os outros sete. Todo o catálogo acima —
+`E01`–`E19`, `W01`–`W05` — é regra DENTRO de um pacote: roda sobre `pkg`
+sozinho, e um pacote de terceiro isolado já é entrada suficiente para
+avaliá-las todas. Fingir que uma regra DENTRO de um pacote pode certificar
+algo sobre o acervo INTEIRO seria a regra mentindo sobre o que ela de fato
+verificou — por isso esta categoria vive separada, com prefixo `A`
+(acervo), não `E`/`W` (pacote), e com função própria, `validateAcervo(pkgs)`,
+que recebe a LISTA de pacotes em vez de um pacote só.
+
+| Código | Regra (`rule`) | O que rejeita | Consequência sem a regra |
+|---|---|---|---|
+| A01 | `identidade-repetida` | Ícone, `display_name` ou sobrenome de `metadata.persona` repetido entre QUAISQUER dois papéis do acervo — do mesmo pacote ou de pacotes diferentes; campo ausente nunca entra na comparação | Dois papéis com a mesma identidade visual/nominal na vitrine — o humano não consegue distinguir quem é quem no card, e a unicidade que o acervo promete (42 papéis, 42 identidades) vira coincidência, não garantia |
+
+**Quem chama:** o CLI (`tools/validate.mjs`), quando valida sem alvo
+explícito — o modo "acervo inteiro" que já carrega todos os pacotes via
+`listPackages`; e a vitrine, que tem o acervo inteiro carregado em memória.
+Com `--package <alvo>` (um pacote só, de propósito), o CLI NÃO chama
+`validateAcervo` — ela decidiria unicidade sobre um recorte que o operador
+nunca pediu, e a pergunta "este pacote de terceiro é internamente
+consistente" já é respondida por `E01`–`E19` sem precisar do resto do
+acervo.
+
+**Lista vazia é recusada (lança), não aprovada.** `validateAcervo([])`
+nunca devolve `{ errors: [] }` — zero pacotes não é "zero colisão
+verificada", é carregamento incompleto (`listPackages` sem resultado, raiz
+errada) disfarçado de acervo limpo. Um teto que aprova sem ter checado nada
+não é teto.
+
+**Persona ausente não é colisão.** Dois papéis sem ícone não "repetem"
+`undefined` — a ausência é `W03` (regra de pacote), nunca `A01`. Esta
+distinção é a cicatriz de 2026-10-24: um teste de unicidade escrito sem o
+filtro de ausência acusou repetição onde havia falta.
+
 ### Verificação de completude do catálogo
 
 ```bash
-impl=$(grep -ohE "'E[0-9]{2}'" tools/*.mjs | tr -d "'" | sort -u)
-doc=$(grep -ohE "E[0-9]{2}" SCHEMA.md | sort -u)
+impl=$(grep -ohE "'[EWA][0-9]{2}'" tools/*.mjs | tr -d "'" | sort -u)
+doc=$(grep -ohE "[EWA][0-9]{2}" SCHEMA.md | sort -u)
 diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
 ```
 
