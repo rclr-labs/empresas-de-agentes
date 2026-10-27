@@ -322,6 +322,22 @@ test('E15: papel que lê web e nega rede é erro', () => {
   assert.equal(validatePackage(pkg).errors.filter((e) => e.code === 'E15').length, 1);
 });
 
+test('E15: nmap com network false também é erro — a lacuna de 2026-10-27', () => {
+  // fix round 1 da revisão: curl mordia, nmap/nuclei/ffuf não. Mesmo
+  // formato do teste de curl acima, só para provar que a lacuna foi
+  // fechada — não que a regra em si mudou de forma.
+  const pkg = pacoteMinimo({
+    slug: 'scan', capabilities: {
+      read: ['repository'], write: ['report'],
+      execute: { allow: ['nmap -sV*'], deny: ['sudo *'] },
+      network: false,
+    },
+  });
+  const e15 = validatePackage(pkg).errors.filter((e) => e.code === 'E15');
+  assert.equal(e15.length, 1, JSON.stringify(validatePackage(pkg).errors, null, 2));
+  assert.match(e15[0].message, /nmap -sV\*/);
+});
+
 test('E15: o mesmo papel com domínio declarado passa', () => {
   const pkg = pacoteMinimo({
     slug: 'coleta', capabilities: {

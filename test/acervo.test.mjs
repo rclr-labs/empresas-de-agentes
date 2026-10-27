@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { loadPackage, listPackages } from '../tools/schema.mjs';
-import { validatePackage } from '../tools/rules.mjs';
+import { validatePackage, COMANDOS_DE_REDE, COMANDOS_LOCAIS } from '../tools/rules.mjs';
 import { applyBinding } from '../tools/bindings.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -239,6 +239,34 @@ test('todo papel que abre pull request consegue dar push, e vice-versa', () => {
       }
     }
   }
+});
+
+test('todo comando de execute.allow do acervo está classificado — rede ou local', () => {
+  // Fix round 1 da Task 1: a revisão achou nmap/nuclei/ffuf fora de
+  // COMANDOS_DE_REDE — sexta aparição do mesmo defeito ("enumerar em vez
+  // de derivar"). Fechar a lacuna com três entradas não impede a sétima.
+  // Este teste deriva do acervo, não enumera: todo comando que já aparece
+  // em algum execute.allow dos oito pacotes tem de bater em
+  // COMANDOS_DE_REDE ou em COMANDOS_LOCAIS (exportados de tools/rules.mjs).
+  // Comando novo que não bater em nenhum dos dois (ex.: alguém acrescenta
+  // `httpie` ou `aws` a um papel) deixa este teste vermelho, nomeando o
+  // comando — classificar passa a ser obrigatório, não opcional.
+  const naoClassificados = [];
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const allow = a.frontmatter.metadata?.capabilities?.execute?.allow ?? [];
+      for (const padrao of allow) {
+        const classificado = COMANDOS_DE_REDE.some((re) => re.test(padrao))
+          || COMANDOS_LOCAIS.some((re) => re.test(padrao));
+        if (!classificado) {
+          const comando = padrao.match(/^\S+/)?.[0] ?? padrao;
+          naoClassificados.push(`${nome}/${a.slug}: "${padrao}" (comando "${comando}")`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(naoClassificados, [],
+    `comando(s) de execute.allow sem classificação em COMANDOS_DE_REDE nem COMANDOS_LOCAIS:\n${naoClassificados.join('\n')}`);
 });
 
 test('fabrica-de-testes: zero erro', () => {

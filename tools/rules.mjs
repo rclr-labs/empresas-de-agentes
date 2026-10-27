@@ -63,10 +63,62 @@ function erro(code, rule, where, message) {
  * EXPORTADO de propósito: a vitrine valida no browser com esta mesma lista,
  * e cópia de lista é como a guarda de alcance ficou cega para `npm audit`
  * e `semgrep` até 2026-10-26. Uma lista, dois consumidores.
+ *
+ * `nmap`/`nuclei`/`ffuf` entraram em 2026-10-27, fix-round 1 da Task 1: a
+ * revisão achou que a lista original (curl/wget/http/npm audit/semgrep)
+ * não reconhecia as três ferramentas de scan que `seguranca-ofensiva/
+ * pentest-aplicacao` já usa — sexta aparição do defeito "enumerar em vez
+ * de derivar". Não é falso negativo vivo hoje (aquele papel já declara
+ * `network` não-falso), mas deixaria passar em silêncio um papel futuro
+ * que listasse só essas três com `network: false`.
+ *
+ * O critério de pertencimento aqui é "o alvo é um domínio que o operador
+ * escolhe e declara em `capabilities.network`" — scanner/cliente HTTP
+ * genérico, ou consulta que só existe contra registry ao vivo (`npm
+ * audit`). Ferramenta que fala com um endpoint PRÉ-CONFIGURADO (remote
+ * git, API do GitHub, cluster k8s, provider de nuvem, conexão de banco)
+ * não entra aqui — ver `COMANDOS_LOCAIS` e a classificação completa no
+ * relatório da Task 1.
  */
 export const COMANDOS_DE_REDE = Object.freeze([
-  /^curl\s/i, /^wget\s/i, /^http\s/i,
+  /^curl\s/i, /^wget\s/i, /^http\s/i, /^nmap\s/i, /^nuclei\s/i, /^ffuf\s/i,
   /^npm audit\b/i, /^semgrep(?!\s+--config=\.\/)/i,
+]);
+
+/**
+ * Comandos deliberadamente FORA de `COMANDOS_DE_REDE` — o lado "local" da
+ * mesma classificação. Existe para que `test/acervo.test.mjs` possa exigir,
+ * por derivação, que todo comando que já aparece em algum `execute.allow`
+ * do acervo esteja classificado num dos dois lados, nunca ausente dos
+ * dois: ausente dos dois é exatamente como a lacuna de nmap/nuclei/ffuf
+ * ficou invisível até a revisão de 2026-10-27 — de novo, enumerar sem
+ * derivar. Comando novo que não bater aqui nem em COMANDOS_DE_REDE falha
+ * o teste de derivação, nomeado, pedindo classificação explícita.
+ *
+ * `git` e `gh` ficam aqui mesmo `git push`/`gh pr create` alcançando rede:
+ * o alvo é o remote/API do GitHub já configurado, não um domínio que
+ * `capabilities.network` declara — essa contradição específica (push/PR
+ * sem `write` incluir `pull_request`) é o ângulo da E16 (próxima tarefa),
+ * não de E15. `kubectl`/`helm`/`terraform` ficam aqui pela mesma razão:
+ * falam com cluster/provider via credencial pré-configurada, não domínio
+ * declarado. `mysql`/`psql` ficam aqui porque o alvo é conexão de banco já
+ * configurada, governada por `capabilities.read/write` de `database`, não
+ * por `network`. Gerenciador de pacote/build/teste (`npm`, `npx`, `pip`,
+ * `yarn`, `pnpm`, `composer`, `mvn`, `gradle`, `dotnet`, `python`, `dbt`,
+ * `great_expectations`, `docker`, `k6`) segue o precedente já existente de
+ * `npm audit` — o próprio `npm` bare não entra em `COMANDOS_DE_REDE`, só a
+ * forma que exige o registry ao vivo; o mesmo raciocínio deixa estas
+ * ferramentas aqui, não lá.
+ */
+export const COMANDOS_LOCAIS = Object.freeze([
+  /^rg\s/i, /^grep\s/i,
+  /^git\s/i, /^gh\s/i,
+  /^kubectl\s/i, /^helm\s/i, /^terraform\s/i, /^docker\s/i,
+  /^mysql\b/i, /^psql\b/i,
+  /^npm\s/i, /^npx\s/i, /^pip\s/i, /^yarn\s/i, /^pnpm\s/i, /^composer\s/i,
+  /^mvn\s/i, /^gradle\s/i, /^dotnet\s/i, /^python\s/i,
+  /^dbt\s/i, /^great_expectations\s/i, /^k6\s/i,
+  /^semgrep\s+--config=\.\//i,
 ]);
 
 function temRede(cap) {
