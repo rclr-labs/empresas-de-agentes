@@ -125,13 +125,6 @@ function construirPapel(pkg, agente) {
   };
 }
 
-function construirSkill(pkg, skill) {
-  return {
-    slug: skill.slug,
-    description: skill.frontmatter?.description,
-  };
-}
-
 // `teams`/`tasks`/`projects` (e `projects[].tasks`, aninhado) não têm
 // forma declarada no brief — mas `loadPackage` os carrega como coleção de
 // primeira classe, e três dos oito pacotes do acervo real têm conteúdo
@@ -156,16 +149,67 @@ function construirGenerico(pkg, item) {
   };
 }
 
+/**
+ * As chaves que o CATÁLOGO acrescenta a uma cópia de frontmatter, por
+ * classe de entrada. Exportadas porque são o INVERSO declarado de
+ * `construirPacote`/`construirPapel`: quem quiser o frontmatter de volta
+ * (o editor da Fase 2, a prova de reconstrução) remove estas e fica com o
+ * que o arquivo declarava — sem precisar saber, de memória, quais campos
+ * são do arquivo e quais são do catálogo.
+ *
+ * É a diferença entre uma lista fixa de campos do ARTEFATO (que foi o
+ * defeito: `construirPacote` enumerava `name`/`description`/`license` e
+ * perdia `goals`, `metadata`, `authors`, `kind`, `requirements`,
+ * `schema`, `tags`, `version` e o corpo inteiro) e uma lista fixa de
+ * campos do FORMATO, que é finita por construção e guardada por teste:
+ * chave nova no catálogo sem entrar aqui deixa a prova de reconstrução
+ * vermelha.
+ *
+ * `slug` NÃO é derivada para estas duas classes: os 8 `COMPANY.md` e os
+ * 42 `AGENTS.md` declaram `slug` no frontmatter, e o catálogo só reescreve
+ * o valor pelo canônico (`pkg.slug`/`item.slug`, que caem para o nome do
+ * diretório quando o arquivo omite) na mesma posição.
+ */
+export const CHAVES_DERIVADAS = Object.freeze({
+  pacote: Object.freeze(['body', 'path', 'agents', 'skills', 'teams', 'tasks', 'projects']),
+  agente: Object.freeze(['body', 'path']),
+});
+
+// O pacote copia o frontmatter da empresa ESPALHANDO o que o arquivo
+// declara — mesmo princípio de `construirGenerico` e de `construirPapel`
+// com `metadata` — mais corpo e caminho. Enumerar aqui foi um Critical
+// medido em 2026-10-27: contra a união das chaves dos 8 `COMPANY.md`, o
+// catálogo descartava de TODO pacote `goals`, `metadata` (e com ele
+// `budget` e `capability_vocabulary`), `authors`, `kind`, `requirements`,
+// `schema`, `tags`, `version` — e o corpo inteiro, 2,6 a 5,1 KB cada. Dos
+// seis campos de pacote que o spec §6 nomeia para o editor (nome,
+// descrição, metas, portões, teto, `license`), DOIS não existiam no
+// catálogo: metas e teto.
+//
+// `human_gates` içado no topo foi REMOVIDO junto. Três razões: com o
+// frontmatter inteiro espalhado, `metadata.human_gates` chega íntegro e o
+// içado passou a ser verdade duplicada (atualizar a cópia esquecida
+// recria o defeito); o `?? []` do içado FABRICAVA lista vazia para um
+// pacote que não declara portão nenhum, o que é afirmar algo que o
+// arquivo não diz; e nenhum consumidor existia (`grep` em `test/`,
+// `tools/` e `bindings/`: zero). Os "portões" do spec §6 seguem
+// atendidos, em `metadata.human_gates` — o lugar onde o arquivo os
+// escreve.
 function construirPacote(pkg) {
-  const fm = pkg.company.frontmatter ?? {};
   return {
+    ...(pkg.company.frontmatter ?? {}),
     slug: pkg.slug,
-    name: fm.name,
-    description: fm.description,
-    license: fm.license,
+    body: pkg.company.body ?? '',
+    path: caminhoDoItem(pkg, pkg.company),
     agents: pkg.agents.map((a) => construirPapel(pkg, a)),
-    human_gates: fm.metadata?.human_gates ?? [],
-    skills: pkg.skills.map((s) => construirSkill(pkg, s)),
+    // `skills` deixou de ser `{slug, description}` enumerado à mão
+    // (minor da mesma família, ledger:194) e passou a `construirGenerico`:
+    // o frontmatter que o arquivo declara — `name`, `description`,
+    // `allowed-tools`, `metadata` — mais corpo e caminho. Isso faz o
+    // catálogo crescer (corpo de SKILL.md é da ordem de KB), e é o
+    // preço de a vitrine não precisar voltar ao disco para mostrar uma
+    // skill.
+    skills: (pkg.skills ?? []).map((s) => construirGenerico(pkg, s)),
     teams: (pkg.teams ?? []).map((t) => construirGenerico(pkg, t)),
     tasks: (pkg.tasks ?? []).map((t) => construirGenerico(pkg, t)),
     projects: (pkg.projects ?? []).map((proj) => ({

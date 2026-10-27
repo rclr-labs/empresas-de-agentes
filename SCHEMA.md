@@ -395,6 +395,44 @@ doc=$(grep -ohE "[EWA][0-9]{2}" SCHEMA.md | sort -u)
 diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
 ```
 
+### Regra de forma do `catalog.json`: derive do artefato, não enumere
+
+O catálogo que a vitrine consome (`tools/catalog.mjs`) copia o frontmatter
+que o arquivo DE FATO declara — espalhando as chaves — mais `body` e
+`path`. Nenhum construtor enumera uma lista fixa de campos do artefato.
+
+A regra é ruling de 2026-10-27, de um Critical medido: `construirPacote`
+era o único construtor com lista enumerada à mão
+(`name`/`description`/`license`), e por isso o `catalog.json` **não
+reconstruía nenhum dos 8 `COMPANY.md`** — descartava de todo pacote
+`goals`, `metadata` (e com ele `budget` e `capability_vocabulary`),
+`authors`, `kind`, `requirements`, `schema`, `tags`, `version` e o corpo
+inteiro. Dois dos seis campos de pacote que o spec §6 nomeia para o editor
+(metas e teto) não existiam no catálogo. `construirSkill` tinha o mesmo
+defeito em escala menor (`{slug, description}`) e foi substituído pelo
+construtor genérico.
+
+**O inverso é declarado, não lembrado.** `CHAVES_DERIVADAS`, exportado de
+`tools/catalog.mjs`, nomeia por classe de entrada as chaves que o CATÁLOGO
+acrescenta à cópia de frontmatter (`body`, `path` e, no pacote, as
+coleções `agents`/`skills`/`teams`/`tasks`/`projects`). Quem quer o
+frontmatter de volta remove essas e fica com o que o arquivo declarava —
+lista fixa de campos do FORMATO, finita por construção, em vez de lista
+fixa de campos do ARTEFATO.
+
+**A guarda é a prova de reconstrução**, parametrizada sobre as duas
+classes em `test/catalog.test.mjs`: todo `AGENTS.md` (42) e todo
+`COMPANY.md` (8) tem de voltar do catálogo byte a byte, mais uma asserção
+de CONJUNTO ("as chaves do catálogo são as do arquivo mais as derivadas
+declaradas, nada a mais nem a menos"). Campo que pare de ser copiado fica
+vermelho; chave nova no catálogo sem declaração também.
+
+**`human_gates` não é içado para o topo do pacote.** Com o frontmatter
+inteiro espalhado, `metadata.human_gates` chega íntegro; uma cópia no topo
+seria verdade duplicada, e o `?? []` dela fabricava lista vazia para
+pacote que não declara portão nenhum. Os "portões" do spec §6 ficam em
+`metadata.human_gates`, onde o arquivo os escreve.
+
 ### Limites declarados do emissor de YAML (`tools/yaml-emit.mjs`)
 
 O emissor é puro e não tem parser para se conferir — o browser da Fase 2 o
