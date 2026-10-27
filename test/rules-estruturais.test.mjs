@@ -59,6 +59,49 @@ function pacoteMinimo({ capabilities = {} } = {}) {
   };
 }
 
+// --- O CONTAINER de capabilities: validar a forma de um nó antes de
+// descer nele (Critical da revisão ampla, 2026-10-27).
+//
+// Medido ponta a ponta pelo revisor numa cópia do acervo: um papel real com
+// `capabilities: "oops"` saía `0 erro, 0 aviso` no portão, e o artefato
+// emitido saía com `tools: ""` e os 18 padrões de deny do hook
+// DESAPARECIDOS. A causa era `const cap = meta.capabilities ?? {}`: com
+// escalar, `cap` ERA o escalar, e as cinco sondas de
+// `verificarTiposDeCapacidade` leem `cap.read`/`cap.network`/`cap.execute`
+// como `undefined` e fazem `continue`. Não é escalada de privilégio
+// (`tools: ""` não concede nada) — é o PORTÃO CERTIFICANDO LIMPO sobre um
+// papel cuja metade legível por máquina da fronteira foi descartada, e a
+// fronteira é o produto deste acervo.
+test('E19: container de capabilities com tipo errado dá UM erro nomeando o container — e o pacote NÃO sai limpo', () => {
+  for (const forma of ['oops', [1, 2, 3], 42, null, true]) {
+    const pkg = pacoteMinimo({ capabilities: forma });
+    const { errors } = validatePackage(pkg);          // não pode lançar
+    const e19 = errors.filter((e) => e.code === 'E19');
+    assert.equal(e19.length, 1,
+      `capabilities: ${JSON.stringify(forma)} deu ${e19.length} E19, esperado exatamente 1`);
+    assert.match(e19[0].message, /metadata\.capabilities deveria ser um objeto/);
+    assert.match(e19[0].message, /Declare capabilities como objeto/);
+    // A asserção que o Critical pedia: o veredito do pacote não pode ser
+    // "ok". Um E19 que existisse na lista sem reprovar o pacote repetiria
+    // o defeito numa camada acima.
+    assert.ok(errors.length > 0,
+      `capabilities: ${JSON.stringify(forma)} passou limpo no veredito do pacote`);
+  }
+});
+
+test('E19: capabilities AUSENTE não é E19 — ausência é outro caso, e quem cobra fronteira é E06', () => {
+  const pkg = pacoteMinimo();
+  delete pkg.agents[0].frontmatter.metadata.capabilities;
+  const { errors } = validatePackage(pkg);
+  assert.deepEqual(errors.filter((e) => e.code === 'E19'), [],
+    'ausência de capabilities virou erro de TIPO; ausência e malformação têm de seguir distinguíveis');
+});
+
+test('E19: capabilities como objeto vazio segue sem E19 — é declaração mínima, não malformação', () => {
+  const { errors } = validatePackage(pacoteMinimo({ capabilities: {} }));
+  assert.deepEqual(errors.filter((e) => e.code === 'E19'), []);
+});
+
 test('E19: allow com item que não é string não derruba o validador', () => {
   const pkg = pacoteMinimo({ capabilities: { read: ['repository'], write: ['report'],
     execute: { allow: [123], deny: ['sudo *'] }, network: false } });

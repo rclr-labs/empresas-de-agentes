@@ -8,6 +8,24 @@ function isPlainObject(v) {
 }
 
 /**
+ * Container de leitura segura: devolve o mapa quando É mapa, e `{}` quando
+ * não é. Existe porque "validar a FORMA de um nó antes de descer nele" é a
+ * causa raiz do Critical de 2026-10-27: `const cap = meta.capabilities ?? {}`
+ * fazia `cap` SER o escalar quando `capabilities: "oops"`, e aí toda sonda
+ * (`cap.read`, `cap.network`, `cap.execute`) lia `undefined` e seguia em
+ * frente — o pacote saía certificado em 0 erro e 0 aviso com a metade
+ * legível por máquina da fronteira inteira descartada.
+ *
+ * Quem RELATA a forma errada é E19 (`verificarTiposDeCapacidade`), que
+ * recebe o valor CRU, justamente para distinguir ausência de malformação.
+ * Este helper só garante que as regras a jusante nunca desçam num nó cuja
+ * forma não é a esperada — o mesmo contrato de `listaDeTexto`.
+ */
+function mapaOuVazio(v) {
+  return isPlainObject(v) ? v : {};
+}
+
+/**
  * Reescreve chaves de alias pt-BR para o canônico em inglês, recursivamente.
  * Não muta a entrada. Canônico vence quando as duas chaves coexistem.
  */
@@ -95,8 +113,26 @@ const isListaDeTextoValida = (v) => Array.isArray(v) && v.every((x) => typeof x 
  * e falhar aberto significa tela branca com stack em vez de mensagem.
  * Um E19 por CAMINHO de campo, nunca um por item — "`execute.allow` tem
  * item que não é texto" é um defeito, não N.
+ *
+ * Recebe o valor CRU de `metadata.capabilities`, não um `?? {}` já
+ * normalizado: o CONTAINER é o primeiro nó cuja forma precisa ser
+ * validada, e com `?? {}` ele chegava aqui indistinguível de ausência.
+ * Medido em 2026-10-27 (Critical da revisão ampla): `capabilities: "oops"`
+ * num papel real passava 0 erro e 0 aviso, e o artefato emitido saía com
+ * `tools: ""` e os 18 padrões de deny do hook DESAPARECIDOS — o portão
+ * certificando limpo sobre um papel sem fronteira de máquina nenhuma.
+ * `[1,2,3]`, `42` e `null` se comportavam igual. Ausência (`undefined`)
+ * NÃO é E19: papel pode não declarar `capabilities`, e quem cobra o que
+ * falta é outra regra (E06 cobra a fronteira em prosa), nunca esta.
  */
-function verificarTiposDeCapacidade(cap, where, erros) {
+function verificarTiposDeCapacidade(capCru, where, erros) {
+  if (capCru === undefined) return;
+  if (!isPlainObject(capCru)) {
+    erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+      `metadata.capabilities deveria ser um objeto com os verbos da fronteira; veio ${tipoRecebido(capCru)}. Declare capabilities como objeto, ex.: { read: ["repository"], execute: { allow: ["git status*"] } } — ou remova a chave, se o papel não declara capacidade nenhuma`));
+    return;
+  }
+  const cap = capCru;
   for (const campo of ['read', 'write', 'delegate', 'approve']) {
     const v = cap[campo];
     if (v === undefined) continue;
@@ -550,13 +586,16 @@ export function validateStructure(pkg) {
 
   for (const agente of pkg.agents) {
     const where = agente.path;
-    const meta = agente.frontmatter?.metadata ?? {};
-    const cap = meta.capabilities ?? {};
+    const meta = mapaOuVazio(agente.frontmatter?.metadata);
+    const cap = mapaOuVazio(meta.capabilities);
 
     // E19 — tipo de campo, ANTES de qualquer regra usar o valor. Precisa
     // vir primeiro no laço: é o que garante que E02 adiante já opera sobre
-    // `listaDeTexto`, nunca sobre o dado cru.
-    verificarTiposDeCapacidade(cap, where, erros);
+    // `listaDeTexto`, nunca sobre o dado cru. Recebe `meta.capabilities`
+    // CRU (não o `cap` já saneado por `mapaOuVazio`): o container é o
+    // primeiro nó a validar, e o saneamento apagaria a diferença entre
+    // ausência e malformação — o Critical de 2026-10-27.
+    verificarTiposDeCapacidade(meta.capabilities, where, erros);
     if (meta.persona) verificarTiposDePersona(meta.persona, where, erros);
 
     // E18 — persona por pacote: o que está DECLARADO e está ERRADO, nunca
@@ -715,8 +754,8 @@ export function validateGovernance(pkg) {
 
   for (const agente of pkg.agents) {
     const where = agente.path;
-    const meta = agente.frontmatter?.metadata ?? {};
-    const cap = meta.capabilities ?? {};
+    const meta = mapaOuVazio(agente.frontmatter?.metadata);
+    const cap = mapaOuVazio(meta.capabilities);
 
     // E06 — fronteira obrigatória
     if (!meta.boundary || (!meta.boundary.can && !meta.boundary.cannot)) {
@@ -972,7 +1011,7 @@ export function validateGovernance(pkg) {
 export function validateWarnings(pkg) {
   const avisos = [...(pkg.warnings ?? [])];
   for (const agente of pkg.agents) {
-    const meta = agente.frontmatter?.metadata ?? {};
+    const meta = mapaOuVazio(agente.frontmatter?.metadata);
     // W03 — persona incompleta. Aviso, não erro: o papel continua válido,
     // a fronteira continua intacta — só o card da vitrine fica pobre.
     // Ruling de 2026-10-27 (coordenador, fix-round 1 da Task 4): existência
@@ -1017,7 +1056,7 @@ export function validateWarnings(pkg) {
     // regra não julga prosa. Medido em 2026-10-25: a mesma allowlist é
     // fronteira de SO no Claude Code e decoração no OpenCode V2 e no janus
     // com provider kind=cli, onde o shell escapa.
-    const cap = meta.capabilities ?? {};
+    const cap = mapaOuVazio(meta.capabilities);
     if (Array.isArray(cap.network) && cap.network.length > 0
         && listaDeTexto(cap.execute?.allow).some((g) => COMANDOS_DE_REDE.some((re) => re.test(descascarRunner(g))))
         && !/allowlist_scope/.test(agente.body ?? '')) {
