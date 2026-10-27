@@ -3,9 +3,10 @@ import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { loadPackage, listPackages, parseMarkdown } from './schema.mjs';
+import { loadPackage, listPackages } from './schema.mjs';
 import { validatePackage, validateAcervo } from './rules.mjs';
 import { toMarkdown } from './serialize.mjs';
+import { verificarEmissao } from './fix-guard.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -41,32 +42,12 @@ let reescritos = 0;
 // tem de ficar livre de js-yaml porque o navegador o importa. O editor da
 // vitrine (Fase 2) vai precisar da mesma conferência com parser próprio;
 // isso é requisito dela, registrado, não resolvido aqui.
+//
+// A guarda em si (`verificarEmissao`) vive em tools/fix-guard.mjs, extraída
+// de propósito para ser chamada isolada por teste — ver
+// test/validate-cli.test.mjs, fix round 3: "guarda sem caso que falha não
+// está provada".
 let guardaFalhou = false;
-
-// Acha o primeiro caminho onde `a` e `b` divergem — usada para nomear o
-// campo na mensagem de erro da guarda, não para decidir se divergem (isso
-// é feito no caller comparando o retorno com `null`).
-function primeiraDiferenca(a, b, caminho = '$') {
-  if (a === b) return null;
-  if (typeof a !== typeof b || a === null || b === null) return caminho;
-  if (Array.isArray(a) !== Array.isArray(b)) return caminho;
-  if (Array.isArray(a)) {
-    if (a.length !== b.length) return caminho;
-    for (let i = 0; i < a.length; i += 1) {
-      const d = primeiraDiferenca(a[i], b[i], `${caminho}[${i}]`);
-      if (d) return d;
-    }
-    return null;
-  }
-  if (typeof a === 'object') {
-    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
-      const d = primeiraDiferenca(a[k], b[k], `${caminho}.${k}`);
-      if (d) return d;
-    }
-    return null;
-  }
-  return caminho;
-}
 
 // Pacotes que de fato carregaram, nesta execução. `validateAcervo` só pode
 // ser chamada sobre o que foi carregado — e só no modo acervo-inteiro
@@ -118,17 +99,9 @@ for (const dir of dirs) {
     let falhouEstePkg = false;
     for (const arquivo of arquivos) {
       const emitido = toMarkdown(arquivo);
-      let reparsed;
-      try {
-        reparsed = parseMarkdown(emitido).frontmatter;
-      } catch (e) {
-        console.error(`${pkg.slug}: --fix NÃO aplicado — ${arquivo.path} emitiu YAML que nem reparseia (${e.message}). Bug do emissor, não do pacote; nada foi gravado.`);
-        falhouEstePkg = true;
-        break;
-      }
-      const campo = primeiraDiferenca(arquivo.frontmatter, reparsed);
-      if (campo) {
-        console.error(`${pkg.slug}: --fix NÃO aplicado — ${arquivo.path} mudaria de sentido na reemissão (campo ${campo} diverge do original). Bug do emissor, não do pacote; nada foi gravado.`);
+      const veredito = verificarEmissao(arquivo.frontmatter, emitido);
+      if (!veredito.ok) {
+        console.error(`${pkg.slug}: --fix NÃO aplicado — ${arquivo.path} ${veredito.motivo}. Bug do emissor, não do pacote; nada foi gravado.`);
         falhouEstePkg = true;
         break;
       }

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { toMarkdown } from '../tools/serialize.mjs';
+import { verificarEmissao } from '../tools/fix-guard.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,6 +37,57 @@ test('toMarkdown não quebra linha longa — lineWidth -1', () => {
   const longa = 'palavra '.repeat(40).trim();
   const texto = toMarkdown({ frontmatter: { headline: longa }, body: '' });
   assert.ok(texto.includes(longa), 'a linha longa sobreviveu inteira');
+});
+
+// --- Fix round 3: a guarda de sanidade pós-emissão (tools/fix-guard.mjs),
+// testada em nível de unidade com pares (frontmatter de origem, texto
+// emitido) construídos à mão — não precisa que o emissor real tenha
+// produzido o texto divergente, só que o par não bata. "Este teste
+// passaria se o mecanismo estivesse ausente?" — não: sem a guarda, os
+// três casos abaixo não detectariam nada, e a mensagem não nomearia
+// campo nenhum.
+
+test('verificarEmissao DETECTA campo faltando e NOMEIA o campo', () => {
+  const original = { name: 'X', slug: 'x', version: '1.0.0' };
+  const emitido = '---\nname: X\nslug: x\n---\n\ncorpo\n'; // "version" sumiu
+  const veredito = verificarEmissao(original, emitido);
+  assert.equal(veredito.ok, false, 'tem de detectar a divergência');
+  assert.match(veredito.motivo, /version/, 'a mensagem tem de nomear o campo que divergiu');
+});
+
+test('verificarEmissao DETECTA valor alterado e NOMEIA o campo', () => {
+  const original = { name: 'X', slug: 'x' };
+  const emitido = '---\nname: Y\nslug: x\n---\n\ncorpo\n'; // "name" mudou de X para Y
+  const veredito = verificarEmissao(original, emitido);
+  assert.equal(veredito.ok, false, 'tem de detectar a divergência');
+  assert.match(veredito.motivo, /name/, 'a mensagem tem de nomear o campo que divergiu');
+});
+
+test('verificarEmissao DETECTA campo a mais e NOMEIA o campo', () => {
+  const original = { name: 'X', slug: 'x' };
+  const emitido = '---\nname: X\nslug: x\nextra: surpresa\n---\n\ncorpo\n'; // "extra" não existia
+  const veredito = verificarEmissao(original, emitido);
+  assert.equal(veredito.ok, false, 'tem de detectar a divergência');
+  assert.match(veredito.motivo, /extra/, 'a mensagem tem de nomear o campo que divergiu');
+});
+
+test('verificarEmissao aprova um par que de fato bate (caso de controle)', () => {
+  const original = { name: 'X', slug: 'x' };
+  const emitido = '---\nname: X\nslug: x\n---\n\ncorpo\n';
+  assert.deepEqual(verificarEmissao(original, emitido), { ok: true });
+});
+
+test('verificarEmissao NÃO GRAVA nada — o módulo não importa capacidade de escrita', () => {
+  // A prova de "não grava" não pode ser comportamental (a função não
+  // recebe caminho de arquivo nenhum para escrever) — é estrutural: o
+  // módulo da guarda só pode decidir, nunca persistir, porque ele não
+  // importa writeFileSync nem qualquer outra função de escrita de
+  // tools/fix-guard.mjs. Quem grava é o caller (validate.mjs), e só
+  // depois de checar `ok: true`.
+  const fonte = readFileSync(join(RAIZ, 'tools/fix-guard.mjs'), 'utf8');
+  const linhasDeImport = fonte.split('\n').filter((l) => /^\s*import\b/.test(l)).join('\n');
+  assert.ok(!/writeFileSync|appendFile|rmSync|unlink/.test(linhasDeImport),
+    'tools/fix-guard.mjs não pode IMPORTAR nenhuma capacidade de escrita');
 });
 
 test('o CLI aprova os pacotes reais do acervo', () => {
