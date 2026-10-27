@@ -91,58 +91,31 @@ function arquivosDoAcervo() {
   return arquivos;
 }
 
-// Seis ocorrências, em cinco arquivos, não fecham byte-a-byte — e a
-// causa, medida, NÃO é uma regra de estilo derivável: é formatação manual
-// inconsistente do próprio acervo.
-//
-// 1) `documentacao-e-suporte/agents/suporte-nivel-2/AGENTS.md`,
-//    `engenharia-de-dados/agents/{analytics-bi,modelagem-de-dados,
-//    pipeline-de-dados,qualidade-de-dados}/AGENTS.md` (5 ocorrências):
-//    a lista `execute.deny` quebra em várias linhas quando ficaria muito
-//    longa numa só. MAS a mesma regra não vale para `execute.allow` no
-//    MESMO arquivo: `pipeline-de-dados` tem `allow` com 141 caracteres
-//    numa linha só (sem quebra) e `deny` quebrado ao lado — e arquivos
-//    de OUTROS pacotes (`fabrica-de-testes/agents/api-funcional`, 184
-//    caracteres; `software-house/agents/desenvolvimento-backend`, 293
-//    caracteres) não quebram nunca. Não há threshold de coluna nem de
-//    contagem de item que explique os dois lados sem citar o nome do
-//    arquivo — é edição manual, não estilo.
-// 2) `seguranca-ofensiva/agents/pentest-aplicacao/AGENTS.md` (1
-//    ocorrência): `capabilities.network` sai em BLOCO ali, mas em FLUXO
-//    em todo outro arquivo do acervo que tem `network` como lista
-//    (inclusive com a mesma contagem de 2 itens em
-//    `fabrica-de-testes/agents/automacao-e2e`). Mesma conclusão.
-const EXCECOES_CONHECIDAS = new Set([
-  'documentacao-e-suporte/agents/suporte-nivel-2/AGENTS.md',
-  'engenharia-de-dados/agents/analytics-bi/AGENTS.md',
-  'engenharia-de-dados/agents/modelagem-de-dados/AGENTS.md',
-  'engenharia-de-dados/agents/pipeline-de-dados/AGENTS.md',
-  'engenharia-de-dados/agents/qualidade-de-dados/AGENTS.md',
-  'seguranca-ofensiva/agents/pentest-aplicacao/AGENTS.md',
-]);
+// Seis ocorrências, em cinco arquivos, não fechavam byte-a-byte na
+// primeira passada do emissor. A causa, medida, não era escolha autoral
+// de outubro: eram arquivos que os fix rounds desta mesma fase editaram
+// à mão hoje (Task 3 expandiu o trio de SQL para 12 entradas nos cinco
+// papéis de banco; Task 1 tocou `pentest-aplicacao`) — formatação ad hoc
+// de uma edição de hoje, não estilo a preservar. Canonizados: o campo
+// divergente de cada um foi reescrito no formato que este emissor deriva
+// (fluxo numa linha só, sem quebra manual; `network` em fluxo como todo
+// outro arquivo do acervo). A reescrita foi provada semanticamente nula
+// — frontmatter parseado antes/depois é `deepEqual` nos 6 — e as 32
+// emissões batem idênticas antes/depois da canonização. Ver
+// task-6-report.md para a prova completa.
 
-test('yaml-emit: reemitir todo papel do acervo não muda um byte, exceto as seis exceções documentadas', () => {
+test('yaml-emit: reemitir todo papel do acervo não muda um byte', () => {
   let total = 0;
-  let excecoesEncontradas = 0;
   for (const { nome, f } of arquivosDoAcervo()) {
     total++;
     const original = readFileSync(join(RAIZ, nome, f.path), 'utf8');
     const reemitido = toMarkdown(f);
-    const chave = join(nome, f.path);
-    if (EXCECOES_CONHECIDAS.has(chave)) {
-      excecoesEncontradas++;
-      assert.notEqual(reemitido, original,
-        `${chave} está na lista de exceções conhecidas mas bateu byte-a-byte — remova da lista`);
-    } else {
-      assert.equal(reemitido, original, `${chave} mudou na reemissão`);
-    }
+    assert.equal(reemitido, original, `${join(nome, f.path)} mudou na reemissão`);
   }
   assert.equal(total, 85, `esperado 85 arquivos no acervo, achou ${total}`);
-  assert.equal(excecoesEncontradas, EXCECOES_CONHECIDAS.size,
-    'todas as seis exceções conhecidas precisam aparecer no acervo real');
 });
 
-test('PARIDADE semântica: todo frontmatter real do acervo faz ida e volta sem perda (mesmo nas seis exceções de formatação)', () => {
+test('PARIDADE semântica: todo frontmatter real do acervo faz ida e volta sem perda', () => {
   for (const { nome, f } of arquivosDoAcervo()) {
     const volta = recarregar(f.frontmatter);
     assert.deepEqual(volta, f.frontmatter, `${nome}/${f.path} não sobreviveu à ida e volta semântica`);

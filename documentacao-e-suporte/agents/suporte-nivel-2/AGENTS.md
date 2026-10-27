@@ -35,9 +35,7 @@ metadata:
     write: [report]
     execute:
       allow: ["kubectl logs*", "kubectl describe*", "psql -c*", "rg *", "git log*"]
-      deny: ["kubectl apply*", "kubectl delete*", "psql*DROP*", "psql*drop*",
-        "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*",
-        "git push*", "sudo *"]
+      deny: ["kubectl apply*", "kubectl delete*", "psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*", "git push*", "sudo *"]
     network: false
     delegate: []
     budget:
