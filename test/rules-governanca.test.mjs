@@ -610,3 +610,108 @@ test('E17: entrada com curinga continua derivando o representativo do allow, sem
     network: false } });
   assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
 });
+
+// O negativo do mesmo par: `psql --command*` com o trio ancorado em `-c`,
+// uma flag que ESTE allow nunca invoca. É o espelho do caso `mysql -e*`/
+// `-c`, com a forma longa no lugar da curta — a flag cravada do round 1
+// casaria aqui e certificaria cobertura inexistente.
+test('E17: allow "psql --command*" com deny ancorado em "-c" é erro — a forma longa não é a curta', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql --command*'], deny: [
+      'psql -c*DROP*', 'psql -c*drop*', 'psql -c*TRUNCATE*',
+      'psql -c*truncate*', 'psql -c*DELETE*', 'psql -c*delete*',
+      'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1,
+    `o deny está ancorado em "-c" e o allow invoca "--command": nenhum padrão casa: ${JSON.stringify(e17, null, 2)}`);
+  assert.match(e17[0].message, /psql --command\*/);
+});
+
+// Fix-round 4 (achado da revisão, 2026-10-27): a regra passou a perguntar,
+// POR ENTRADA de `allow`, "esta entrada pode invocar comando destrutivo? e
+// se pode, existe deny que o bloqueia?". Os testes abaixo são as bordas que
+// essa formulação resolve e que a anterior errava.
+
+// Entrada literal SEM verbo destrutivo: sem `*`, o shell só pode rodar
+// exatamente essa string, e `DROP` é estruturalmente inalcançável ali. A
+// versão anterior acusava e exigia cobertura — e a única forma de silenciar
+// era `deny: ['psql --version']`, negar o que se acabou de permitir: a
+// defesa decorativa exata que E17 existe para caçar.
+test('E17: allow literal sem verbo destrutivo não exige deny nenhum', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql --version'], deny: ['sudo *'] }, network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), [],
+    '"psql --version" não tem curinga: nenhum comando destrutivo é alcançável a partir dela');
+});
+
+// O agravante do mesmo achado: `faltando` era um Set por CLIENTE, logo a
+// entrada inofensiva contaminava a entrada irmã JÁ CORRETAMENTE COBERTA.
+// Aqui `psql -c*` tem o trio completo ancorado em `-c` — cobertura real do
+// caminho destrutivo — e a presença de `psql --version` ao lado não pode
+// reprovar o papel.
+test('E17: entrada inofensiva não contamina a entrada irmã já coberta', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*', 'psql --version'], deny: [
+      'psql -c*DROP*', 'psql -c*drop*', 'psql -c*TRUNCATE*',
+      'psql -c*truncate*', 'psql -c*DELETE*', 'psql -c*delete*',
+      'sudo *'] },
+    network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), [],
+    'o trio ancorado em "-c" cobre a entrada com curinga, e a entrada literal inofensiva não exige nada');
+});
+
+// Verbo destrutivo em CAIXA MISTA numa entrada literal. Acusar é correto, e
+// não é zelo: `tools/writers.mjs` emite `case "$cmd" in $p)`, glob de shell
+// case-sensitive, logo um `deny` ancorado em `DROP` ou em `drop` de fato
+// NÃO bloquearia `psql -c "Drop Table users"`. A cobertura que o papel
+// declara aqui é aparente, não real.
+test('E17: verbo destrutivo em caixa mista não é coberto por deny de DROP/drop', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c "Drop Table users"'], deny: [
+      'psql*DROP*', 'psql*drop*', 'psql*TRUNCATE*', 'psql*truncate*',
+      'psql*DELETE*', 'psql*delete*', 'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1,
+    `nem "psql*DROP*" nem "psql*drop*" casam "Drop" — o glob do hook é case-sensitive: ${JSON.stringify(e17, null, 2)}`);
+  assert.match(e17[0].message, /psql/);
+  // A mensagem tem de nomear a grafia COMO ESCRITA ("Drop"), não a grafia
+  // canônica do vocabulário ("DROP"): dizer que falta cobrir DROP, quando o
+  // que está escrito é Drop, descreve uma verificação que não correu —
+  // o Minor de mensagem não-acionável que esta reestruturação fecha.
+  assert.match(e17[0].message, /escreve Drop\b/);
+});
+
+// Mesma reestruturação, outra falsidade que ela desfaz (ver "Fora do
+// pedido" no relatório): o representativo passou a sair da entrada CRUA, não
+// da descascada de runner. `descascarRunner` detecta o cliente; o hook
+// compara o comando INTEIRO (`tool_input.command`), logo o comando real aqui
+// é `npx psql -c "DROP ..."`, que "psql*DROP*" não casa.
+test('E17: cliente SQL atrás de runner exige deny que case o comando com o runner', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['npx psql -c*'], deny: [
+      'psql*DROP*', 'psql*drop*', 'psql*TRUNCATE*', 'psql*truncate*',
+      'psql*DELETE*', 'psql*delete*', 'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1,
+    `o comando real começa com "npx", que nenhum padrão "psql*" casa: ${JSON.stringify(e17, null, 2)}`);
+  assert.match(e17[0].message, /npx psql/);
+});
+
+test('E17: cliente SQL atrás de runner passa com deny que inclui o runner', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['npx psql -c*'], deny: [
+      'npx psql -c*DROP*', 'npx psql -c*drop*', 'npx psql -c*TRUNCATE*',
+      'npx psql -c*truncate*', 'npx psql -c*DELETE*', 'npx psql -c*delete*',
+      'sudo *'] },
+    network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});

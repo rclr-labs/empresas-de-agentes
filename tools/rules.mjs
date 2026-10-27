@@ -300,6 +300,51 @@ export function globCasa(padrao, texto) {
 // grafias — ver E17 em `validateGovernance`.
 const CLIENTES_SQL = Object.freeze(['psql', 'mysql', 'mariadb', 'sqlite3']);
 const VERBOS_DESTRUTIVOS = Object.freeze(['DROP', 'TRUNCATE', 'DELETE']);
+// As duas grafias de cada verbo, na ordem em que a mensagem de erro as
+// lista. SQL não é sensível a caixa, e a minúscula é a grafia idiomática —
+// um `deny` que cobre só a maiúscula protege a forma que ninguém digita.
+const GRAFIAS_DESTRUTIVAS = Object.freeze(
+  VERBOS_DESTRUTIVOS.flatMap((v) => [v, v.toLowerCase()]));
+
+/**
+ * As grafias de verbo destrutivo que JÁ ESTÃO ESCRITAS no texto, na caixa
+ * exata em que aparecem. Usado por E17 para decidir se uma entrada de
+ * `allow` SEM curinga pode invocar comando destrutivo: sem `*`, o shell só
+ * pode rodar literalmente aquela string, logo `DROP` só é alcançável se
+ * estiver escrito ali.
+ *
+ * Casa SUBSTRING, não palavra inteira — `DELETE` é encontrado dentro de
+ * `delete_tmp.sql`. Escolha deliberada, não omissão: a direção de erro é
+ * acusar (exigir `deny` de quem talvez não precisasse), nunca certificar
+ * cobertura inexistente, e é a mesma direção conservadora que `globCasa`
+ * toma com `?`/`[...]`. Zero impacto no acervo de hoje (nenhuma entrada de
+ * `allow` de cliente SQL é literal — conferido por grep antes de escrever).
+ */
+function verbosDestrutivosEscritos(texto) {
+  const baixo = texto.toLowerCase();
+  const achados = new Set();
+  for (const verbo of VERBOS_DESTRUTIVOS) {
+    const alvo = verbo.toLowerCase();
+    for (let i = baixo.indexOf(alvo); i !== -1; i = baixo.indexOf(alvo, i + 1)) {
+      achados.add(texto.slice(i, i + verbo.length));
+    }
+  }
+  return [...achados];
+}
+
+/**
+ * Parte o padrão de `allow` no ÚLTIMO `*` — o ponto que o próprio papel
+ * declarou que varia. `null` quando não há `*`: o padrão é literal e não
+ * tem ponto de variação nenhum. Fonte única da divisão usada tanto pelo
+ * comando representativo quanto pelo `deny` sugerido na mensagem de erro —
+ * é o que garante que a sugestão de fato casa o representativo (ver
+ * `denySugerido`).
+ */
+function partesDoCuringa(padraoAllow) {
+  const i = padraoAllow.lastIndexOf('*');
+  if (i === -1) return null;
+  return { prefixo: padraoAllow.slice(0, i), sufixo: padraoAllow.slice(i + 1) };
+}
 
 /**
  * Comando destrutivo representativo, derivado do próprio padrão de `allow`
@@ -341,14 +386,44 @@ const VERBOS_DESTRUTIVOS = Object.freeze(['DROP', 'TRUNCATE', 'DELETE']);
  * checagem, não da checagem frouxa demais. A entrada sem `*` não precisa
  * de substituição nenhuma — já está completa; só falta perguntar a
  * `globCasa` se algum `deny` a casa.
+ *
+ * Fix-round 4: a entrada que chega aqui é a entrada CRUA de `allow`, não a
+ * descascada de runner — ver o laço de E17 para a razão (o hook compara o
+ * comando inteiro, runner incluído).
  */
 function comandoRepresentativo(padraoAllow, sentenca) {
-  const i = padraoAllow.lastIndexOf('*');
-  if (i === -1) return null;
-  const prefixo = padraoAllow.slice(0, i);
-  const sufixo = padraoAllow.slice(i + 1);
+  const partes = partesDoCuringa(padraoAllow);
+  if (!partes) return null;
+  const { prefixo, sufixo } = partes;
   const espaco = prefixo.length > 0 && !/\s$/.test(prefixo) ? ' ' : '';
   return `${prefixo}${espaco}${sentenca}${sufixo}`;
+}
+
+/**
+ * O padrão de `deny` que a mensagem de erro de E17 sugere para cobrir uma
+ * grafia descoberta desta entrada de `allow`. Construído da MESMA divisão
+ * que o representativo (`partesDoCuringa`), e é isso que o torna
+ * verificavelmente correto em vez de plausível:
+ *
+ *   entrada  "psql -c*"                   (prefixo "psql -c", sufixo "")
+ *   repr.    "psql -c DROP TABLE x"
+ *   sugestão "psql -c*DROP*"  →  regex ^psql \-c.*DROP.*$  →  casa o repr.
+ *
+ * A sugestão não assume que a entrada começa com o nome do cliente: para
+ * `allow: ["npx psql -c*"]` ela sai `"npx psql -c*DROP*"`, que é o que o
+ * hook de fato precisa ver (o `psql*DROP*` ingênuo não casaria o comando
+ * real, que começa com `npx`).
+ *
+ * Entrada literal (sem `*`): a sugestão é a PRÓPRIA entrada, que como glob
+ * casa exatamente ela mesma. Não é defesa decorativa — a entrada literal só
+ * chega a este ponto quando já contém verbo destrutivo, e aí negar
+ * exatamente o que se permitiu é de fato o reparo (a mensagem oferece antes
+ * a alternativa melhor: tirar a entrada de `allow`).
+ */
+function denySugerido(padraoAllow, grafia) {
+  const partes = partesDoCuringa(padraoAllow);
+  if (!partes) return padraoAllow;
+  return `${partes.prefixo}*${grafia}*${partes.sufixo}`;
 }
 
 function temRede(cap) {
@@ -723,43 +798,74 @@ export function validateGovernance(pkg) {
     // (depois de descascar runner), não do nome do cliente sozinho — ver
     // `comandoRepresentativo` para a razão (cravar uma flag fixa, mesmo
     // que plausível como `-c`, teria feito `mysql -e*` exigir cobertura na
-    // flag errada). Um cliente com duas entradas de forma diferente em
-    // `allow` (ex. `"psql -c*"` e `"psql --command*"`) tem cada entrada
-    // verificada separadamente — `deny` tem de cobrir a forma que CADA
-    // entrada de fato invoca, não só uma delas.
+    // flag errada).
+    //
+    // Fix-round 4 (achado da revisão, 2026-10-27) — a REESTRUTURAÇÃO que
+    // transforma as quatro camadas numa pergunta só. A pergunta de E17 é:
+    //
+    //   para CADA ENTRADA de `allow` que possa invocar comando destrutivo,
+    //   existe padrão em `deny` que o bloqueia?
+    //
+    // Daí decorrem os dois casos sem nenhum caso especial:
+    //   - entrada COM `*` pode invocar qualquer coisa → exige cobertura das
+    //     seis grafias, com o representativo derivado da própria entrada;
+    //   - entrada SEM `*` só pode invocar o que está escrita nela → entra
+    //     na exigência SOMENTE se contiver verbo destrutivo, e aí ela
+    //     mesma é o representativo.
+    //
+    // O que isso corrige: `allow: ['psql --version']` disparava E17 e
+    // pedia cobertura de um `DROP` que aquela entrada é estruturalmente
+    // incapaz de invocar — e a única forma de silenciar era
+    // `deny: ['psql --version']`, negar o que se acabou de permitir, a
+    // defesa decorativa exata que esta regra existe para caçar. Pior, o
+    // `faltando` era um Set por CLIENTE: `allow: ['psql -c*',
+    // 'psql --version']` com o trio completo ancorado em `-c` — cobertura
+    // real — continuava acusando, porque a entrada inofensiva contaminava
+    // a entrada coberta. Com `faltando` por ENTRADA, a contaminação
+    // desaparece por construção, não por remendo.
+    //
+    // E o representativo passa a sair da entrada CRUA, não da descascada de
+    // runner: `descascarRunner` serve só para DETECTAR o cliente. O hook
+    // que `tools/writers.mjs` emite compara
+    // `cmd=$(cat | jq -r ".tool_input.command // empty")` — o comando
+    // inteiro, runner incluído — logo para `allow: ['npx psql -c*']` o
+    // comando real é `npx psql -c "DROP ..."`, que `psql*DROP*` NÃO casa.
+    // Medir a cobertura sobre a forma descascada certificava proteção que
+    // o hook não daria.
     //
     // O verbo — DROP vs drop — é comparado na caixa exata em que aparece na
     // sentença: é isso que mantém a distinção de grafia que esta regra
-    // existe para forçar (ver E17 em `SCHEMA.md`).
+    // existe para forçar (ver E17 em `SCHEMA.md`). Por isso
+    // `allow: ['psql -c "Drop Table users"']` é acusado mesmo com `deny`
+    // cobrindo `DROP` e `drop`: o hook usa a mesma semântica de glob
+    // case-sensitive, e nenhum desses dois padrões bloquearia `Drop`.
     const deny = listaDeTexto(cap.execute?.deny);
-    for (const cliente of CLIENTES_SQL) {
-      const entradas = allow
-        .map((g) => descascarRunner(g))
-        .filter((g) => g.toLowerCase().startsWith(cliente));
-      if (entradas.length === 0) continue;
-      const faltando = new Set();
-      for (const entrada of entradas) {
-        for (const verbo of VERBOS_DESTRUTIVOS) {
-          for (const grafia of [verbo, verbo.toLowerCase()]) {
-            const tabela = grafia === verbo ? 'TABLE' : 'table';
-            // Entrada sem nenhum `*`: `comandoRepresentativo` devolve
-            // `null` — não há curinga onde injetar a sentença — e aqui o
-            // representativo cai para a PRÓPRIA entrada, não para
-            // "sem exigência". A entrada literal já é a sentença destrutiva
-            // quando o papel a escreveu assim (ver comentário na função);
-            // perguntar a `globCasa` direto sobre ela é a pergunta certa,
-            // tanto para acusar quem não tem `deny` nenhum quanto para
-            // deixar passar quem já está coberto por um `deny` largo.
-            const representativo = comandoRepresentativo(entrada, `${grafia} ${tabela} x`) ?? entrada;
-            const coberto = deny.some((d) => globCasa(d, representativo));
-            if (!coberto) faltando.add(`${cliente}*${grafia}*`);
-          }
+    for (const entrada of allow) {
+      const cliente = CLIENTES_SQL.find(
+        (c) => descascarRunner(entrada).toLowerCase().startsWith(c));
+      if (!cliente) continue;
+
+      const temCuringa = entrada.includes('*');
+      const escritos = verbosDestrutivosEscritos(entrada);
+      // Entrada literal sem verbo destrutivo (`psql --version`): não há
+      // comando destrutivo que ela possa invocar, logo não há o que exigir.
+      if (!temCuringa && escritos.length === 0) continue;
+
+      const faltando = [];
+      for (const grafia of temCuringa ? GRAFIAS_DESTRUTIVAS : escritos) {
+        const tabela = grafia === grafia.toLowerCase() ? 'table' : 'TABLE';
+        const representativo = comandoRepresentativo(entrada, `${grafia} ${tabela} x`) ?? entrada;
+        if (!deny.some((d) => globCasa(d, representativo))) {
+          faltando.push({ grafia, sugestao: denySugerido(entrada, grafia) });
         }
       }
-      if (faltando.size) {
-        erros.push(erro('E17', 'deny-de-sql-incompleto', where,
-          `permite "${cliente}" em execute.allow e o deny não cobre ${[...faltando].join(', ')} — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias, como glob que de fato casa a forma que o allow invoca`));
-      }
+      if (faltando.length === 0) continue;
+
+      const grafias = faltando.map((f) => f.grafia).join(', ');
+      const sugestoes = [...new Set(faltando.map((f) => `"${f.sugestao}"`))].join(', ');
+      erros.push(erro('E17', 'deny-de-sql-incompleto', where, temCuringa
+        ? `permite "${entrada}" em execute.allow (cliente SQL "${cliente}") e nenhum padrão de execute.deny bloqueia ${grafias} nessa forma de invocação — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias; acrescente a execute.deny ${sugestoes}`
+        : `permite "${entrada}" em execute.allow (cliente SQL "${cliente}") — entrada literal, sem curinga, que já escreve ${grafias}, e nenhum padrão de execute.deny a bloqueia; tire a entrada de execute.allow ou acrescente a execute.deny ${sugestoes}`));
     }
   }
 
