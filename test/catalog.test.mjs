@@ -132,3 +132,37 @@ test('catalog: --ref sobrepõe a detecção automática', () => {
   const cat = buildCatalog(RAIZ, { ref: 'deadbee' });
   assert.equal(cat.generated_from, 'deadbee');
 });
+
+// Achado da prova de suficiência (fix round 2): remontar os 42 papéis a
+// partir do catálogo só bate byte a byte com o disco quando a ordem de
+// chave de topo do frontmatter reconstruído é EXATAMENTE a do arquivo
+// original (name, title, slug, reportsTo, skills, metadata) — e essa
+// ordem não está em lugar nenhum do catalog.json, só na uniformidade dos
+// 42 arquivos de hoje. Convenção sem guarda é silêncio: este teste deriva
+// a ordem do PRIMEIRO arquivo encontrado (nunca a crava) e exige que os
+// outros 41 tenham a mesma. Papel novo com ordem diferente fica vermelho
+// aqui — a decisão aparece, em vez do editor da Fase 2 reescrever a
+// ordem de todo papel não editado a cada salvamento, em silêncio.
+test('catalog: os 42 AGENTS.md têm a mesma ordem de chave de topo — convenção que o catálogo não carrega, só a uniformidade do acervo garante', () => {
+  let ordemEsperada = null;
+  let origemDaOrdem = null;
+  let totalConferido = 0;
+  for (const nome of listPackages(RAIZ)) {
+    const pkg = loadPackage(join(RAIZ, nome));
+    for (const agente of pkg.agents) {
+      const ordem = Object.keys(agente.frontmatter);
+      if (ordemEsperada === null) {
+        ordemEsperada = ordem;
+        origemDaOrdem = agente.path;
+      } else {
+        assert.deepEqual(ordem, ordemEsperada,
+          `${nome}/${agente.path} tem ordem de chave de topo [${ordem.join(', ')}], ` +
+          `diferente de ${origemDaOrdem} [${ordemEsperada.join(', ')}] — um editor que ` +
+          `reescrever este papel (ou qualquer outro) a partir do catálogo não tem como ` +
+          `saber qual das duas é a correta, porque o catalog.json não carrega ordem alguma`);
+      }
+      totalConferido += 1;
+    }
+  }
+  assert.ok(totalConferido > 0, 'nenhum agente encontrado — acervo vazio?');
+});
