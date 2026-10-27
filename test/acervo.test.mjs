@@ -213,13 +213,35 @@ test('nenhum papel declara curinga de runner puro em execute.allow — Task 8, f
   // "Curinga de runner puro" = o padrão, depois de descascar o prefixo
   // de RUNNERS (`npx`, `pnpm dlx`, `yarn dlx`, `bunx`, `pipx run`, `uvx`,
   // `dotnet run --`), não sobra nome de comando nenhum — só espaço e/ou
-  // `*`. `npm` bare entra pela MESMA razão mesmo não estando em RUNNERS
-  // (não é um runner que carrega outro comando, mas o problema de fundo
-  // é idêntico: qualquer subcomando do ecossistema, sem nome nenhum
-  // declarado) — por isso soma-se a RUNNERS aqui, em vez de reescrever a
-  // lista: `tools/rules.mjs` já é a fonte única dos prefixos de runner,
-  // e copiar essa lista à mão é exatamente o defeito ("enumerar em vez
-  // de derivar") que esta fase caçou o dia inteiro.
+  // `*`. `npm` bare entra mesmo não estando em RUNNERS — por isso soma-se
+  // a RUNNERS aqui, em vez de reescrever a lista: `tools/rules.mjs` já é
+  // a fonte única dos prefixos de runner, e copiar essa lista à mão é
+  // exatamente o defeito ("enumerar em vez de derivar") que esta fase
+  // caçou o dia inteiro.
+  //
+  // O QUE ESTA GUARDA COBRE, medido na revisão ampla de 2026-10-27 — e
+  // escrito aqui porque a versão anterior deste comentário afirmava o
+  // critério "qualquer subcomando do ecossistema, sem nome nenhum
+  // declarado", que a guarda NÃO implementa:
+  //
+  //   acusa   "npx *"  "npm *"  "pnpm dlx *"  "yarn dlx *"  "bunx *"
+  //           "uvx *"  "pipx run *"  "dotnet run -- *"
+  //   passa   "pnpm *"  "yarn *"  "bun *"  "mvn *"  "gradle *"  "pip *"
+  //           "dotnet *"  "composer *"  "npm*"  "npx*"
+  //
+  // Cobre, então, os RUNNERS na forma `npx`/`npm`/`dlx` com espaço antes
+  // do curinga. NÃO cobre `yarn`/`pnpm` nus — que não são runners pela
+  // definição da lista, mas permitem tudo o que `yarn dlx *`/`pnpm dlx *`
+  // permitem, e mais —, nem a forma sem espaço (`npx*`, `npm*`), porque
+  // os prefixos de RUNNERS exigem `\s+`. O padrão estreito é pego; o
+  // superconjunto, não.
+  //
+  // `yarn *` e `pnpm *` estão VIVOS em
+  // `software-house/desenvolvimento-frontend` e `desenvolvimento-fullstack`
+  // e não foram estreitados: é decisão de fronteira do dono do acervo, a
+  // classe exata da issue #1, e apertar a guarda aqui deixaria a suíte
+  // vermelha em papel publicado. Nenhum papel usa hoje a forma sem
+  // espaço. Ver SCHEMA.md, "Decisão: curinga de runner não é fronteira".
   const PREFIXOS_CURINGA = [...RUNNERS, /^npm\s+/i];
   const curingasPuros = [];
   for (const nome of listPackages(RAIZ)) {

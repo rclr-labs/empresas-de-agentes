@@ -310,6 +310,36 @@ usa, e `npm run` — quando mantido — é limitado pelo `package.json` do
 repositório adotante, não por esta lista; essa dívida é nomeada no corpo
 do papel, não escondida.
 
+**O que a guarda de verdade cobre, medido** (`test/acervo.test.mjs`, teste
+"nenhum papel declara curinga de runner puro em `execute.allow`"):
+
+```
+acusa   "npx *"  "npm *"  "pnpm dlx *"  "yarn dlx *"  "bunx *"  "uvx *"
+        "pipx run *"  "dotnet run -- *"
+passa   "pnpm *"  "yarn *"  "bun *"  "mvn *"  "gradle *"  "pip *"
+        "dotnet *"  "composer *"  "npm*"  "npx*"
+```
+
+Ou seja: a guarda cobre **os runners na forma `npx`/`npm`/`dlx` com espaço
+antes do curinga** — os prefixos de `RUNNERS` (`tools/rules.mjs`) mais
+`npm` nu. Ela **não** cobre `yarn`/`pnpm` nus, que não são runners pela
+definição da lista mas permitem tudo o que `yarn dlx *`/`pnpm dlx *`
+permitem, e mais; nem as formas sem espaço (`npx*`, `npm*`), porque os
+prefixos de `RUNNERS` exigem `\s+`. O padrão estreito é pego, o
+superconjunto não.
+
+O comentário da guarda afirmava o critério "qualquer subcomando do
+ecossistema, sem nome nenhum declarado", que ela não implementa — corrigido
+em 2026-10-27 (revisão ampla) para dizer o que de fato cobre.
+
+**`yarn *` e `pnpm *` estão vivos agora** em
+`software-house/desenvolvimento-frontend` e `desenvolvimento-fullstack`, e
+**não foram estreitados**: estreitá-los é decisão de fronteira do dono do
+acervo — a classe exata da issue #1 —, e apertar a guarda no meio de uma
+onda de revisão deixaria a suíte vermelha em papel publicado. A medição
+está comentada na issue, que segue aberta. Nenhum papel do acervo usa hoje
+a forma sem espaço (`npx*`, `npm*`).
+
 ### Avisos (`W01`–`W05`) — não reprovam o pacote
 
 | Código | O que sinaliza | Consequência de ignorar |
