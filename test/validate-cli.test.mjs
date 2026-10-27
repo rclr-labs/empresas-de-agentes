@@ -157,7 +157,7 @@ test('--fix relata a contagem real de arquivos reescritos', () => {
   writeFileSync(join(dir, 'COMPANY.md'),
     '---\nname: X\nslug: x\nschema: agentcompanies/v1\nkind: company\nlicense: MIT\n---\n\n# x\n');
   writeFileSync(join(dir, 'agents', 'a', 'AGENTS.md'),
-    '---\nname: A\nslug: a\nreportsTo: null\nskills: [x]\nmetadata:\n  persona: {display_name: N, icon: Z}\n  fronteira:\n    pode: [ler]\n    nao_pode: []\n---\n\n# A\n');
+    '---\nname: A\nslug: a\nreportsTo: null\nskills: [x]\nmetadata:\n  persona: {display_name: N, icon: Z, background: [a, b, c]}\n  fronteira:\n    pode: [ler]\n    nao_pode: []\n---\n\n# A\n');
 
   const { stdout } = rodar([dir, '--fix']);
   assert.match(stdout, /--fix aplicado: \d+ arquivo/, 'diz quantos');

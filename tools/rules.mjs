@@ -142,6 +142,31 @@ function verificarTiposDeCapacidade(cap, where, erros) {
 }
 
 /**
+ * E19 — tipo dos campos de `persona` que E18 avalia por CONTEÚDO
+ * (`display_name`, `background`). Separado de `verificarTiposDeCapacidade`
+ * porque vive sob `metadata.persona`, não `metadata.capabilities` — mas é
+ * o mesmo princípio: tipo errado é defeito de TIPO, e quem relata isso é
+ * sempre E19, nunca a regra de conteúdo (E18). Sem esta função, um
+ * `background` string ou um `display_name` número cairiam direto nas
+ * checagens de E18 em `validateStructure`, que pressupõem o tipo certo
+ * (`Array.isArray`, regex `.test`) — e ou quebrariam, ou produziriam a
+ * mesma mensagem confusa de E18 para um defeito que é de tipo, não de
+ * conteúdo. Chamada ANTES de E18 avaliar `p`, pela mesma razão que
+ * `verificarTiposDeCapacidade` é chamada antes de E02: regra de conteúdo
+ * só opera sobre valor já sabido do tipo certo.
+ */
+function verificarTiposDePersona(p, where, erros) {
+  if (p.display_name !== undefined && typeof p.display_name !== 'string') {
+    erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+      `persona.display_name deveria ser texto; veio ${tipoRecebido(p.display_name)}. Corrija para uma string, ex.: "Joao Silva"`));
+  }
+  if (p.background !== undefined && !isListaDeTextoValida(p.background)) {
+    erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+      `persona.background deveria ser uma lista de texto; veio ${tipoRecebido(p.background)}. Corrija para uma lista de 3 strings`));
+  }
+}
+
+/**
  * Comandos que alcançam a rede, derivados do que o acervo de fato usa.
  * EXPORTADO de propósito: a vitrine valida no browser com esta mesma lista,
  * e cópia de lista é como a guarda de alcance ficou cega para `npm audit`
@@ -520,6 +545,41 @@ export function validateStructure(pkg) {
     // vir primeiro no laço: é o que garante que E02 adiante já opera sobre
     // `listaDeTexto`, nunca sobre o dado cru.
     verificarTiposDeCapacidade(cap, where, erros);
+    if (meta.persona) verificarTiposDePersona(meta.persona, where, erros);
+
+    // E18 — persona por pacote. `display_name` é ASCII puro porque o nome
+    // tem de funcionar em pt-BR e em inglês; o corpo nunca o menciona
+    // porque o papel é o papel, não a pessoa; e `background` tem 3 linhas
+    // porque uma delas é a cicatriz que faz o modelo seguir a regra quando
+    // ela custa. Unicidade entre pacotes é validateAcervo (Task 5), não
+    // aqui — `validatePackage(pkg)` recebe um pacote só e não pode decidir
+    // unicidade global.
+    //
+    // Cada checagem só roda quando o TIPO do campo já está correto —
+    // `verificarTiposDePersona` (E19) relata o resto. Sem essa guarda,
+    // `background` string ou `display_name` número dispararia E18 e E19
+    // para o mesmo defeito: duas causas relatadas onde há uma, e a
+    // checagem de ASCII rodando `.test()` sobre tipo que não é string.
+    const p = meta.persona;
+    if (p) {
+      if (typeof p.display_name === 'string' && !/^[A-Za-z][A-Za-z ]*$/.test(p.display_name)) {
+        erros.push(erro('E18', 'persona-invalida', where,
+          `display_name "${p.display_name}" não é ASCII puro — o nome tem de funcionar em pt-BR e em inglês`));
+      }
+      const backgroundTipoValido = p.background === undefined || isListaDeTextoValida(p.background);
+      if (backgroundTipoValido) {
+        const linhas = listaDeTexto(p.background);
+        if (linhas.length !== 3) {
+          erros.push(erro('E18', 'persona-invalida', where,
+            `background tem ${linhas.length} linha(s); a regra é 3, e ao menos uma é uma cicatriz`));
+        }
+      }
+      if (typeof p.display_name === 'string' && p.display_name
+          && (agente.body ?? '').includes(p.display_name)) {
+        erros.push(erro('E18', 'persona-invalida', where,
+          `o corpo menciona "${p.display_name}" — o corpo descreve o papel, e a persona serve o humano e a vitrine`));
+      }
+    }
 
     // E02 — vocabulário fechado
     for (const verbo of ['read', 'write']) {

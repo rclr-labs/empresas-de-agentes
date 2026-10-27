@@ -138,17 +138,6 @@ test('todo pacote do acervo: nenhuma chave de topo nova — só o que a spec per
   }
 });
 
-test('todo pacote do acervo: a persona não vaza para o corpo do agente', () => {
-  // Era só software-house (achado Important 7).
-  for (const nome of listPackages(RAIZ)) {
-    for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      const nomePersona = a.frontmatter.metadata.persona.display_name;
-      assert.ok(!a.body.includes(nomePersona),
-        `${nome}/${a.slug}: "${nomePersona}" aparece no corpo. A persona não entra no prompt — custa token em toda chamada`);
-    }
-  }
-});
-
 test('nenhum papel assina o portão de teto sobre os próprios limites', () => {
   // Teste estreito, de propósito — e isso é aceitável aqui porque o
   // portão de teto tem razão própria para nunca ter um papel como signer,

@@ -36,7 +36,7 @@ const codigos = (pkg) => validateGovernance(pkg).map((e) => e.code);
 // memória — para os testes de E15/W05, que só precisam de um papel com
 // capabilities.network e execute.allow controláveis, sem o resto do
 // aparato de `pacote()` acima (gates, hierarquia, orçamento).
-function pacoteMinimo({ slug, capabilities = {}, body = '' } = {}) {
+function pacoteMinimo({ slug, capabilities = {}, body = '', persona } = {}) {
   return {
     slug,
     dir: null,
@@ -53,7 +53,7 @@ function pacoteMinimo({ slug, capabilities = {}, body = '' } = {}) {
         metadata: {
           boundary: { can: ['ler'], cannot: [] },
           capabilities,
-          persona: { display_name: 'N', icon: '🧪' },
+          persona: persona ?? { display_name: 'N', icon: '🧪' },
         },
       },
       body,
@@ -714,4 +714,92 @@ test('E17: cliente SQL atrás de runner passa com deny que inclui o runner', () 
       'sudo *'] },
     network: false } });
   assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});
+
+// E18 — persona por pacote. Só o que é verificável DENTRO de um pacote só:
+// `display_name` ASCII, `background` com 3 linhas, e o corpo não vazando o
+// `display_name`. Unicidade de ícone/nome entre pacotes é validateAcervo,
+// Task 5 — `validatePackage(pkg)` recebe um pacote só e não pode decidir
+// unicidade global.
+test('E18: display_name com acento é erro', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'João Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' } });
+  const e18 = validatePackage(pkg).errors.filter((e) => e.code === 'E18');
+  assert.equal(e18.length, 1);
+  assert.match(e18[0].message, /ASCII/);
+});
+
+test('E18: background com 2 linhas é erro', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b'],
+    signature_question: 'E se faltar?' } });
+  assert.equal(validatePackage(pkg).errors.filter((e) => e.code === 'E18').length, 1);
+});
+
+test('E18: display_name no corpo do agente é erro', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' },
+    body: 'Joao Silva escreve o código desta casa.\n' });
+  const e18 = validatePackage(pkg).errors.filter((e) => e.code === 'E18');
+  assert.equal(e18.length, 1);
+  assert.match(e18[0].message, /corpo/);
+});
+
+test('E18: persona correta passa', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' }, body: 'Você escreve código.\n' });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E18'), []);
+});
+
+// Correção ao brief: a checagem é `body.includes(display_name)` — inclusão
+// da STRING COMPLETA do nome ("Ana Lima"), não casamento por palavra isolada
+// do primeiro nome ("Ana"). Um papel chamado "Ana Lima" cujo corpo fala de
+// "analisa"/"anomalia" (que contêm "ana"/"Ana" como substring de OUTRA
+// palavra, não "Ana Lima" por extenso) não pode disparar E18 por acidente —
+// só dispararia se o corpo contivesse "Ana Lima" literalmente, nome e
+// sobrenome juntos.
+test('E18: nome que é substring de outra palavra no corpo não é falso positivo', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Ana Lima', icon: '🔎', pronouns: 'ela/dela',
+    headline: 'Analisa dados', background: ['a', 'b', 'c'],
+    signature_question: 'Os dados confirmam?' },
+    body: 'Você analisa dados e detecta anomalia.\n' });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E18'), []);
+});
+
+// Correção ao brief: background com TIPO errado (string em vez de lista) dá
+// E19 (tipo de campo), não E18 — E18 só reclama de CONTEÚDO, depois que o
+// tipo já está correto. Sem esta separação, um `background` string dispararia
+// os dois códigos para o mesmo defeito, e quem lê o relatório veria duas
+// causas onde há uma.
+test('E18/E19: background como string (tipo errado) dá E19, não E18', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: 'uma string, não uma lista',
+    signature_question: 'E se faltar?' } });
+  const { errors } = validatePackage(pkg);
+  assert.deepEqual(errors.filter((e) => e.code === 'E18'), [],
+    `tipo errado é E19, não E18: ${JSON.stringify(errors, null, 2)}`);
+  assert.equal(errors.filter((e) => e.code === 'E19').length, 1);
+});
+
+// Mesma separação, do outro lado: display_name com tipo errado (número) dá
+// E19, não E18 — a checagem de ASCII pressupõe string e não pode rodar sobre
+// outro tipo.
+test('E18/E19: display_name como número (tipo errado) dá E19, não E18', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 42, icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' } });
+  const { errors } = validatePackage(pkg);
+  assert.deepEqual(errors.filter((e) => e.code === 'E18'), [],
+    `tipo errado é E19, não E18: ${JSON.stringify(errors, null, 2)}`);
+  assert.equal(errors.filter((e) => e.code === 'E19').length, 1);
 });
