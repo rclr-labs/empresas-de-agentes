@@ -328,13 +328,19 @@ const VERBOS_DESTRUTIVOS = Object.freeze(['DROP', 'TRUNCATE', 'DELETE']);
  * só usa `*` no fim para cliente SQL (confirmado por grep), mas a função
  * não assume isso.
  *
- * Padrão SEM NENHUM `*`: devolve `null`. Decisão declarada, não escalada —
- * um padrão totalmente literal (ex. `"psql -c 'select 1'"`) só pode
- * invocar exatamente aquela string; não há wildcard nenhum onde injetar
- * uma sentença destrutiva, e fabricar uma assumiria uma forma que o
- * `allow` não declarou. Essa entrada específica fica fora da exigência de
- * `deny` — se o mesmo cliente tiver OUTRA entrada em `allow` com `*`, essa
- * outra continua exigindo o trio normalmente.
+ * Padrão SEM NENHUM `*`: devolve `null`. Quem chama (o laço de E17) não
+ * descarta esse caso — usa a PRÓPRIA ENTRADA como representativo. Fix-round
+ * 3 desta tarefa (achado do coordenador, 2026-10-27): a versão anterior
+ * fazia `continue` aqui, e isso tirava a entrada da exigência de `deny`
+ * POR INTEIRO — regressão em relação ao round 1, que acusava
+ * `allow: ['psql -c "DROP TABLE users"']` sem deny de SQL. Pior que um
+ * furo comum: a entrada literal JÁ É a sentença destrutiva (`DROP` está
+ * escrito nela); desistir de injetar um curinga que não existe, sem nunca
+ * olhar o texto que já está ali, era o próprio defeito desta fase
+ * (presença de token real, ignorada) só que do lado da ausência de
+ * checagem, não da checagem frouxa demais. A entrada sem `*` não precisa
+ * de substituição nenhuma — já está completa; só falta perguntar a
+ * `globCasa` se algum `deny` a casa.
  */
 function comandoRepresentativo(padraoAllow, sentenca) {
   const i = padraoAllow.lastIndexOf('*');
@@ -736,11 +742,15 @@ export function validateGovernance(pkg) {
         for (const verbo of VERBOS_DESTRUTIVOS) {
           for (const grafia of [verbo, verbo.toLowerCase()]) {
             const tabela = grafia === verbo ? 'TABLE' : 'table';
-            const representativo = comandoRepresentativo(entrada, `${grafia} ${tabela} x`);
-            // Entrada sem nenhum `*`: não há onde injetar a sentença — ver
-            // decisão declarada em `comandoRepresentativo`. Essa entrada
-            // específica não gera exigência de deny.
-            if (representativo === null) continue;
+            // Entrada sem nenhum `*`: `comandoRepresentativo` devolve
+            // `null` — não há curinga onde injetar a sentença — e aqui o
+            // representativo cai para a PRÓPRIA entrada, não para
+            // "sem exigência". A entrada literal já é a sentença destrutiva
+            // quando o papel a escreveu assim (ver comentário na função);
+            // perguntar a `globCasa` direto sobre ela é a pergunta certa,
+            // tanto para acusar quem não tem `deny` nenhum quanto para
+            // deixar passar quem já está coberto por um `deny` largo.
+            const representativo = comandoRepresentativo(entrada, `${grafia} ${tabela} x`) ?? entrada;
             const coberto = deny.some((d) => globCasa(d, representativo));
             if (!coberto) faltando.add(`${cliente}*${grafia}*`);
           }

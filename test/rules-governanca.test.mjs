@@ -573,3 +573,40 @@ test('E17: allow "mysql -e*" com deny ancorado em "-e" passa limpo — a flag ce
     network: false } });
   assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
 });
+
+// Fix-round 3 (achado do coordenador, 2026-10-27): entrada de `allow` SEM
+// curinga regredia para "fora da exigência de deny" — a entrada literal
+// já é a sentença destrutiva (`DROP` está escrita nela), e o round 2
+// desistia de checá-la por não ter onde injetar um curinga que nunca
+// existiu. Os dois testes abaixo são o repro exato.
+test('E17: allow literal já destrutivo sem nenhum deny de SQL é erro — a entrada já é a sentença', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c "DROP TABLE users"'], deny: ['sudo *'] }, network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1,
+    `a entrada literal contém "DROP" e não há deny de SQL nenhum: ${JSON.stringify(e17, null, 2)}`);
+  assert.match(e17[0].message, /psql/);
+});
+
+test('E17: allow literal já destrutivo coberto por deny largo passa limpo — mesma pergunta, por efeito', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c "DROP TABLE users"'], deny: ['psql*', 'sudo *'] }, network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});
+
+// O caso que NÃO muda: entrada com curinga segue com o comportamento do
+// round 2 — prova de que a correção acima não regrediu o que já estava
+// certo (a derivação do representativo a partir do próprio allow).
+test('E17: entrada com curinga continua derivando o representativo do allow, sem regressão', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql --command*'], deny: [
+      'psql --command*DROP*', 'psql --command*drop*',
+      'psql --command*TRUNCATE*', 'psql --command*truncate*',
+      'psql --command*DELETE*', 'psql --command*delete*',
+      'sudo *'] },
+    network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});
