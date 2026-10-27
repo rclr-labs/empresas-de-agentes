@@ -475,8 +475,19 @@ export function validateGovernance(pkg) {
     // deixou passar um papel com `gh pr create*` em allow e `write` sem
     // `pull_request`: a metade legível por humano concedia o que a metade
     // legível por máquina negava.
+    //
+    // A detecção passa por `descascarRunner` (fix round 1 desta regra,
+    // 2026-10-27): sem isso, `npx gh pr create*` escaparia da checagem —
+    // o padrão cru não casa `/^gh pr create/` — e, ao mesmo tempo, o teste
+    // de derivação de test/acervo.test.mjs classificaria esse mesmo padrão
+    // como "local" (gh já está em COMANDOS_LOCAIS depois de descascar o
+    // runner), deixando as duas regras cegas para o mesmo papel ao mesmo
+    // tempo. É a forma exata da lacuna de `npx artillery*` que a Task 1
+    // consertou em dois rounds — aqui, aplicar o descascador já construído
+    // é no-op para todo padrão de hoje (`git push*` entra e sai igual) e
+    // fecha essa inconsistência antes dela existir.
     const write = cap.write ?? [];
-    const temPush = allow.some((g) => /^(git push|gh pr create)/.test(g));
+    const temPush = allow.some((g) => /^(git push|gh pr create)/.test(descascarRunner(g)));
     if (write.includes('pull_request') && !temPush) {
       erros.push(erro('E16', 'par-pull-request', where,
         'declara write: [pull_request] e não tem "git push*" nem "gh pr create*" em execute.allow — capacidade inalcançável'));
@@ -484,6 +495,15 @@ export function validateGovernance(pkg) {
     if (temPush && !write.includes('pull_request')) {
       erros.push(erro('E16', 'par-pull-request', where,
         'tem "git push*" ou "gh pr create*" em execute.allow e write não inclui pull_request — acrescente pull_request a write, ou remova o comando'));
+    }
+    // Terceira perna, mesma família: quem pode dar push tem de negar
+    // `--force` explicitamente em execute.deny. "Pode push" sem "nega
+    // force" é a mesma classe de defeito que as duas pernas acima —
+    // concessão sem o limite que a torna aceitável — por isso entra em
+    // E16 como a mesma regra (`par-pull-request`), não um código novo.
+    if (temPush && !(cap.execute?.deny ?? []).some((g) => /force/i.test(g))) {
+      erros.push(erro('E16', 'par-pull-request', where,
+        'tem "git push*" ou "gh pr create*" em execute.allow e execute.deny não nega "--force" — acrescente um padrão como "git push --force*" a deny'));
     }
   }
 

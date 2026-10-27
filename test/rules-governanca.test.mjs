@@ -401,9 +401,12 @@ test('E16: write pull_request sem git push é erro', () => {
 });
 
 test('E16: git push sem write pull_request é erro — a direção inversa', () => {
+  // deny já nega --force aqui de propósito: isolar a direção sob teste
+  // (write sem pull_request) da terceira perna (force-deny ausente),
+  // que tem teste próprio mais abaixo.
   const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
     read: ['repository'], write: ['code'],
-    execute: { allow: ['git push*'], deny: ['sudo *'] }, network: false } });
+    execute: { allow: ['git push*'], deny: ['git push --force*', 'sudo *'] }, network: false } });
   const e16 = validatePackage(pkg).errors.filter((e) => e.code === 'E16');
   assert.equal(e16.length, 1);
   assert.match(e16[0].message, /pull_request/);
@@ -412,6 +415,31 @@ test('E16: git push sem write pull_request é erro — a direção inversa', () 
 test('E16: os dois juntos passam', () => {
   const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
     read: ['repository'], write: ['code', 'pull_request'],
-    execute: { allow: ['git push*'], deny: ['sudo *'] }, network: false } });
+    execute: { allow: ['git push*'], deny: ['git push --force*', 'sudo *'] }, network: false } });
   assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E16'), []);
+});
+
+test('E16: git push sem deny de force é erro — a terceira perna', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code', 'pull_request'],
+    execute: { allow: ['git push*'], deny: ['sudo *'] }, network: false } });
+  const e16 = validatePackage(pkg).errors.filter((e) => e.code === 'E16');
+  assert.equal(e16.length, 1);
+  assert.match(e16[0].message, /force/);
+});
+
+test('E16: git push com deny de force é limpo — a terceira perna satisfeita', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code', 'pull_request'],
+    execute: { allow: ['git push*'], deny: ['git push --force*', 'sudo *'] }, network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E16'), []);
+});
+
+test('E16: npx gh pr create* sem write pull_request é erro — o runner não esconde o comando', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code'],
+    execute: { allow: ['npx gh pr create*'], deny: ['sudo *'] }, network: false } });
+  const e16 = validatePackage(pkg).errors.filter((e) => e.code === 'E16');
+  assert.ok(e16.some((e) => /pull_request/.test(e.message)),
+    JSON.stringify(e16, null, 2));
 });
