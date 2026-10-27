@@ -32,6 +32,36 @@ function pacote({ companyBudget = null, agents = [], gates = [] } = {}) {
 
 const codigos = (pkg) => validateGovernance(pkg).map((e) => e.code);
 
+// Pacote de um agente só, espelho de test/fixtures/pacote-minimo/ em
+// memória — para os testes de E15/W05, que só precisam de um papel com
+// capabilities.network e execute.allow controláveis, sem o resto do
+// aparato de `pacote()` acima (gates, hierarquia, orçamento).
+function pacoteMinimo({ slug, capabilities = {}, body = '' } = {}) {
+  return {
+    slug,
+    dir: null,
+    company: {
+      path: 'COMPANY.md',
+      frontmatter: { slug, license: 'MIT', metadata: { human_gates: [] } },
+      body: '',
+    },
+    agents: [{
+      path: `agents/${slug}/AGENTS.md`,
+      slug,
+      frontmatter: {
+        slug, reportsTo: null, skills: ['x'],
+        metadata: {
+          boundary: { can: ['ler'], cannot: [] },
+          capabilities,
+          persona: { display_name: 'N', icon: '🧪' },
+        },
+      },
+      body,
+    }],
+    skills: [], teams: [], tasks: [], projects: [], warnings: [], problems: [],
+  };
+}
+
 test('E06: papel sem boundary falha', () => {
   assert.ok(codigos(pacote({ agents: [{ slug: 'a', boundary: null }] })).includes('E06'));
 });
@@ -266,4 +296,65 @@ test('E05: um ciclo é reportado uma vez, não uma por nó', () => {
   }));
   const ciclos = erros.filter((e) => e.code === 'E05' && /ciclo/i.test(e.message));
   assert.equal(ciclos.length, 1, 'três nós, um ciclo, um erro');
+});
+
+test('E15: papel com comando de rede e network false é erro', () => {
+  const pkg = pacoteMinimo({
+    slug: 'coleta', capabilities: {
+      read: ['repository'], write: ['report'],
+      execute: { allow: ['curl -s*'], deny: ['sudo *'] },
+      network: false,
+    },
+  });
+  const { errors } = validatePackage(pkg);
+  const e15 = errors.filter((e) => e.code === 'E15');
+  assert.equal(e15.length, 1, JSON.stringify(errors, null, 2));
+  assert.match(e15[0].message, /curl -s\*/);
+});
+
+test('E15: papel que lê web e nega rede é erro', () => {
+  const pkg = pacoteMinimo({
+    slug: 'leitor', capabilities: {
+      read: ['repository', 'web'], write: ['report'],
+      execute: { allow: ['rg *'], deny: ['sudo *'] }, network: false,
+    },
+  });
+  assert.equal(validatePackage(pkg).errors.filter((e) => e.code === 'E15').length, 1);
+});
+
+test('E15: o mesmo papel com domínio declarado passa', () => {
+  const pkg = pacoteMinimo({
+    slug: 'coleta', capabilities: {
+      read: ['repository'], write: ['report'],
+      execute: { allow: ['curl -s*'], deny: ['sudo *'] },
+      network: ['api.exemplo.com.br'],
+    },
+  });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E15'), []);
+});
+
+test('W05: domínio + comando de rede sem a ressalva no corpo é aviso', () => {
+  const pkg = pacoteMinimo({
+    slug: 'coleta', capabilities: {
+      read: ['repository'], write: ['report'],
+      execute: { allow: ['curl -s*'], deny: ['sudo *'] },
+      network: ['api.exemplo.com.br'],
+    },
+    body: 'Você coleta evidência.\n',
+  });
+  const w = validatePackage(pkg).warnings.filter((x) => x.code === 'W05');
+  assert.equal(w.length, 1);
+  assert.match(w[0].message, /allowlist_scope/);
+});
+
+test('W05: com a ressalva no corpo, nenhum aviso', () => {
+  const pkg = pacoteMinimo({
+    slug: 'coleta', capabilities: {
+      read: ['repository'], write: ['report'],
+      execute: { allow: ['curl -s*'], deny: ['sudo *'] },
+      network: ['api.exemplo.com.br'],
+    },
+    body: 'No Claude Code a allowlist é fronteira de SO (`allowlist_scope: os`); no OpenCode V2 e no janus `kind=cli` é `fetch-only` e o `curl` escapa.\n',
+  });
+  assert.deepEqual(validatePackage(pkg).warnings.filter((x) => x.code === 'W05'), []);
 });

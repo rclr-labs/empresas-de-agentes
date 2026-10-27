@@ -15,26 +15,6 @@ function relatorio(nome) {
   return { pkg, ...validatePackage(pkg) };
 }
 
-// Lista NOMEADA de comandos capazes de rede usados neste acervo — derivada,
-// não enumerada do zero a cada achado. Esta é a quinta vez que o defeito
-// "enumerar em vez de derivar" aparece neste repo (achado Important 6 da
-// revisão da Fase F): o teste original só conhecia curl/wget/http, e por
-// isso não pegou `npm audit*` sem `network` declarada em
-// seguranca-ofensiva/cadeia-de-suprimentos. `npm audit` consulta a base de
-// advisory do registry por desenho — não há `npm audit` inteiramente
-// local. `semgrep` fica fora, apesar de aparecer no mesmo achado: a única
-// invocação deste acervo é `semgrep --config=./*` (regra local, ver
-// seguranca-ofensiva/revisao-de-codigo-seguro), e o padrão abaixo exclui
-// essa forma explicitamente — adicionar de volta um `semgrep` sem
-// `--config=./` em qualquer papel volta a casar, e quebra o teste.
-const COMANDOS_DE_REDE = [
-  /^curl\s/i,
-  /^wget\s/i,
-  /^http\s/i,
-  /^npm audit\b/i,
-  /^semgrep(?!\s+--config=\.\/)/i,
-];
-
 test('software-house: zero erro', () => {
   const { errors } = relatorio('software-house');
   assert.deepEqual(errors, [], errors.map((e) => `${e.code} ${e.where}: ${e.message}`).join('\n'));
@@ -256,32 +236,6 @@ test('todo papel que abre pull request consegue dar push, e vice-versa', () => {
       if (abrePR) {
         assert.ok(write.includes('pull_request'),
           `${nome}/${a.slug} tem git push ou gh pr create em execute.allow mas write não inclui pull_request — a metade legível por máquina nega o que a metade legível por humano concede`);
-      }
-    }
-  }
-});
-
-test('nenhum papel declara alcance que não tem', () => {
-  // Mesma classe de defeito do teste de pull_request acima, nas duas
-  // direções: ler "web" sem nenhum mecanismo de rede é alcance
-  // inalcançável; e um comando de rede em execute.allow com
-  // network: false é a contradição inversa — a capacidade promete
-  // silêncio e o comando promete saída. COMANDOS_DE_REDE é a lista
-  // nomeada no topo do arquivo — ver o comentário ali para o porquê de
-  // cada entrada.
-  for (const nome of listPackages(RAIZ)) {
-    for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      const cap = a.frontmatter.metadata?.capabilities ?? {};
-      const temRede = cap.network === true || (Array.isArray(cap.network) && cap.network.length > 0);
-      if ((cap.read ?? []).includes('web')) {
-        assert.ok(temRede,
-          `${nome}/${a.slug} lê "web" mas network é ${JSON.stringify(cap.network)} — não há mecanismo declarado para alcançar a rede`);
-      }
-      const allow = cap.execute?.allow ?? [];
-      const comandoDeRede = allow.find((g) => COMANDOS_DE_REDE.some((re) => re.test(g)));
-      if (comandoDeRede) {
-        assert.ok(temRede,
-          `${nome}/${a.slug} tem "${comandoDeRede}" em execute.allow mas network é ${JSON.stringify(cap.network)} — a capacidade nega a mesma rede que o comando usa`);
       }
     }
   }

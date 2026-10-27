@@ -59,6 +59,21 @@ function erro(code, rule, where, message) {
 }
 
 /**
+ * Comandos que alcançam a rede, derivados do que o acervo de fato usa.
+ * EXPORTADO de propósito: a vitrine valida no browser com esta mesma lista,
+ * e cópia de lista é como a guarda de alcance ficou cega para `npm audit`
+ * e `semgrep` até 2026-10-26. Uma lista, dois consumidores.
+ */
+export const COMANDOS_DE_REDE = Object.freeze([
+  /^curl\s/i, /^wget\s/i, /^http\s/i,
+  /^npm audit\b/i, /^semgrep(?!\s+--config=\.\/)/i,
+]);
+
+function temRede(cap) {
+  return cap.network === true || (Array.isArray(cap.network) && cap.network.length > 0);
+}
+
+/**
  * Todo arquivo carregado do pacote, numa lista só. Existe para que uma
  * regra que precisa varrer "o pacote inteiro" (hoje, E09) não tenha de
  * enumerar as coleções à mão — foi exatamente assim que o E09 ficou cego
@@ -322,6 +337,21 @@ export function validateGovernance(pkg) {
           `aprova "${gateId}", mas o signer desse portão é "${portao.signer}". approve significa "pode assinar": se quem assina é outra pessoa ou outro papel, este papel não aprova nada — remova o portão de approve, ou declare este papel como signer`));
       }
     }
+
+    // E15 — alcance declarado. Capacidade que nega a rede que o comando usa
+    // é fronteira que não existe: o operador lê "sem rede" e o processo sai.
+    const allow = cap.execute?.allow ?? [];
+    const cmdRede = allow.find((g) => COMANDOS_DE_REDE.some((re) => re.test(g)));
+    if (!temRede(cap)) {
+      if ((cap.read ?? []).includes('web')) {
+        erros.push(erro('E15', 'alcance-nao-declarado', where,
+          'lê "web" mas network é falso. Declare os domínios em capabilities.network, ou remova "web" de read'));
+      }
+      if (cmdRede) {
+        erros.push(erro('E15', 'alcance-nao-declarado', where,
+          `tem "${cmdRede}" em execute.allow mas network é falso — a capacidade nega a mesma rede que o comando usa. Declare o domínio, ou remova o comando`));
+      }
+    }
   }
 
   // E09 — segredo e caminho absoluto, em TODO arquivo do pacote.
@@ -354,6 +384,18 @@ export function validateWarnings(pkg) {
     if (!(agente.frontmatter?.skills ?? []).length) {
       avisos.push({ code: 'W04', path: agente.path,
         message: 'papel sem skills declaradas' });
+    }
+
+    // W05 — a ressalva de escopo. Aviso, não erro: o que falta é PROSA, e
+    // regra não julga prosa. Medido em 2026-10-25: a mesma allowlist é
+    // fronteira de SO no Claude Code e decoração no OpenCode V2 e no janus
+    // com provider kind=cli, onde o shell escapa.
+    const cap = meta.capabilities ?? {};
+    if (Array.isArray(cap.network) && cap.network.length > 0
+        && (cap.execute?.allow ?? []).some((g) => COMANDOS_DE_REDE.some((re) => re.test(g)))
+        && !/allowlist_scope/.test(agente.body ?? '')) {
+      avisos.push({ code: 'W05', path: agente.path,
+        message: 'declara allowlist de domínio e comando capaz de rede, e o corpo não traz a ressalva de allowlist_scope: no Claude Code a allowlist é fronteira de SO, no OpenCode V2 e no janus kind=cli é fetch-only e o comando escapa' });
     }
   }
   return avisos;
