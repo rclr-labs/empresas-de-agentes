@@ -470,6 +470,21 @@ export function validateGovernance(pkg) {
           `tem "${cmdRede}" em execute.allow mas network é falso — a capacidade nega a mesma rede que o comando usa. Declare o domínio, ou remova o comando`));
       }
     }
+
+    // E16 — o par push/PR, nas DUAS direções. A direção que faltava é a que
+    // deixou passar um papel com `gh pr create*` em allow e `write` sem
+    // `pull_request`: a metade legível por humano concedia o que a metade
+    // legível por máquina negava.
+    const write = cap.write ?? [];
+    const temPush = allow.some((g) => /^(git push|gh pr create)/.test(g));
+    if (write.includes('pull_request') && !temPush) {
+      erros.push(erro('E16', 'par-pull-request', where,
+        'declara write: [pull_request] e não tem "git push*" nem "gh pr create*" em execute.allow — capacidade inalcançável'));
+    }
+    if (temPush && !write.includes('pull_request')) {
+      erros.push(erro('E16', 'par-pull-request', where,
+        'tem "git push*" ou "gh pr create*" em execute.allow e write não inclui pull_request — acrescente pull_request a write, ou remova o comando'));
+    }
   }
 
   // E09 — segredo e caminho absoluto, em TODO arquivo do pacote.

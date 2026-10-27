@@ -275,7 +275,7 @@ Este catálogo é gerado a partir do código (`tools/rules.mjs` e
 qualquer erro, `0` se só houver avisos. Essa é a única garantia que o
 CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 
-### Erros (`E01`–`E15`) — reprovam o pacote
+### Erros (`E01`–`E16`) — reprovam o pacote
 
 | Código | Regra (`rule`) | O que rejeita | Consequência sem a regra |
 |---|---|---|---|
@@ -294,6 +294,7 @@ CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 | E13 | `portao-malformado` | `metadata.human_gates` que não é lista, ou uma entrada que não é string nem objeto com `id` válido | Antes desta regra, um gate sem `id` virava `undefined` no conjunto de ids, e produzia um E04 que acusa "portão não existe" quando a causa real é a declaração malformada do próprio portão |
 | E14 | `approve-discorda-do-signer` | `capabilities.approve` lista um gate cujo `human_gates[].signer` não é o próprio papel | `approve` significa "este papel pode assinar"; se o `signer` real é outra pessoa ou outro papel, a declaração é falsa — segurança decorativa do mesmo tipo que E04, só que com o portão existindo de fato |
 | E15 | `alcance-nao-declarado` | Capacidade nega a rede (`network` falso) que um comando de `execute.allow` usa (`COMANDOS_DE_REDE`, lista nomeada e exportada em `tools/rules.mjs`), ou `read` inclui `web` com `network` falso | A capacidade promete silêncio e o comando promete saída — contradição verificável entre dois campos declarados, não opinião sobre prosa |
+| E16 | `par-pull-request` | `capabilities.write` inclui `pull_request` sem `"git push*"` nem `"gh pr create*"` em `execute.allow`, OU `execute.allow` tem um desses comandos sem `write` incluir `pull_request` — nas duas direções | A metade legível por humano e a metade legível por máquina têm de nomear a mesma capacidade; achado real (2026-10-26): um papel tinha `gh pr create*` em `allow` e `write` sem `pull_request`, e só a direção antiga da checagem existia para pegar isso |
 
 ### Avisos (`W01`–`W05`) — não reprovam o pacote
 

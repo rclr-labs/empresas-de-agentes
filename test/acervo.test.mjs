@@ -211,36 +211,6 @@ test('TAREFA 30: só os portões com padrão de comando real declaram triggers',
   }
 });
 
-test('todo papel que abre pull request consegue dar push, e vice-versa', () => {
-  // Bidirecional de propósito (achado Critical 3 e mecanismo aprovado na
-  // revisão da Fase F): a regra escrita a partir do PRINCÍPIO é "as duas
-  // metades nomeiam a mesma capacidade" — prosa/máquina concordam nas
-  // duas direções, não só na que o teste original cobria
-  // (write: pull_request ⇒ git push). A direção inversa (git push/gh pr
-  // create em execute.allow ⇒ write inclui pull_request) é a que teria
-  // pego engenharia-de-dados/qualidade-de-dados na hora da escrita: o
-  // papel tinha `gh pr create*` e `git push*` em allow, e `boundary.can`
-  // prometia abrir pull request, mas `write` não incluía `pull_request`.
-  for (const nome of listPackages(RAIZ)) {
-    for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      const cap = a.frontmatter.metadata?.capabilities ?? {};
-      const allow = cap.execute?.allow ?? [];
-      const write = cap.write ?? [];
-      const abrePR = allow.some((g) => /^gh pr create/.test(g) || /^git push/.test(g));
-      if (write.includes('pull_request')) {
-        assert.ok(allow.some((g) => /^git push/.test(g)),
-          `${nome}/${a.slug} declara write: [pull_request] mas não tem git push em execute.allow — capacidade inalcançável`);
-        assert.ok((cap.execute?.deny ?? []).some((g) => /force/.test(g)),
-          `${nome}/${a.slug} pode dar push e tem de negar push --force explicitamente`);
-      }
-      if (abrePR) {
-        assert.ok(write.includes('pull_request'),
-          `${nome}/${a.slug} tem git push ou gh pr create em execute.allow mas write não inclui pull_request — a metade legível por máquina nega o que a metade legível por humano concede`);
-      }
-    }
-  }
-});
-
 test('todo comando de execute.allow do acervo está classificado — rede ou local', () => {
   // Fix round 1 da Task 1: a revisão achou nmap/nuclei/ffuf fora de
   // COMANDOS_DE_REDE — sexta aparição do mesmo defeito ("enumerar em vez

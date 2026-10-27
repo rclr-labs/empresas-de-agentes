@@ -392,3 +392,26 @@ test('W05: com a ressalva no corpo, nenhum aviso', () => {
   });
   assert.deepEqual(validatePackage(pkg).warnings.filter((x) => x.code === 'W05'), []);
 });
+
+test('E16: write pull_request sem git push é erro', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code', 'pull_request'],
+    execute: { allow: ['npm test*'], deny: ['sudo *'] }, network: false } });
+  assert.equal(validatePackage(pkg).errors.filter((e) => e.code === 'E16').length, 1);
+});
+
+test('E16: git push sem write pull_request é erro — a direção inversa', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code'],
+    execute: { allow: ['git push*'], deny: ['sudo *'] }, network: false } });
+  const e16 = validatePackage(pkg).errors.filter((e) => e.code === 'E16');
+  assert.equal(e16.length, 1);
+  assert.match(e16[0].message, /pull_request/);
+});
+
+test('E16: os dois juntos passam', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code', 'pull_request'],
+    execute: { allow: ['git push*'], deny: ['sudo *'] }, network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E16'), []);
+});
