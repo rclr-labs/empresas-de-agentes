@@ -302,15 +302,47 @@ const CLIENTES_SQL = Object.freeze(['psql', 'mysql', 'mariadb', 'sqlite3']);
 const VERBOS_DESTRUTIVOS = Object.freeze(['DROP', 'TRUNCATE', 'DELETE']);
 
 /**
- * Comando destrutivo representativo para `cliente` executando `grafia`
- * (`DROP`/`drop` etc.) — usado só para testar cobertura de `deny` via
- * `globCasa`, nunca executado. A forma exata (`-c "<verbo> table x"`) é
- * arbitrária; o que importa é começar com `cliente` (para casar
- * `cliente*`) e conter `grafia` na caixa exata recebida (para distinguir
- * cobertura de DROP de cobertura de drop).
+ * Comando destrutivo representativo, derivado do próprio padrão de `allow`
+ * que casou o cliente — não de uma flag fixa escolhida por esta função.
+ * Fix-round 2 desta tarefa (achado do revisor, 2026-10-27): a versão
+ * anterior cravava `-c` para TODO cliente, inclusive `mysql`, cuja forma
+ * real e idiomática no acervo é `-e`. Isso fazia um `deny` ancorado em `-e`
+ * (a forma correta para `allow: ["mysql -e*"]`) parecer incompleto, e um
+ * `deny` ancorado em `-c` (que esse `allow` nunca invoca) parecer
+ * cobertura — errado nas duas direções, e a segunda é exatamente a classe
+ * que esta regra existe para pegar, agora escondida dentro do mecanismo
+ * feito para detectá-la.
+ *
+ * Um mapa de flag por cliente (`psql` → `-c`, `mysql` → `-e`, ...) seria
+ * enumeração — a sexta desta fase — e cega de novo no primeiro papel que
+ * usar `psql --command*` ou `mariadb --execute*`. A fonte de verdade sobre
+ * a forma da invocação é o próprio `allow`: ele já diz como aquele papel
+ * chama o cliente. Esta função substitui o ÚLTIMO `*` do padrão pela
+ * sentença destrutiva — o ponto onde o próprio papel já declarou que
+ * varia:
+ *   "mysql -e*"      + "DROP TABLE x" → "mysql -e DROP TABLE x"
+ *   "psql --command*"+ "DROP TABLE x" → "psql --command DROP TABLE x"
+ *   "psql*"          + "DROP TABLE x" → "psql DROP TABLE x"
+ * Texto depois do último `*` (se houver) é preservado como sufixo literal
+ * — generaliza para `*` no MEIO do padrão, não só no fim; o acervo de hoje
+ * só usa `*` no fim para cliente SQL (confirmado por grep), mas a função
+ * não assume isso.
+ *
+ * Padrão SEM NENHUM `*`: devolve `null`. Decisão declarada, não escalada —
+ * um padrão totalmente literal (ex. `"psql -c 'select 1'"`) só pode
+ * invocar exatamente aquela string; não há wildcard nenhum onde injetar
+ * uma sentença destrutiva, e fabricar uma assumiria uma forma que o
+ * `allow` não declarou. Essa entrada específica fica fora da exigência de
+ * `deny` — se o mesmo cliente tiver OUTRA entrada em `allow` com `*`, essa
+ * outra continua exigindo o trio normalmente.
  */
-function comandoRepresentativo(cliente, grafia) {
-  return `${cliente} -c "${grafia} table x"`;
+function comandoRepresentativo(padraoAllow, sentenca) {
+  const i = padraoAllow.lastIndexOf('*');
+  if (i === -1) return null;
+  const prefixo = padraoAllow.slice(0, i);
+  const sufixo = padraoAllow.slice(i + 1);
+  const espaco = prefixo.length > 0 && !/\s$/.test(prefixo) ? ' ' : '';
+  return `${prefixo}${espaco}${sentenca}${sufixo}`;
 }
 
 function temRede(cap) {
@@ -680,23 +712,43 @@ export function validateGovernance(pkg) {
     // pedido, mas cobertura real) passar limpo — a versão por token o
     // reprovaria.
     //
-    // O verbo — DROP vs drop — é comparado na caixa exata em que aparece em
-    // `comandoRepresentativo`: é isso que mantém a distinção de grafia que
-    // esta regra existe para forçar (ver E17 em `SCHEMA.md`).
+    // Fix-round 2 (achado do revisor, 2026-10-27): o representativo é
+    // construído a partir de CADA ENTRADA de `allow` que casa o cliente
+    // (depois de descascar runner), não do nome do cliente sozinho — ver
+    // `comandoRepresentativo` para a razão (cravar uma flag fixa, mesmo
+    // que plausível como `-c`, teria feito `mysql -e*` exigir cobertura na
+    // flag errada). Um cliente com duas entradas de forma diferente em
+    // `allow` (ex. `"psql -c*"` e `"psql --command*"`) tem cada entrada
+    // verificada separadamente — `deny` tem de cobrir a forma que CADA
+    // entrada de fato invoca, não só uma delas.
+    //
+    // O verbo — DROP vs drop — é comparado na caixa exata em que aparece na
+    // sentença: é isso que mantém a distinção de grafia que esta regra
+    // existe para forçar (ver E17 em `SCHEMA.md`).
     const deny = listaDeTexto(cap.execute?.deny);
     for (const cliente of CLIENTES_SQL) {
-      if (!allow.some((g) => descascarRunner(g).toLowerCase().startsWith(cliente))) continue;
-      const faltando = [];
-      for (const verbo of VERBOS_DESTRUTIVOS) {
-        for (const grafia of [verbo, verbo.toLowerCase()]) {
-          const representativo = comandoRepresentativo(cliente, grafia);
-          const coberto = deny.some((d) => globCasa(d, representativo));
-          if (!coberto) faltando.push(`${cliente}*${grafia}*`);
+      const entradas = allow
+        .map((g) => descascarRunner(g))
+        .filter((g) => g.toLowerCase().startsWith(cliente));
+      if (entradas.length === 0) continue;
+      const faltando = new Set();
+      for (const entrada of entradas) {
+        for (const verbo of VERBOS_DESTRUTIVOS) {
+          for (const grafia of [verbo, verbo.toLowerCase()]) {
+            const tabela = grafia === verbo ? 'TABLE' : 'table';
+            const representativo = comandoRepresentativo(entrada, `${grafia} ${tabela} x`);
+            // Entrada sem nenhum `*`: não há onde injetar a sentença — ver
+            // decisão declarada em `comandoRepresentativo`. Essa entrada
+            // específica não gera exigência de deny.
+            if (representativo === null) continue;
+            const coberto = deny.some((d) => globCasa(d, representativo));
+            if (!coberto) faltando.add(`${cliente}*${grafia}*`);
+          }
         }
       }
-      if (faltando.length) {
+      if (faltando.size) {
         erros.push(erro('E17', 'deny-de-sql-incompleto', where,
-          `permite "${cliente}" em execute.allow e o deny não cobre ${faltando.join(', ')} — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias, como glob que de fato casa o comando`));
+          `permite "${cliente}" em execute.allow e o deny não cobre ${[...faltando].join(', ')} — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias, como glob que de fato casa a forma que o allow invoca`));
       }
     }
   }

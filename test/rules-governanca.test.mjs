@@ -542,3 +542,34 @@ test('E17: deny "psql*" sozinho cobre o trio por ser mais largo — cobertura po
     execute: { allow: ['psql -c*'], deny: ['psql*', 'sudo *'] }, network: false } });
   assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
 });
+
+// Fix-round 2 (achado do revisor, 2026-10-27): o representativo cravava a
+// flag `-c` para TODO cliente, inclusive `mysql`, cuja forma real no
+// acervo é `-e`. Os dois testes abaixo são o repro exato, nas duas
+// direções: `deny` ancorado numa flag que o `allow` real nunca invoca
+// (`-c`, quando o `allow` é `-e`) tem de ser acusado; `deny` ancorado na
+// flag que o `allow` de fato usa (`-e`) tem de passar limpo.
+test('E17: allow "mysql -e*" com deny ancorado em "-c" é erro — a flag errada não cobre nada', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['mysql -e*'], deny: [
+      'mysql -c*DROP*', 'mysql -c*drop*', 'mysql -c*TRUNCATE*',
+      'mysql -c*truncate*', 'mysql -c*DELETE*', 'mysql -c*delete*',
+      'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1,
+    `o deny está ancorado em "-c", mas o allow real é "-e" — nenhum dos padrões casa a invocação de verdade: ${JSON.stringify(e17, null, 2)}`);
+  assert.match(e17[0].message, /mysql/);
+});
+
+test('E17: allow "mysql -e*" com deny ancorado em "-e" passa limpo — a flag certa cobre', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['mysql -e*'], deny: [
+      'mysql -e*DROP*', 'mysql -e*drop*', 'mysql -e*TRUNCATE*',
+      'mysql -e*truncate*', 'mysql -e*DELETE*', 'mysql -e*delete*',
+      'sudo *'] },
+    network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});
