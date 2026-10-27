@@ -256,6 +256,40 @@ test('W03: papel sem persona avisa, não falha', () => {
   assert.ok(!errors.some((e) => e.code.startsWith('E')) || errors.length === 0);
 });
 
+// W03 — ruling de 2026-10-27 (fix-round 1 da Task 4): existência de `icon`
+// e `pronouns` é degradação de vitrine, não defeito de governança — mesma
+// classe de `display_name` ausente, que já era W03 antes desta tarefa.
+// E18 cobre só o que está DECLARADO e está ERRADO (ASCII, 3 linhas, corpo);
+// nunca existência.
+test('W03: persona sem icon avisa, não é E18', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' } });
+  const { errors, warnings } = validatePackage(pkg);
+  assert.deepEqual(errors.filter((e) => e.code === 'E18'), []);
+  assert.ok(warnings.some((w) => w.code === 'W03' && /icon/.test(w.message)));
+});
+
+test('W03: persona sem pronouns avisa, não é E18', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' } });
+  const { errors, warnings } = validatePackage(pkg);
+  assert.deepEqual(errors.filter((e) => e.code === 'E18'), []);
+  assert.ok(warnings.some((w) => w.code === 'W03' && /pronouns/.test(w.message)));
+});
+
+test('W03: persona completa (display_name, icon, pronouns) não avisa', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', persona: {
+    display_name: 'Joao Silva', icon: '🔧', pronouns: 'ele/dele',
+    headline: 'Escreve código', background: ['a', 'b', 'c'],
+    signature_question: 'E se faltar?' } });
+  const { warnings } = validatePackage(pkg);
+  assert.deepEqual(warnings.filter((w) => w.code === 'W03'), []);
+});
+
 test('W04: papel sem skills avisa', () => {
   const { warnings } = validatePackage(pacote({ agents: [{ slug: 'a', skills: [] }] }));
   assert.ok(warnings.some((w) => w.code === 'W04'));

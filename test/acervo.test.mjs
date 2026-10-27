@@ -82,25 +82,6 @@ test('software-house: nenhum papel de dev amarra stack no slug', () => {
   }
 });
 
-test('todo pacote do acervo: toda persona tem nome, ícone, pronomes e histórico de 3 linhas', () => {
-  // Era só software-house (achado Important 7 da revisão da Fase F): os
-  // 20 papéis novos em cinco pacotes novos ficavam sem esta guarda. E o
-  // limiar de `background` sobe de ">= 2" para "== 3", que é a regra
-  // escrita do plano (fase-f-constraints.md, regra 4 de persona).
-  for (const nome of listPackages(RAIZ)) {
-    for (const a of loadPackage(join(RAIZ, nome)).agents) {
-      const p = a.frontmatter.metadata.persona;
-      assert.ok(p.display_name, `${nome}/${a.slug} sem display_name`);
-      assert.ok(p.icon, `${nome}/${a.slug} sem icon`);
-      assert.ok(p.pronouns, `${nome}/${a.slug} sem pronouns`);
-      assert.match(p.display_name, /^[A-Za-z][A-Za-z ]+$/,
-        `${nome}/${a.slug}: "${p.display_name}" tem diacrítico ou caractere não-ASCII. O nome tem de funcionar em pt-BR e em inglês`);
-      assert.ok(Array.isArray(p.background) && p.background.length === 3,
-        `${nome}/${a.slug} precisa de exatamente 3 linhas de histórico, tem ${p.background?.length ?? 0}`);
-    }
-  }
-});
-
 test('todo pacote do acervo: ícone único entre os declarados', () => {
   // Considera só ícone DECLARADO. Um agente ainda não migrado não tem
   // persona, logo `icon` é undefined — e sem o filtro, dois agentes sem

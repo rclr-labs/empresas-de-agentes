@@ -952,9 +952,26 @@ export function validateWarnings(pkg) {
   const avisos = [...(pkg.warnings ?? [])];
   for (const agente of pkg.agents) {
     const meta = agente.frontmatter?.metadata ?? {};
+    // W03 — persona incompleta. Aviso, não erro: o papel continua válido,
+    // a fronteira continua intacta — só o card da vitrine fica pobre.
+    // Ruling de 2026-10-27 (coordenador, fix-round 1 da Task 4): existência
+    // de `icon` e `pronouns` entra aqui, ao lado de `display_name`, pela
+    // mesma razão que `display_name` ausente já era aviso — degradação da
+    // vitrine, não defeito de governança. `E18` fica só para o que está
+    // DECLARADO e está ERRADO (ASCII, contagem de linhas, vazamento no
+    // corpo); persona ausente ou incompleta nunca é E18, mesmo que isso
+    // reprovasse pacote de terceiro que não se importa com esta vitrine.
     if (!meta.persona?.display_name) {
       avisos.push({ code: 'W03', path: agente.path,
         message: 'papel sem metadata.persona.display_name; o Studio vai mostrar o slug' });
+    }
+    if (meta.persona && !meta.persona.icon) {
+      avisos.push({ code: 'W03', path: agente.path,
+        message: 'papel sem metadata.persona.icon; o card da vitrine fica sem ícone' });
+    }
+    if (meta.persona && !meta.persona.pronouns) {
+      avisos.push({ code: 'W03', path: agente.path,
+        message: 'papel sem metadata.persona.pronouns; o card da vitrine fica sem pronome' });
     }
     if (!(agente.frontmatter?.skills ?? []).length) {
       avisos.push({ code: 'W04', path: agente.path,
