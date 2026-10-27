@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { loadPackage, listPackages } from '../tools/schema.mjs';
-import { validatePackage, validateAcervo, COMANDOS_DE_REDE, COMANDOS_LOCAIS, descascarRunner } from '../tools/rules.mjs';
+import { validatePackage, validateAcervo, COMANDOS_DE_REDE, COMANDOS_LOCAIS, descascarRunner, RUNNERS } from '../tools/rules.mjs';
 import { applyBinding } from '../tools/bindings.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -194,6 +194,52 @@ test('todo comando de execute.allow do acervo está classificado — rede ou loc
   }
   assert.deepEqual(naoClassificados, [],
     `comando(s) de execute.allow sem classificação em COMANDOS_DE_REDE nem COMANDOS_LOCAIS:\n${naoClassificados.join('\n')}`);
+});
+
+test('nenhum papel declara curinga de runner puro em execute.allow — Task 8, fix-round 1', () => {
+  // A Task 8 estreitou `npx *` em cinco papéis (vitrine-fase-1-acervo),
+  // mas a medição pós-commit do coordenador (fix-round 1) achou três
+  // curingas de runner puro fora do escopo original: `npx *` em
+  // `fabrica-de-testes/api-funcional` (excluído de propósito — declara
+  // domínio) e `npm *` em `engenharia-de-dados/pipeline-de-dados` e
+  // `plataforma-e-operacao/plataforma-e-entrega` (nunca medidos, porque
+  // a issue original só olhava `npx`). SCHEMA.md agora afirma que
+  // curinga de runner não é fronteira — um papel publicado com curinga
+  // puro contradiz esse princípio documentado, a mesma classe de defeito
+  // que foi Critical na revisão da Fase F (COMPANY.md afirmando algo que
+  // um papel publicado desmentia). Este teste fecha o ciclo: sem ele,
+  // nada impede o curinga de voltar no próximo papel novo.
+  //
+  // "Curinga de runner puro" = o padrão, depois de descascar o prefixo
+  // de RUNNERS (`npx`, `pnpm dlx`, `yarn dlx`, `bunx`, `pipx run`, `uvx`,
+  // `dotnet run --`), não sobra nome de comando nenhum — só espaço e/ou
+  // `*`. `npm` bare entra pela MESMA razão mesmo não estando em RUNNERS
+  // (não é um runner que carrega outro comando, mas o problema de fundo
+  // é idêntico: qualquer subcomando do ecossistema, sem nome nenhum
+  // declarado) — por isso soma-se a RUNNERS aqui, em vez de reescrever a
+  // lista: `tools/rules.mjs` já é a fonte única dos prefixos de runner,
+  // e copiar essa lista à mão é exatamente o defeito ("enumerar em vez
+  // de derivar") que esta fase caçou o dia inteiro.
+  const PREFIXOS_CURINGA = [...RUNNERS, /^npm\s+/i];
+  const curingasPuros = [];
+  for (const nome of listPackages(RAIZ)) {
+    for (const a of loadPackage(join(RAIZ, nome)).agents) {
+      const allow = a.frontmatter.metadata?.capabilities?.execute?.allow ?? [];
+      for (const padrao of allow) {
+        for (const prefixo of PREFIXOS_CURINGA) {
+          const m = padrao.match(prefixo);
+          if (!m) continue;
+          const resto = padrao.slice(m[0].length);
+          if (/^[\s*]*$/.test(resto)) {
+            curingasPuros.push(`${nome}/${a.slug}: "${padrao}"`);
+          }
+          break;
+        }
+      }
+    }
+  }
+  assert.deepEqual(curingasPuros, [],
+    `curinga de runner puro em execute.allow — SCHEMA.md diz que isso não é fronteira; nomeie o comando ou documente a exceção no corpo do papel:\n${curingasPuros.join('\n')}`);
 });
 
 test('fabrica-de-testes: zero erro', () => {

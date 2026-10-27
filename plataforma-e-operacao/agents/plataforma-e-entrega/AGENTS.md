@@ -36,7 +36,7 @@ metadata:
     read: [repository, documentation]
     write: [code, documentation, pull_request]
     execute:
-      allow: ["terraform plan*", "terraform validate*", "terraform fmt*", "helm template*", "helm lint*", "kubectl diff*", "docker build*", "npm *", "git add*", "git commit*", "git push*", "git diff*", "gh pr create*"]
+      allow: ["terraform plan*", "terraform validate*", "terraform fmt*", "helm template*", "helm lint*", "kubectl diff*", "docker build*", "git add*", "git commit*", "git push*", "git diff*", "gh pr create*"]
       deny: ["terraform apply*", "terraform destroy*", "helm upgrade*", "kubectl apply*", "kubectl delete*", "docker push*", "git push --force*", "git merge*", "sudo *"]
     network: false
     delegate: []

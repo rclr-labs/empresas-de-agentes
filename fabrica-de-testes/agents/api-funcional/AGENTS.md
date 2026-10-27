@@ -36,7 +36,7 @@ metadata:
     read: [repository, documentation, test_evidence, web]
     write: [test_evidence, report]
     execute:
-      allow: ["npm test*", "npx *", "curl -s*", "psql -c*"]
+      allow: ["npm test*", "curl -s*", "psql -c*"]
       deny: ["kubectl *", "helm *", "terraform *", "sudo *", "git push*", "git commit*", "psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*"]
     network: ["api-staging.exemplo.com.br"]
     delegate: []
