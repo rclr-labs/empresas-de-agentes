@@ -9,12 +9,20 @@ name: avisa a vitrine
 on:
   push:
     branches: [main]
-    paths:
-      # Só o que muda o catálogo derivado. Mexer em docs/ ou no README não
-      # republica a vitrine — sino que toca sem motivo é sino que se ignora.
-      - 'pacotes/**'
-      - 'bindings/**'
-      - 'tools/catalog.mjs'
+    # Filtro por EXCLUSÃO, de propósito. Os pacotes são diretórios da RAIZ
+    # (software-house/, fabrica-de-testes/, …), não vivem sob um prefixo
+    # comum — então listar o que dispara significaria enumerar os 8, e o
+    # nono pacote nasceria fora do filtro, em silêncio. Listar o que NÃO
+    # dispara é uma lista curta e estável, e pacote novo entra sozinho.
+    #
+    # (Escrevi este filtro como 'pacotes/**' na primeira versão, contra uma
+    # estrutura que eu supus em vez de olhar. Nunca teria disparado.)
+    paths-ignore:
+      - 'docs/**'
+      - 'test/**'
+      - '.github/**'
+      - 'README.md'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions: {}

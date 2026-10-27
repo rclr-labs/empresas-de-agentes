@@ -1,8 +1,8 @@
 runtime: paperclip
 source: >-
   IDENTIDADE, re-lida em 2026-10-25 contra
-  /Users/rafaelnc/apps/paperclip/docs/companies/companies-spec.md
-  (checkout local de rclr-labs/paperclip, versão `agentcompanies/v1-draft`).
+  rclr-labs/paperclip, em docs/companies/companies-spec.md
+  (versão `agentcompanies/v1-draft`).
   A emissão copia o pacote byte a byte — isso não mudou. O que a leitura
   corrigiu é a afirmação de "zero perda": ela era verdadeira só por
   confundir SOBREVIVER NO ARQUIVO com SER APLICADO PELO RUNTIME. A spec
