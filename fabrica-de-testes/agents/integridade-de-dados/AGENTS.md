@@ -35,7 +35,7 @@ metadata:
     write: [test_evidence, report]
     execute:
       allow: ["npm test*", "psql -c*", "mysql -e*"]
-      deny: ["kubectl *", "helm *", "terraform *", "sudo *", "git push*", "psql*DROP*", "mysql*DROP*"]
+      deny: ["kubectl *", "helm *", "terraform *", "sudo *", "git push*", "psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*", "mysql*DROP*", "mysql*drop*", "mysql*TRUNCATE*", "mysql*truncate*", "mysql*DELETE*", "mysql*delete*"]
     network: false
     delegate: []
     budget:

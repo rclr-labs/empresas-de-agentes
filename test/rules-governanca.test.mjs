@@ -460,3 +460,54 @@ test('E16: só "gh pr create*" sem "git push*" não recebe a terceira perna (for
   // comando já está presente em allow, então nenhum E16 deveria sobrar.
   assert.deepEqual(e16, []);
 });
+
+test('E17: cliente SQL sem nenhum deny é erro', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*'], deny: ['sudo *'] }, network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1);
+  assert.match(e17[0].message, /psql/);
+});
+
+test('E17: deny só em maiúscula é erro — SQL não é sensível a caixa', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*'],
+      deny: ['psql*DROP*', 'psql*TRUNCATE*', 'psql*DELETE*', 'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1, 'a grafia minúscula não está coberta');
+  assert.match(e17[0].message, /minúscula|lowercase|drop/i);
+});
+
+test('E17: trio completo nas duas caixas passa', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*'], deny: [
+      'psql*DROP*', 'psql*drop*', 'psql*TRUNCATE*', 'psql*truncate*',
+      'psql*DELETE*', 'psql*delete*', 'sudo *'] },
+    network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});
+
+test('E17: dois clientes no allow exigem o trio para cada um', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*', 'mysql -e*'], deny: [
+      'psql*DROP*', 'psql*drop*', 'psql*TRUNCATE*', 'psql*truncate*',
+      'psql*DELETE*', 'psql*delete*', 'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1);
+  assert.match(e17[0].message, /mysql/);
+});
+
+test('E17: cliente SQL atrás de runner exige o mesmo trio — o runner não esconde o comando', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['npx psql -c*'], deny: ['sudo *'] }, network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1);
+  assert.match(e17[0].message, /psql/);
+});

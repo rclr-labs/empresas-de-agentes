@@ -43,7 +43,7 @@ metadata:
     write: [code, test_evidence, pull_request]
     execute:
       allow: ["npm *", "npx *", "mvn *", "gradle *", "composer *", "pip *", "dotnet *", "git add*", "git commit*", "git push*", "git diff*", "git log*", "gh pr create*", "psql -c*", "mysql -e*"]
-      deny: ["git push --force*", "git merge*", "kubectl *", "helm *", "terraform *", "sudo *", "psql*DROP*", "mysql*DROP*"]
+      deny: ["git push --force*", "git merge*", "kubectl *", "helm *", "terraform *", "sudo *", "psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*", "mysql*DROP*", "mysql*drop*", "mysql*TRUNCATE*", "mysql*truncate*", "mysql*DELETE*", "mysql*delete*"]
     network: false
     delegate: []
     budget:

@@ -37,7 +37,7 @@ metadata:
     write: [test_evidence, report]
     execute:
       allow: ["npm test*", "npx *", "curl -s*", "psql -c*"]
-      deny: ["kubectl *", "helm *", "terraform *", "sudo *", "git push*", "git commit*", "psql*DROP*"]
+      deny: ["kubectl *", "helm *", "terraform *", "sudo *", "git push*", "git commit*", "psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*"]
     network: ["api-staging.exemplo.com.br"]
     delegate: []
     budget:

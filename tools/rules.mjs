@@ -270,6 +270,11 @@ export function descascarRunner(padrao) {
   return padrao;
 }
 
+// Clientes de SQL cujo `deny` precisa do trio DROP/TRUNCATE/DELETE nas duas
+// grafias — ver E17 em `validateGovernance`.
+const CLIENTES_SQL = Object.freeze(['psql', 'mysql', 'mariadb', 'sqlite3']);
+const VERBOS_DESTRUTIVOS = Object.freeze(['DROP', 'TRUNCATE', 'DELETE']);
+
 function temRede(cap) {
   return cap.network === true || (Array.isArray(cap.network) && cap.network.length > 0);
 }
@@ -602,6 +607,49 @@ export function validateGovernance(pkg) {
     if (temPushGit && !listaDeTexto(cap.execute?.deny).some((g) => /force/i.test(g))) {
       erros.push(erro('E16', 'par-pull-request', where,
         'tem "git push*" em execute.allow e execute.deny não nega "--force" — acrescente um padrão como "git push --force*" a deny'));
+    }
+
+    // E17 — deny de SQL completo. Duas lições de 2026-10-26: `mysql -e*`
+    // ficou permitido com zero deny de mysql, e `psql*DROP*` não bloqueava
+    // `psql -c "drop table users"` — o deny protegia a grafia que ninguém
+    // usa. O deny é defesa em profundidade; a fronteira real é o portão
+    // humano. Mas defesa que cobre só metade da grafia é pior que nenhuma,
+    // porque parece cobertura.
+    //
+    // A detecção do cliente atravessa `descascarRunner`, como E15 e E16:
+    // hoje nenhum papel do acervo roda SQL via runner, mas `npx prisma db
+    // execute*` e análogos existem no mundo, e classificar pelo padrão cru
+    // em vez do comando real foi exatamente a lacuna que a Task 1 fechou em
+    // dois rounds para COMANDOS_DE_REDE/LOCAIS. Aplicar o mesmo descascador
+    // aqui é no-op para todo padrão de hoje.
+    //
+    // `deny` usa `listaDeTexto`, não `cap.execute?.deny ?? []`: o dado cru
+    // pode ter item não-string (E19 já cobre o relato; aqui só não se pode
+    // quebrar `.some` sobre ele).
+    //
+    // A cobertura por grafia é verificada em CASO ORIGINAL (`d.includes(grafia)`),
+    // não após `.toLowerCase()` dos dois lados — essa foi a armadilha do
+    // rascunho inicial desta regra: baixar a caixa de `padrao` E de `deny`
+    // antes de comparar faz "DROP" e "drop" colapsarem no mesmo texto, e um
+    // único `psql*DROP*` passava a "cobrir" a grafia minúscula que nunca
+    // apareceu — o próprio defeito que esta regra existe para impedir,
+    // escondido dentro da checagem que deveria pegá-lo. Só o prefixo do
+    // cliente é comparado sem caixa (`d.toLowerCase().startsWith(cliente)`);
+    // o verbo — DROP vs drop — é comparado como está escrito.
+    const deny = listaDeTexto(cap.execute?.deny);
+    for (const cliente of CLIENTES_SQL) {
+      if (!allow.some((g) => descascarRunner(g).toLowerCase().startsWith(cliente))) continue;
+      const faltando = [];
+      for (const verbo of VERBOS_DESTRUTIVOS) {
+        for (const grafia of [verbo, verbo.toLowerCase()]) {
+          const coberto = deny.some((d) => d.toLowerCase().startsWith(cliente) && d.includes(grafia));
+          if (!coberto) faltando.push(`${cliente}*${grafia}*`);
+        }
+      }
+      if (faltando.length) {
+        erros.push(erro('E17', 'deny-de-sql-incompleto', where,
+          `permite "${cliente}" em execute.allow e o deny não cobre ${faltando.join(', ')} — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias`));
+      }
     }
   }
 
