@@ -425,6 +425,36 @@ doc=$(grep -ohE "[EWA][0-9]{2}" SCHEMA.md | sort -u)
 diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
 ```
 
+### Limites declarados das guardas de comando (`E15`, `E17`)
+
+Os dois limites abaixo falham para o lado SEGURO no acervo de hoje, e
+estão escritos aqui porque quem triar um pacote de TERCEIRO — ou o editor
+da Fase 2, que roda `rules.mjs` isolado no navegador — vai encontrar o
+sintoma sem ter a explicação.
+
+- **`globCasa` trata `?` e `[...]` como literal, não como curinga.** O
+  helper implementa a semântica de glob que o hook emitido por
+  `tools/writers.mjs` usa de fato, mas só a parte de `*` (zero ou mais
+  caracteres, âncora nas duas pontas, sensível a caixa). Medido:
+  `globCasa('psql -?', 'psql -c')` é `false`, enquanto
+  `globCasa('psql -*', 'psql -c')` é `true`. Nenhum padrão do acervo usa
+  `?` ou `[...]`. A falha é no lado seguro — SUBcredita a cobertura de
+  `deny`, então acusa um `E17` que talvez já estivesse coberto —, mas é um
+  `E17` de aparência espúria para quem escreveu `deny: ["psql -?"]`
+  achando que cobria.
+- **`E15` compara o comando pelo PREFIXO cru da entrada de
+  `execute.allow`, sem normalizar caminho, envoltório nem espaço à
+  esquerda.** Medido com `network: false`: `curl -s*` e `CURL -S*`
+  disparam `E15` corretamente; `/usr/bin/curl -s*`, `env curl -s*`,
+  `sudo curl -s*` e `  curl -s*` (dois espaços antes) **não** disparam. O
+  acervo está protegido por outra via — o teste de derivação de
+  `test/acervo.test.mjs` fica vermelho nos três, exigindo que todo comando
+  de `execute.allow` esteja classificado em `COMANDOS_DE_REDE` ou
+  `COMANDOS_LOCAIS` —, então a lacuna existe para `rules.mjs` ISOLADO: o
+  editor da Fase 2 e o pacote de terceiro. A correção geral é normalização
+  de prefixo de comando, que é **decisão nova** e não foi tomada nesta
+  onda.
+
 ### Regra de forma do `catalog.json`: derive do artefato, não enumere
 
 O catálogo que a vitrine consome (`tools/catalog.mjs`) copia o frontmatter
