@@ -37,7 +37,7 @@ metadata:
     read: [repository, documentation]
     write: [code, test_evidence, pull_request]
     execute:
-      allow: ["npm *", "npx *", "yarn *", "pnpm *", "git add*", "git commit*", "git push*", "git diff*", "git log*", "gh pr create*"]
+      allow: ["npm install*", "npm ci*", "npm test*", "npm run*", "npx vitest*", "npx jest*", "yarn *", "pnpm *", "git add*", "git commit*", "git push*", "git diff*", "git log*", "gh pr create*"]
       deny: ["git push --force*", "git merge*", "psql*", "mysql*", "kubectl *", "helm *", "terraform *", "sudo *"]
     network: false
     delegate: []
@@ -85,6 +85,11 @@ caminho feliz com dado bonito.
    Alegação de sucesso sem evidência é a falha mais cara desta operação.
 
 ## Fronteira que importa
+
+`npm run` continua liberado porque lint e build de interface rodam por
+script — mas o script que `npm run` dispara é o `package.json` **do
+repositório** quem define, não esta lista: o limite real de `npm run` é
+sempre o do projeto, não o nosso.
 
 Você não altera schema de banco nem migração — isso não é interface. Você
 não faz merge do seu próprio PR, e nunca commita segredo, chave ou

@@ -299,6 +299,17 @@ CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 | E18 | `persona-invalida` | Para cada papel com `metadata.persona` declarada, três invariantes verificáveis DENTRO do pacote, todos sobre o que está DECLARADO: `display_name` com caractere fora de `[A-Za-z ]` (acento, diacrítico, símbolo); `background`, quando EXISTE (`isListaDeTextoValida`), que não tem exatamente 3 linhas; ou o corpo do agente (`AGENTS.md`) contendo o `display_name` por extenso | `display_name` tem de funcionar em pt-BR e em inglês — acento quebra isso. `background` declarado com menos de 3 linhas perde a linha que funciona como cicatriz, a que faz o modelo seguir a regra quando ela custa; cada linha extra além de 3 é zelo que a vitrine não pede. O corpo nunca menciona o `display_name`: o papel é o papel, não a pessoa, e o nome no prompt custa token em toda chamada sem servir ao modelo — só serve ao humano e à vitrine, fora do corpo. Verifica tipo antes de conteúdo: `display_name`/`background` com TIPO errado (número, string no lugar de lista) é `E19`, não `E18` — ver `verificarTiposDePersona`. Unicidade de ícone, nome e sobrenome ENTRE pacotes é invariante de acervo, não de pacote — fica para `validateAcervo(pkgs)` (Task 5); `validatePackage(pkg)` recebe um pacote só e não pode decidir unicidade global. **A divisão com `W03`:** E18 é o que está DECLARADO e está ERRADO (o papel mente sobre si); AUSÊNCIA de `display_name`/`icon`/`pronouns`/`background` nunca é E18 — isso é `W03`, persona incompleta, degradação de vitrine, não defeito de governança. `background` entrou nesse lado da divisão no ruling de 2026-10-27 (fix-round 2): a persona não entra no prompt, exceto `signature_question` — `background` custa token sem mudar comportamento, então sua ausência é card pobre, não mentira sobre si |
 | E19 | `tipo-de-campo-invalido` | Campo de `capabilities` com tipo diferente do esperado: `read`/`write`/`delegate`/`approve` que não é lista de texto; `execute` que não é objeto, ou `execute.allow`/`execute.deny` que não é lista de texto; `network` que não é `true`, `false` nem lista de texto; `budget` que não é objeto. Desde E18, também `metadata.persona.display_name` que não é texto, e `metadata.persona.background` que não é lista de texto | O validador roda no navegador, sobre o que o editor está digitando — tipo errado é o caso ESPERADO ali, não exceção. Antes desta regra, campo de tipo errado derrubava o validador com `TypeError` (`padrao.match`, `allow.find`, "not iterable") em vez de reprovar o pacote, e no caso de `write` como string nem derrubava: produzia uma dúzia de `E02` espúrios, um por caractere, porque `for...of` itera string. Falhar aberto num validador que roda sobre conteúdo em edição é tela branca com stack; E19 falha fechado, com mensagem nomeada |
 
+### Decisão: curinga de runner não é fronteira
+
+`npx *` (e, pela mesma razão, `npm *` sem subcomando) não declara nada —
+abre qualquer ferramenta do ecossistema que o runner carregar, contornando
+toda guarda por comando nomeado (`COMANDOS_DE_REDE`/`COMANDOS_LOCAIS`,
+`E15`, `E17`). Decisão de 2026-10-27 (Task 8, issue
+`rclr-labs/empresas-de-agentes#1`): papel declara os comandos que de fato
+usa, e `npm run` — quando mantido — é limitado pelo `package.json` do
+repositório adotante, não por esta lista; essa dívida é nomeada no corpo
+do papel, não escondida.
+
 ### Avisos (`W01`–`W05`) — não reprovam o pacote
 
 | Código | O que sinaliza | Consequência de ignorar |

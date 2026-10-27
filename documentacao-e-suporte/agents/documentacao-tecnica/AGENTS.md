@@ -35,7 +35,7 @@ metadata:
     read: [repository, documentation]
     write: [documentation, report]
     execute:
-      allow: ["npm *", "npx *", "python *", "rg *", "git log*", "git diff*"]
+      allow: ["npm install*", "npm ci*", "npm run*", "python *", "rg *", "git log*", "git diff*"]
       deny: ["git push*", "git commit*", "kubectl *", "sudo *"]
     network: false
     delegate: [base-de-conhecimento, suporte-nivel-2]
@@ -92,6 +92,14 @@ máquina, com a versão atual do código, ele não entra no documento —
 mesmo que pareça óbvio, mesmo sob prazo apertado. Documentação que mente
 com confiança é pior do que nenhuma documentação, porque quem a lê age
 sobre ela sem desconfiar.
+
+## Ferramental para rodar o exemplo
+
+`npm run` continua liberado para rodar exemplo que vive em projeto Node —
+mas o script que ele dispara é o `package.json` **do próprio exemplo**
+quem define, não esta lista: o limite real de `npm run` é sempre o do
+projeto, não o nosso. Sem nenhuma ferramenta de `npx` nomeada no que este
+papel faz, `npx` não entra no `allow`.
 
 ## O que você não decide por conta própria
 

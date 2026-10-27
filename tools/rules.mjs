@@ -240,12 +240,21 @@ export const COMANDOS_LOCAIS = Object.freeze([
   // Comando real por trás de um runner (ver comentário acima) — não o
   // runner, que fica só em RUNNERS.
   /^axe\b/i, /^cypress\b/i, /^playwright\b/i, /^@stoplight\/spectral-cli\b/i,
+  // `vitest`/`jest` — Task 8 (estreitar o curinga de runner em
+  // `npx *`), 2026-10-27: o alvo (arquivo `*.test.*`, `vitest.config.*`,
+  // `jest.config.*`) é sempre configurado em disco, nunca passado como
+  // domínio/host na invocação — mesma razão de `npm`/`pip` bare acima.
+  /^vitest\b/i, /^jest\b/i,
   // `npx` bare SÓ para o caso degenerado de `descascarRunner` (`npx *`,
-  // sem sub-comando nomeado): seis papéis do acervo usam esse wildcard
-  // puro para "qualquer ferramenta do ecossistema npm", pelo mesmo
-  // precedente que já trata `npm *` bare como local. Nunca bate quando
-  // existe um comando real depois do runner — esse caso vai para o nome
-  // do comando, nunca para esta entrada.
+  // sem sub-comando nomeado): seis papéis do acervo usavam esse wildcard
+  // puro para "qualquer ferramenta do ecossistema npm" até a Task 8
+  // (2026-10-27) estreitar cinco deles para comando nomeado
+  // (`npx vitest*`/`npx jest*`, ou remoção total onde a prosa não
+  // sustentava nenhum) — `fabrica-de-testes/api-funcional` é o único
+  // que ainda usa o curinga puro, de propósito (fora do escopo da Task
+  // 8: ali o curinga convive com fronteira de rede já declarada). Nunca
+  // bate quando existe um comando real depois do runner — esse caso vai
+  // para o nome do comando, nunca para esta entrada.
   /^npx\b/i,
 ]);
 
@@ -275,8 +284,11 @@ export const RUNNERS = Object.freeze([
  * direto contra COMANDOS_DE_REDE/COMANDOS_LOCAIS sem ramificar em "tem
  * runner ou não".
  *
- * Caso degenerado: `npx *` (visto em seis papéis do acervo) não nomeia
- * sub-comando nenhum — é wildcard puro. Não há "comando real" para
+ * Caso degenerado: `npx *` (visto em um papel do acervo desde a Task 8,
+ * 2026-10-27 — `fabrica-de-testes/api-funcional`; os outros cinco que o
+ * usavam foram estreitados para comando nomeado ou tiveram o `npx`
+ * removido) não nomeia sub-comando nenhum — é wildcard puro. Não há
+ * "comando real" para
  * classificar aí; a classificação cai no nome do PRÓPRIO runner (`npx`),
  * que entra em COMANDOS_LOCAIS só para este caso, documentado onde a
  * lista declara essa entrada. Isso não reabre a lacuna do fix-round 2: lá

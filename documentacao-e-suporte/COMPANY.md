@@ -128,3 +128,7 @@ e um caso aberto associado.
   manter referência verificada são trabalhos próximos o suficiente para
   uma pessoa só, desde que o teto e a prosa continuem distinguindo os
   dois tipos de documento.
+- **Comando nomeado em `execute.allow`:** a lista de `npm` em
+  `documentacao-tecnica` é a do arquétipo — derivada do que este pacote
+  assume sobre rodar exemplo em projeto Node. Quem adota troca pela lista
+  do próprio projeto; ela não é prescrição.

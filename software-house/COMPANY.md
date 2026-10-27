@@ -114,3 +114,7 @@ uma recomendação universal:
   anexe a skill de stack. Os três perfis existem para quem tem fronteira
   real entre interface e serviço; criar a fronteira no papel sem ela
   existir no time só adiciona handoff.
+- **Comando nomeado em `execute.allow`:** a lista de `npm`/`npx` em cada
+  papel de desenvolvimento é a do arquétipo — derivada do que este pacote
+  assume sobre teste e build. Quem adota troca pela lista do próprio
+  projeto; ela não é prescrição.

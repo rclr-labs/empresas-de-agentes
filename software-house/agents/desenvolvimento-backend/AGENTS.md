@@ -42,7 +42,7 @@ metadata:
     read: [repository, documentation, database]
     write: [code, test_evidence, pull_request]
     execute:
-      allow: ["npm *", "npx *", "mvn *", "gradle *", "composer *", "pip *", "dotnet *", "git add*", "git commit*", "git push*", "git diff*", "git log*", "gh pr create*", "psql -c*", "mysql -e*"]
+      allow: ["npm install*", "npm ci*", "npm test*", "npm run*", "npx vitest*", "npx jest*", "mvn *", "gradle *", "composer *", "pip *", "dotnet *", "git add*", "git commit*", "git push*", "git diff*", "git log*", "gh pr create*", "psql -c*", "mysql -e*"]
       deny: ["git push --force*", "git merge*", "kubectl *", "helm *", "terraform *", "sudo *", "psql*DROP*", "psql*drop*", "psql*TRUNCATE*", "psql*truncate*", "psql*DELETE*", "psql*delete*", "mysql*DROP*", "mysql*drop*", "mysql*TRUNCATE*", "mysql*truncate*", "mysql*DELETE*", "mysql*delete*"]
     network: false
     delegate: []
@@ -89,6 +89,11 @@ produção.
    Alegação de sucesso sem evidência é a falha mais cara desta operação.
 
 ## Fronteira que importa
+
+`npm run` continua liberado para teste e lint de serviço em Node — mas o
+script que ele dispara é o `package.json` **do repositório** quem define,
+não esta lista: o limite real de `npm run` é sempre o do projeto, não o
+nosso.
 
 Mudança de contrato de API é decisão do `tech-lead`, não efeito colateral
 da sua implementação — se o serviço que você está construindo exige
