@@ -59,6 +59,89 @@ function erro(code, rule, where, message) {
 }
 
 /**
+ * Lista de string, ou vazio. Existe porque o acervo é público e aceita
+ * pacote de terceiro: campo com tipo errado tem de REPROVAR o pacote (E19),
+ * nunca derrubar o validador — e menos ainda derrubar o navegador, onde a
+ * vitrine roda esta mesma função sobre o que o editor digitou. Item que não
+ * é string é descartado em silêncio aqui: quem relata o tipo errado é E19,
+ * não este helper — este só garante que as outras regras sempre recebem
+ * algo seguro para `.includes`/`.some`/`.find`/`.filter`.
+ */
+function listaDeTexto(v) {
+  return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+}
+
+// Descreve o tipo recebido numa forma legível para a mensagem de E19.
+// Caso especial para array: "veio lista" já diz que a lista existe, mas
+// tem item do tipo errado dentro — distinto de "veio number" (o campo
+// inteiro é do tipo errado).
+function tipoRecebido(v) {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'lista com item que não é texto';
+  return typeof v;
+}
+
+const isListaDeTextoValida = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/**
+ * E19 — tipo de campo validado ANTES de qualquer regra usar o valor.
+ * Medido em 2026-10-27: pacote de terceiro com `execute.allow` número,
+ * string ou lista com item não-string derrubava o validador inteiro com
+ * TypeError (`padrao.match`, `allow.find`, "not iterable") em vez de
+ * reprovar o pacote — e, no caso de `write` como string, nem derrubava:
+ * produzia uma dúzia de E02 espúrios, um por caractere, porque `for...of`
+ * itera string. A vitrine roda esta mesma função no navegador sobre o que
+ * o editor está digitando; tipo errado é o caso ESPERADO ali, não exceção,
+ * e falhar aberto significa tela branca com stack em vez de mensagem.
+ * Um E19 por CAMINHO de campo, nunca um por item — "`execute.allow` tem
+ * item que não é texto" é um defeito, não N.
+ */
+function verificarTiposDeCapacidade(cap, where, erros) {
+  for (const campo of ['read', 'write', 'delegate', 'approve']) {
+    const v = cap[campo];
+    if (v === undefined) continue;
+    if (!isListaDeTextoValida(v)) {
+      erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+        `capabilities.${campo} deveria ser uma lista de texto; veio ${tipoRecebido(v)}. Corrija para uma lista de strings, ex.: ["repository"]`));
+    }
+  }
+
+  // `network` tem TRÊS formas válidas, não duas: `false` (sem rede),
+  // `true` (rede sem allowlist de domínio — ver `temRede` abaixo, que já
+  // resolve essa forma) e lista de texto (allowlist de domínio). Medido no
+  // acervo real: `operacao-de-conhecimento/agents/pesquisa` usa
+  // `network: true` com `curl -s*` em execute.allow, e passa E15 hoje
+  // porque `temRede` já conta `true` como alcance declarado. Outlawar essa
+  // forma aqui reprovaria um papel real que nunca foi malformado.
+  const net = cap.network;
+  if (net !== undefined && net !== false && net !== true && !isListaDeTextoValida(net)) {
+    erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+      `capabilities.network deveria ser "true", "false" ou uma lista de texto; veio ${tipoRecebido(net)}. Declare os domínios como lista de strings, ou "true"/"false" quando não há allowlist específica`));
+  }
+
+  if (cap.budget !== undefined && cap.budget !== null && !isPlainObject(cap.budget)) {
+    erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+      `capabilities.budget deveria ser um objeto; veio ${tipoRecebido(cap.budget)}. Declare budget como objeto, ex.: { limit: 100, alert_to: "slug" }`));
+  }
+
+  if (cap.execute !== undefined) {
+    if (!isPlainObject(cap.execute)) {
+      erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+        `capabilities.execute deveria ser um objeto com "allow"/"deny"; veio ${tipoRecebido(cap.execute)}. Declare execute como objeto, ex.: { allow: ["git push*"], deny: ["sudo *"] }`));
+    } else {
+      for (const campo of ['allow', 'deny']) {
+        const v = cap.execute[campo];
+        if (v === undefined) continue;
+        if (!isListaDeTextoValida(v)) {
+          erros.push(erro('E19', 'tipo-de-campo-invalido', where,
+            `capabilities.execute.${campo} deveria ser uma lista de texto; veio ${tipoRecebido(v)}. Corrija para uma lista de strings, ex.: ["git push*"]`));
+        }
+      }
+    }
+  }
+}
+
+/**
  * Comandos que alcançam a rede, derivados do que o acervo de fato usa.
  * EXPORTADO de propósito: a vitrine valida no browser com esta mesma lista,
  * e cópia de lista é como a guarda de alcance ficou cega para `npm audit`
@@ -277,10 +360,15 @@ export function validateStructure(pkg) {
     const meta = agente.frontmatter?.metadata ?? {};
     const cap = meta.capabilities ?? {};
 
+    // E19 — tipo de campo, ANTES de qualquer regra usar o valor. Precisa
+    // vir primeiro no laço: é o que garante que E02 adiante já opera sobre
+    // `listaDeTexto`, nunca sobre o dado cru.
+    verificarTiposDeCapacidade(cap, where, erros);
+
     // E02 — vocabulário fechado
     for (const verbo of ['read', 'write']) {
       const permitidos = enumDe(verbo);
-      for (const valor of cap[verbo] ?? []) {
+      for (const valor of listaDeTexto(cap[verbo])) {
         if (!permitidos.includes(valor)) {
           erros.push(erro('E02', 'vocabulario-desconhecido', where,
             `capabilities.${verbo} contém "${valor}", fora do vocabulário. Permitidos: ${permitidos.join(', ')}`));
@@ -303,7 +391,7 @@ export function validateStructure(pkg) {
     }
 
     // E03 — delegação para papel existente
-    for (const alvo of cap.delegate ?? []) {
+    for (const alvo of listaDeTexto(cap.delegate)) {
       if (!slugs.has(alvo)) {
         erros.push(erro('E03', 'delegacao-orfa', where,
           `delega para "${alvo}", que não é papel deste pacote. Papéis: ${[...slugs].join(', ')}`));
@@ -311,7 +399,7 @@ export function validateStructure(pkg) {
     }
 
     // E04 — approve referencia gate existente
-    for (const gate of cap.approve ?? []) {
+    for (const gate of listaDeTexto(cap.approve)) {
       if (!gateIds.has(gate)) {
         erros.push(erro('E04', 'portao-inexistente', where,
           `aprova "${gate}", que não está em metadata.human_gates da empresa. Portões: ${[...gateIds].join(', ') || 'nenhum'}`));
@@ -379,8 +467,8 @@ function orcamentoDe(agente, pkg) {
 }
 
 function escreveOuExecuta(cap) {
-  const escreve = (cap.write ?? []).length > 0;
-  const executa = (cap.execute?.allow ?? []).length > 0;
+  const escreve = listaDeTexto(cap.write).length > 0;
+  const executa = listaDeTexto(cap.execute?.allow).length > 0;
   return escreve || executa;
 }
 
@@ -418,10 +506,10 @@ export function validateGovernance(pkg) {
     }
 
     // E10 — divergência prosa × capacidade
-    const naoPode = (meta.boundary?.cannot ?? []).join(' | ');
+    const naoPode = listaDeTexto(meta.boundary?.cannot).join(' | ');
     for (const { prosa, comandos } of CONTRADICOES) {
       if (!prosa.test(naoPode)) continue;
-      for (const permitido of cap.execute?.allow ?? []) {
+      for (const permitido of listaDeTexto(cap.execute?.allow)) {
         if (comandos.some((c) => c.test(permitido))) {
           erros.push(erro('E10', 'prosa-contradiz-capacidade', where,
             `boundary.cannot nega "${naoPode}" mas execute.allow permite "${permitido}". A prosa e a capacidade descrevem a mesma fronteira e discordam`));
@@ -430,7 +518,7 @@ export function validateGovernance(pkg) {
     }
 
     // E11 — quem implementa não aprova
-    if ((cap.write ?? []).includes('code') && (cap.approve ?? []).length > 0) {
+    if (listaDeTexto(cap.write).includes('code') && listaDeTexto(cap.approve).length > 0) {
       erros.push(erro('E11', 'segregacao-violada', where,
         'o mesmo papel escreve código e assina portão humano. Segregação de função: quem implementa não aprova, e quem aprova não implementa'));
     }
@@ -447,7 +535,7 @@ export function validateGovernance(pkg) {
     // num pacote cujo próprio COMPANY.md diz "nenhum é decisão de agente".
     // Guarda escrita a partir da instância protege a instância; regra
     // escrita a partir do princípio protege a classe.
-    for (const gateId of cap.approve ?? []) {
+    for (const gateId of listaDeTexto(cap.approve)) {
       const portao = gatesDo(pkg).gates.find((g) => g.id === gateId);
       if (!portao) continue; // ausência é E04, não duplica aqui
       if (portao.signer !== agente.slug) {
@@ -458,10 +546,10 @@ export function validateGovernance(pkg) {
 
     // E15 — alcance declarado. Capacidade que nega a rede que o comando usa
     // é fronteira que não existe: o operador lê "sem rede" e o processo sai.
-    const allow = cap.execute?.allow ?? [];
+    const allow = listaDeTexto(cap.execute?.allow);
     const cmdRede = allow.find((g) => COMANDOS_DE_REDE.some((re) => re.test(descascarRunner(g))));
     if (!temRede(cap)) {
-      if ((cap.read ?? []).includes('web')) {
+      if (listaDeTexto(cap.read).includes('web')) {
         erros.push(erro('E15', 'alcance-nao-declarado', where,
           'lê "web" mas network é falso. Declare os domínios em capabilities.network, ou remova "web" de read'));
       }
@@ -486,7 +574,7 @@ export function validateGovernance(pkg) {
     // consertou em dois rounds — aqui, aplicar o descascador já construído
     // é no-op para todo padrão de hoje (`git push*` entra e sai igual) e
     // fecha essa inconsistência antes dela existir.
-    const write = cap.write ?? [];
+    const write = listaDeTexto(cap.write);
     const temPush = allow.some((g) => /^(git push|gh pr create)/.test(descascarRunner(g)));
     if (write.includes('pull_request') && !temPush) {
       erros.push(erro('E16', 'par-pull-request', where,
@@ -496,14 +584,24 @@ export function validateGovernance(pkg) {
       erros.push(erro('E16', 'par-pull-request', where,
         'tem "git push*" ou "gh pr create*" em execute.allow e write não inclui pull_request — acrescente pull_request a write, ou remova o comando'));
     }
-    // Terceira perna, mesma família: quem pode dar push tem de negar
+    // Terceira perna, mesma família: quem pode dar `git push` tem de negar
     // `--force` explicitamente em execute.deny. "Pode push" sem "nega
     // force" é a mesma classe de defeito que as duas pernas acima —
     // concessão sem o limite que a torna aceitável — por isso entra em
     // E16 como a mesma regra (`par-pull-request`), não um código novo.
-    if (temPush && !(cap.execute?.deny ?? []).some((g) => /force/i.test(g))) {
+    //
+    // Ancorada em `temPushGit` (só `/^git push/` sobre o padrão
+    // descascado), não no `temPush` largo das duas pernas acima: achado da
+    // revisão da Task 2 (2026-10-27) — `temPush` inclui `gh pr create*`,
+    // que não aceita `--force`, então um papel com só `gh pr create*` em
+    // allow e sem `git push*` seria mandado negar uma flag que o comando
+    // nem tem. Inerte no acervo de hoje (os 5 papéis com `gh pr create`
+    // também têm `git push*` e o deny de force), mas a regra como estava
+    // era mais conservadora que o invariante que ela restaura.
+    const temPushGit = allow.some((g) => /^git push/.test(descascarRunner(g)));
+    if (temPushGit && !listaDeTexto(cap.execute?.deny).some((g) => /force/i.test(g))) {
       erros.push(erro('E16', 'par-pull-request', where,
-        'tem "git push*" ou "gh pr create*" em execute.allow e execute.deny não nega "--force" — acrescente um padrão como "git push --force*" a deny'));
+        'tem "git push*" em execute.allow e execute.deny não nega "--force" — acrescente um padrão como "git push --force*" a deny'));
     }
   }
 
@@ -545,7 +643,7 @@ export function validateWarnings(pkg) {
     // com provider kind=cli, onde o shell escapa.
     const cap = meta.capabilities ?? {};
     if (Array.isArray(cap.network) && cap.network.length > 0
-        && (cap.execute?.allow ?? []).some((g) => COMANDOS_DE_REDE.some((re) => re.test(descascarRunner(g))))
+        && listaDeTexto(cap.execute?.allow).some((g) => COMANDOS_DE_REDE.some((re) => re.test(descascarRunner(g))))
         && !/allowlist_scope/.test(agente.body ?? '')) {
       avisos.push({ code: 'W05', path: agente.path,
         message: 'declara allowlist de domínio e comando capaz de rede, e o corpo não traz a ressalva de allowlist_scope: no Claude Code a allowlist é fronteira de SO, no OpenCode V2 e no janus kind=cli é fetch-only e o comando escapa' });

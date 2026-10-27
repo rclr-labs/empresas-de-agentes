@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateStructure } from '../tools/rules.mjs';
+import { validateStructure, validatePackage } from '../tools/rules.mjs';
 
 // Construtor de pacote em memória — o módulo é puro, então o teste
 // não precisa de disco. Cada teste altera só o que a regra observa.
@@ -30,6 +30,90 @@ function pacote({ license = 'MIT', gates = [], agents = [] } = {}) {
 }
 
 const codigos = (pkg) => validateStructure(pkg).map((e) => e.code);
+
+// Espelho do `pacoteMinimo` de test/rules-governanca.test.mjs — um agente
+// só, com `capabilities` controlável. Os testes de E19 precisam só disso:
+// nenhuma hierarquia, orçamento ou gate entra na checagem de tipo.
+function pacoteMinimo({ capabilities = {} } = {}) {
+  return {
+    slug: 'teste',
+    company: {
+      path: 'COMPANY.md',
+      frontmatter: { slug: 'teste', license: 'MIT', metadata: { human_gates: [] } },
+      body: '',
+    },
+    agents: [{
+      path: 'agents/a/AGENTS.md',
+      slug: 'a',
+      frontmatter: {
+        slug: 'a', reportsTo: null, skills: ['x'],
+        metadata: {
+          boundary: { can: ['ler'], cannot: [] },
+          capabilities,
+          persona: { display_name: 'N', icon: '🧪' },
+        },
+      },
+      body: '',
+    }],
+    skills: [], teams: [], tasks: [], projects: [], warnings: [], problems: [],
+  };
+}
+
+test('E19: allow com item que não é string não derruba o validador', () => {
+  const pkg = pacoteMinimo({ capabilities: { read: ['repository'], write: ['report'],
+    execute: { allow: [123], deny: ['sudo *'] }, network: false } });
+  const { errors } = validatePackage(pkg);          // não pode lançar
+  const e19 = errors.filter((e) => e.code === 'E19');
+  assert.equal(e19.length, 1);
+  assert.match(e19[0].message, /execute\.allow/);
+});
+
+test('E19: allow como string em vez de lista é erro nomeado', () => {
+  const pkg = pacoteMinimo({ capabilities: { read: ['repository'], write: ['report'],
+    execute: { allow: 'git push*', deny: ['sudo *'] }, network: false } });
+  const { errors } = validatePackage(pkg);
+  assert.equal(errors.filter((e) => e.code === 'E19').length, 1);
+});
+
+test('E19: write como número é erro nomeado', () => {
+  const pkg = pacoteMinimo({ capabilities: { read: ['repository'], write: 42,
+    execute: { allow: ['rg *'], deny: ['sudo *'] }, network: false } });
+  assert.equal(validatePackage(pkg).errors.filter((e) => e.code === 'E19').length, 1);
+});
+
+test('E19: write como string não produz enxurrada de E02', () => {
+  const pkg = pacoteMinimo({ capabilities: { read: ['repository'], write: 'pull_request',
+    execute: { allow: ['rg *'], deny: ['sudo *'] }, network: false } });
+  const { errors } = validatePackage(pkg);
+  assert.equal(errors.filter((e) => e.code === 'E19').length, 1);
+  assert.ok(errors.filter((e) => e.code === 'E02').length <= 1,
+    `tipo errado deve dar UM erro de tipo, não um E02 por caractere: ${errors.filter((e) => e.code === 'E02').length}`);
+});
+
+// `network: true` é forma válida, não erro de tipo — achado ao rodar o
+// portão real: operacao-de-conhecimento/agents/pesquisa/AGENTS.md usa
+// `network: true` (rede sem allowlist de domínio) com `curl -s*` em
+// execute.allow, e `temRede` (tools/rules.mjs) já trata essa forma como
+// alcance declarado. Sem este teste, um futuro "simplificar para false ou
+// lista" (a leitura literal do brief desta tarefa) reprova esse papel real
+// outra vez.
+test('E19: network como "true" (rede sem allowlist) não é erro de tipo', () => {
+  const pkg = pacoteMinimo({ capabilities: { read: ['repository', 'web'], write: ['report'],
+    execute: { allow: ['curl -s*'], deny: ['sudo *'] }, network: true } });
+  const { errors } = validatePackage(pkg);
+  assert.equal(errors.filter((e) => e.code === 'E19').length, 0);
+});
+
+test('E19: nenhuma forma de tipo errado lança', () => {
+  for (const caps of [
+    { read: 'repository', write: ['report'], execute: { allow: ['rg *'] }, network: false },
+    { read: ['repository'], write: ['report'], execute: 'rg *', network: false },
+    { read: ['repository'], write: ['report'], execute: { allow: ['rg *'], deny: 7 }, network: false },
+    { read: ['repository'], write: ['report'], execute: { allow: [null] }, network: false },
+  ]) {
+    assert.doesNotThrow(() => validatePackage(pacoteMinimo({ capabilities: caps })));
+  }
+});
 
 test('E01: pacote sem license falha', () => {
   const pkg = pacote();

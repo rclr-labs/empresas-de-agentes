@@ -443,3 +443,20 @@ test('E16: npx gh pr create* sem write pull_request é erro — o runner não es
   assert.ok(e16.some((e) => /pull_request/.test(e.message)),
     JSON.stringify(e16, null, 2));
 });
+
+// Achado da revisão da Task 2 (tools/rules.mjs:504): a terceira perna
+// disparava em `temPush`, que inclui `gh pr create*` — um comando que não
+// aceita `--force`. Um papel com só `gh pr create*` em allow e SEM
+// `git push*` não deve ser mandado negar uma flag que o comando nem tem;
+// a perna 3 agora ancora só em `/^git push/` sobre o padrão descascado.
+test('E16: só "gh pr create*" sem "git push*" não recebe a terceira perna (force-deny)', () => {
+  const pkg = pacoteMinimo({ slug: 'dev', capabilities: {
+    read: ['repository'], write: ['code', 'pull_request'],
+    execute: { allow: ['gh pr create*'], deny: ['sudo *'] }, network: false } });
+  const e16 = validatePackage(pkg).errors.filter((e) => e.code === 'E16');
+  assert.ok(!e16.some((e) => /force/.test(e.message)),
+    `papel só com "gh pr create*" não deveria receber a perna de force-deny: ${JSON.stringify(e16, null, 2)}`);
+  // As outras pernas continuam corretas: write já inclui pull_request e o
+  // comando já está presente em allow, então nenhum E16 deveria sobrar.
+  assert.deepEqual(e16, []);
+});
