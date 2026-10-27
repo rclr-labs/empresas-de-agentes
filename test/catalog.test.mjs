@@ -18,8 +18,11 @@ test('catalog: oito pacotes, e todo papel traz persona, fronteira e capacidades'
       assert.ok(a.boundary, `${p.slug}/${a.slug} sem boundary`);
       assert.ok(a.capabilities, `${p.slug}/${a.slug} sem capabilities`);
       assert.equal(typeof a.body, 'string');
-      assert.ok(!('background' in a.persona), 'background não entra no catálogo');
-      assert.ok(!('strengths' in a.persona), 'strengths não entra no catálogo');
+      // Ruling do coordenador (fix round 1): background/strengths ENTRAM
+      // — ver construirPapel em tools/catalog.mjs para a razão completa.
+      // Quem tem background no disco tem de ter background no catálogo,
+      // íntegro — é o que o teste de furo 4, abaixo, verifica derivando
+      // do arquivo real, não aqui com uma asserção de exclusão.
     }
   }
 });
@@ -44,8 +47,9 @@ test('catalog: contagem de pacotes e agentes é derivada do disco, não cravada 
     totalAgentesNoDisco);
 });
 
-test('catalog: nenhum campo de metadata do papel (boundary, capabilities, memory, context, persona) se perde — exceto background/strengths por decisão (furo 4)', () => {
+test('catalog: nenhum campo de metadata do papel (boundary, capabilities, memory, context, persona — incluindo background/strengths) se perde (furo 4, sem excecao)', () => {
   const cat = buildCatalog(RAIZ);
+  let algumBackgroundConferido = false;
   for (const nome of listPackages(RAIZ)) {
     const pkg = loadPackage(join(RAIZ, nome));
     const pacoteCatalogo = cat.packages.find((p) => p.slug === nome);
@@ -53,27 +57,36 @@ test('catalog: nenhum campo de metadata do papel (boundary, capabilities, memory
       const entry = pacoteCatalogo.agents.find((a) => a.slug === agente.slug);
       const meta = agente.frontmatter.metadata ?? {};
       // Toda chave de metadata, QUALQUER UMA, exceto `persona` (tratada
-      // abaixo com a exceção declarada), tem de estar presente no catálogo
-      // com o MESMO valor. Isto não enumera 'boundary'/'capabilities' à
-      // mão — itera as chaves que o PRÓPRIO ARQUIVO declara, então um campo
-      // novo que apareça num AGENTS.md futuro (ex.: metadata.tools) já
-      // nasce coberto por este teste, sem precisar editá-lo.
+      // abaixo), tem de estar presente no catálogo com o MESMO valor.
+      // Isto não enumera 'boundary'/'capabilities' à mão — itera as
+      // chaves que o PRÓPRIO ARQUIVO declara, então um campo novo que
+      // apareça num AGENTS.md futuro (ex.: metadata.tools) já nasce
+      // coberto por este teste, sem precisar editá-lo.
       for (const chave of Object.keys(meta)) {
         if (chave === 'persona') continue;
         assert.deepEqual(entry[chave], meta[chave],
           `${nome}/${agente.slug} perdeu metadata.${chave} no catálogo`);
       }
-      // persona: toda chave DECLARADA, exceto background/strengths (decisão
-      // de arquitetura: custam token em toda chamada e não mudam
-      // comportamento), tem de sobreviver com o mesmo valor.
+      // persona: TODA chave declarada, SEM EXCEÇÃO — ruling do
+      // coordenador (fix round 1): background/strengths entram, porque o
+      // editor da Fase 2 precisa reconstruir o papel inteiro, cicatriz
+      // incluída. Nenhuma chave é pulada aqui; se um dia background
+      // voltar a ser excluído, este teste quebra sozinho, sem precisar
+      // de um teste novo — é a mesma garantia "deriva do disco, não
+      // enumera à mão" do resto da suíte, agora sem a exceção anterior.
       const persona = meta.persona ?? {};
       for (const chave of Object.keys(persona)) {
-        if (chave === 'background' || chave === 'strengths') continue;
         assert.deepEqual(entry.persona[chave], persona[chave],
           `${nome}/${agente.slug} perdeu persona.${chave} no catálogo`);
+        if (chave === 'background') algumBackgroundConferido = true;
       }
     }
   }
+  // Guarda contra teste infalsificável: se nenhum papel real do acervo
+  // tivesse `background`, a asserção acima nunca exercitaria o caso que
+  // importa, e passaria mesmo com um bug que voltasse a excluir o campo.
+  assert.ok(algumBackgroundConferido,
+    'nenhum papel do acervo real tem persona.background — o teste não teria pego a exclusão');
 });
 
 test('catalog: nenhum pacote some nem é inventado (slug a slug)', () => {

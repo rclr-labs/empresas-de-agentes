@@ -68,31 +68,27 @@ export function gitShortSha(partindoDe) {
 
 // --- forma do papel no catálogo ---------------------------------------
 //
-// `background` e `strengths` NÃO entram: decisão de arquitetura já
-// tomada (ver W03 em rules.mjs) — custam token em toda chamada ao modelo
-// e não mudam comportamento; a persona não entra no prompt, exceto
-// `signature_question`. Todo o RESTO de `metadata` (boundary,
-// capabilities, memory, context, e qualquer campo que um AGENTS.md
-// futuro venha a declarar) é copiado por INTEIRO para o nível raiz do
-// papel no catálogo — de propósito, por cópia dinâmica das chaves que o
-// próprio arquivo declara, não por uma lista fixa de campos conhecidos
-// hoje. Enumerar ("boundary vai, capabilities vai, mais nada") foi
-// exatamente a classe de furo que esta fase caçou o dia inteiro em
-// rules.mjs (E15/E16/E17: lista fixa que fica cega para o caso novo); o
-// mesmo risco existe aqui — um `metadata.tools` que apareça num AGENTS.md
-// futuro ficaria invisível no catálogo se esta função só soubesse os
-// nomes de hoje.
+// `persona` entra por INTEIRO — `background` e `strengths` inclusos (ver
+// o comentário em `construirPapel`, abaixo, para o ruling e a razão).
+// Todo o RESTO de `metadata` (boundary, capabilities, memory, context, e
+// qualquer campo que um AGENTS.md futuro venha a declarar) é copiado por
+// INTEIRO para o nível raiz do papel no catálogo — de propósito, por
+// cópia dinâmica das chaves que o próprio arquivo declara, não por uma
+// lista fixa de campos conhecidos hoje. Enumerar ("boundary vai,
+// capabilities vai, mais nada") foi exatamente a classe de furo que esta
+// fase caçou o dia inteiro em rules.mjs (E15/E16/E17: lista fixa que fica
+// cega para o caso novo); o mesmo risco existe aqui — um `metadata.tools`
+// que apareça num AGENTS.md futuro ficaria invisível no catálogo se esta
+// função só soubesse os nomes de hoje.
 //
 // `name` e `title` entram apesar de o esboço do brief não os listar: são
 // o nome e o título do PAPEL (distintos de `persona.display_name`, que é
 // a máscara humana) e o editor da Fase 2 precisa deles para reescrever o
 // frontmatter de `AGENTS.md` — sem eles, o editor teria de inventar esses
 // dois campos ao salvar, corrompendo um pacote de terceiro que os
-// declarou diferente do slug. Mesma razão para `memory`/`context`:
-// existem nos 42 papéis de hoje (conferido por grep antes de escrever
-// isto) e, assim como boundary/capabilities, afetam o comportamento do
-// agente — não são prosa decorativa como `background`/`strengths`, não
-// têm o motivo que justificou excluir essas duas.
+// declarou diferente do slug. Mesma razão para `memory`/`context`: existem
+// nos 42 papéis de hoje (conferido por grep antes de escrever isto) e,
+// assim como boundary/capabilities, afetam o comportamento do agente.
 // Caminho endereçável a partir da raiz do acervo. Usa o nome REAL do
 // diretório (`basename(pkg.dir)`), não `pkg.slug`: os dois coincidem nos
 // 8 pacotes de hoje, mas `pkg.slug` vem de `company.frontmatter.slug`
@@ -107,9 +103,24 @@ function caminhoDoItem(pkg, item) {
 function construirPapel(pkg, agente) {
   const fm = agente.frontmatter ?? {};
   const meta = fm.metadata ?? {};
+  // `persona` entra por INTEIRO, `background`/`strengths` incluídos.
+  //
+  // Ruling do coordenador, fix round 1 — revertendo a decisão anterior
+  // DELE MESMO, contra ele: a razão original para excluir os dois era
+  // "custam token em toda chamada e não mudam comportamento". Essa razão
+  // é verdadeira sobre o ARTEFATO EMITIDO (o que o runtime lê a cada
+  // invocação) e falsa sobre `catalog.json`, que é dado para a vitrine e
+  // nunca entra em prompt — confundir os dois consumidores foi o erro.
+  // Medido: os dois campos somam 24 KB nos 42 papéis (10,3% do catálogo
+  // de 234 KB) contra os 1.513 chars médios de `body` POR PAPEL — que já
+  // entra e é 2,5× maior. Excluir por tamanho enquanto se inclui o maior
+  // de todos não se sustentava. E sem eles, o editor da Fase 2 não podia
+  // reconstruir o papel inteiro: salvar uma edição apagaria a persona
+  // completa (incluindo a CICATRIZ do `background`, a linha que faz o
+  // papel ser confiável) e reclassificaria o pacote de 0 aviso para W03
+  // em todo papel editado — consequência que a Task 7 original nomeou
+  // sem resolver, porque era decisão de produto, não de ferramental.
   const persona = { ...(meta.persona ?? {}) };
-  delete persona.background;
-  delete persona.strengths;
 
   const papel = {
     slug: agente.slug,
