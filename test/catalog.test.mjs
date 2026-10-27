@@ -1,28 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPackage, listPackages } from '../tools/schema.mjs';
+import { toMarkdown } from '../tools/serialize.mjs';
 import { buildCatalog } from '../tools/catalog.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-test('catalog: oito pacotes, e todo papel traz persona, fronteira e capacidades', () => {
+test('catalog: oito pacotes, e todo papel traz persona, fronteira e capacidades (metadata aninhado, fix round 3)', () => {
   const cat = buildCatalog(RAIZ);
   assert.equal(cat.schema, 'catalog/v1');
   assert.equal(cat.packages.length, listPackages(RAIZ).length);
   for (const p of cat.packages) {
     assert.ok(p.license, `${p.slug} sem license`);
     for (const a of p.agents) {
-      assert.ok(a.persona.display_name, `${p.slug}/${a.slug} sem display_name`);
-      assert.ok(a.boundary, `${p.slug}/${a.slug} sem boundary`);
-      assert.ok(a.capabilities, `${p.slug}/${a.slug} sem capabilities`);
+      // Ruling do coordenador (fix round 3): metadata — persona, boundary,
+      // capabilities, memory, context — mora DENTRO de `a.metadata`, igual
+      // ao arquivo. Achatar no topo (rounds 1-2) dava ergonomia, não
+      // correção, e criava as duas convenções que a prova de suficiência
+      // expôs (ver fix round 3 no relatório).
+      assert.ok(a.metadata.persona.display_name, `${p.slug}/${a.slug} sem display_name`);
+      assert.ok(a.metadata.boundary, `${p.slug}/${a.slug} sem boundary`);
+      assert.ok(a.metadata.capabilities, `${p.slug}/${a.slug} sem capabilities`);
       assert.equal(typeof a.body, 'string');
-      // Ruling do coordenador (fix round 1): background/strengths ENTRAM
-      // — ver construirPapel em tools/catalog.mjs para a razão completa.
-      // Quem tem background no disco tem de ter background no catálogo,
-      // íntegro — é o que o teste de furo 4, abaixo, verifica derivando
-      // do arquivo real, não aqui com uma asserção de exclusão.
     }
   }
 });
@@ -47,7 +49,7 @@ test('catalog: contagem de pacotes e agentes é derivada do disco, não cravada 
     totalAgentesNoDisco);
 });
 
-test('catalog: nenhum campo de metadata do papel (boundary, capabilities, memory, context, persona — incluindo background/strengths) se perde (furo 4, sem excecao)', () => {
+test('catalog: metadata do papel (boundary, capabilities, memory, context, persona — incluindo background/strengths) sobrevive por inteiro (furo 4)', () => {
   const cat = buildCatalog(RAIZ);
   let algumBackgroundConferido = false;
   for (const nome of listPackages(RAIZ)) {
@@ -56,35 +58,22 @@ test('catalog: nenhum campo de metadata do papel (boundary, capabilities, memory
     for (const agente of pkg.agents) {
       const entry = pacoteCatalogo.agents.find((a) => a.slug === agente.slug);
       const meta = agente.frontmatter.metadata ?? {};
-      // Toda chave de metadata, QUALQUER UMA, exceto `persona` (tratada
-      // abaixo), tem de estar presente no catálogo com o MESMO valor.
-      // Isto não enumera 'boundary'/'capabilities' à mão — itera as
-      // chaves que o PRÓPRIO ARQUIVO declara, então um campo novo que
-      // apareça num AGENTS.md futuro (ex.: metadata.tools) já nasce
-      // coberto por este teste, sem precisar editá-lo.
-      for (const chave of Object.keys(meta)) {
-        if (chave === 'persona') continue;
-        assert.deepEqual(entry[chave], meta[chave],
-          `${nome}/${agente.slug} perdeu metadata.${chave} no catálogo`);
-      }
-      // persona: TODA chave declarada, SEM EXCEÇÃO — ruling do
-      // coordenador (fix round 1): background/strengths entram, porque o
-      // editor da Fase 2 precisa reconstruir o papel inteiro, cicatriz
-      // incluída. Nenhuma chave é pulada aqui; se um dia background
-      // voltar a ser excluído, este teste quebra sozinho, sem precisar
-      // de um teste novo — é a mesma garantia "deriva do disco, não
-      // enumera à mão" do resto da suíte, agora sem a exceção anterior.
-      const persona = meta.persona ?? {};
-      for (const chave of Object.keys(persona)) {
-        assert.deepEqual(entry.persona[chave], persona[chave],
-          `${nome}/${agente.slug} perdeu persona.${chave} no catálogo`);
-        if (chave === 'background') algumBackgroundConferido = true;
+      // Com `metadata` aninhado (fix round 3), furo 4 vira uma comparação
+      // de objeto só — `a.metadata` É `meta`, cópia direta, sem achatar
+      // nem reclassificar nada. Isto cobre toda chave presente E futura
+      // (metadata.tools, se um dia existir) sem precisar enumerar nada à
+      // mão: `deepEqual` nos dois objetos inteiros já é a derivação.
+      assert.deepEqual(entry.metadata, meta,
+        `${nome}/${agente.slug} perdeu ou alterou algo em metadata no catálogo`);
+      if (Array.isArray(meta.persona?.background) && meta.persona.background.length > 0) {
+        algumBackgroundConferido = true;
       }
     }
   }
   // Guarda contra teste infalsificável: se nenhum papel real do acervo
-  // tivesse `background`, a asserção acima nunca exercitaria o caso que
-  // importa, e passaria mesmo com um bug que voltasse a excluir o campo.
+  // tivesse `background`, o deepEqual acima nunca exercitaria o caso que
+  // importa, e passaria mesmo com uma regressão que voltasse a excluir o
+  // campo em `construirPapel`.
   assert.ok(algumBackgroundConferido,
     'nenhum papel do acervo real tem persona.background — o teste não teria pego a exclusão');
 });
@@ -133,36 +122,39 @@ test('catalog: --ref sobrepõe a detecção automática', () => {
   assert.equal(cat.generated_from, 'deadbee');
 });
 
-// Achado da prova de suficiência (fix round 2): remontar os 42 papéis a
-// partir do catálogo só bate byte a byte com o disco quando a ordem de
-// chave de topo do frontmatter reconstruído é EXATAMENTE a do arquivo
-// original (name, title, slug, reportsTo, skills, metadata) — e essa
-// ordem não está em lugar nenhum do catalog.json, só na uniformidade dos
-// 42 arquivos de hoje. Convenção sem guarda é silêncio: este teste deriva
-// a ordem do PRIMEIRO arquivo encontrado (nunca a crava) e exige que os
-// outros 41 tenham a mesma. Papel novo com ordem diferente fica vermelho
-// aqui — a decisão aparece, em vez do editor da Fase 2 reescrever a
-// ordem de todo papel não editado a cada salvamento, em silêncio.
-test('catalog: os 42 AGENTS.md têm a mesma ordem de chave de topo — convenção que o catálogo não carrega, só a uniformidade do acervo garante', () => {
-  let ordemEsperada = null;
-  let origemDaOrdem = null;
-  let totalConferido = 0;
-  for (const nome of listPackages(RAIZ)) {
-    const pkg = loadPackage(join(RAIZ, nome));
-    for (const agente of pkg.agents) {
-      const ordem = Object.keys(agente.frontmatter);
-      if (ordemEsperada === null) {
-        ordemEsperada = ordem;
-        origemDaOrdem = agente.path;
-      } else {
-        assert.deepEqual(ordem, ordemEsperada,
-          `${nome}/${agente.path} tem ordem de chave de topo [${ordem.join(', ')}], ` +
-          `diferente de ${origemDaOrdem} [${ordemEsperada.join(', ')}] — um editor que ` +
-          `reescrever este papel (ou qualquer outro) a partir do catálogo não tem como ` +
-          `saber qual das duas é a correta, porque o catalog.json não carrega ordem alguma`);
-      }
-      totalConferido += 1;
+// Prova de suficiência — fix round 3. A revisão remontou os 42 papéis a
+// partir do catálogo ACHATADO (rounds 1-2) e só bateu byte a byte na
+// SEGUNDA tentativa, depois de descobrir a ordem de chave certa por
+// fora — porque a ordem e a regra de re-aninhamento não estavam no dado.
+// Com `metadata` aninhado como no arquivo (ver construirPapel em
+// tools/catalog.mjs), a reconstrução é direta — `{ name, title, slug,
+// reportsTo, skills, metadata: a.metadata }`, sem reclassificar nada — e
+// esta prova tem de bater na PRIMEIRA tentativa, para os 42, não para um.
+test('catalog: reconstrução byte-a-byte dos 42 AGENTS.md reais a partir do catálogo (prova de suficiência, fix round 3)', () => {
+  const cat = buildCatalog(RAIZ);
+  let totalReconstruido = 0;
+  for (const p of cat.packages) {
+    for (const a of p.agents) {
+      const frontmatterReconstruido = {
+        name: a.name,
+        title: a.title,
+        slug: a.slug,
+        reportsTo: a.reportsTo,
+        skills: a.skills,
+        metadata: a.metadata,
+      };
+      const reconstruido = toMarkdown({ frontmatter: frontmatterReconstruido, body: a.body });
+      const original = readFileSync(join(RAIZ, a.path), 'utf8');
+      assert.equal(reconstruido, original,
+        `${a.path} não reconstruiu byte a byte a partir do catálogo`);
+      totalReconstruido += 1;
     }
   }
-  assert.ok(totalConferido > 0, 'nenhum agente encontrado — acervo vazio?');
+  // Não crava "42" como condição do laço — crava como EXPECTATIVA do
+  // resultado, e deriva o total de agentes do próprio catálogo para a
+  // asserção de contagem (furo 3) já cobrir silêncio aqui; esta linha só
+  // confirma que o laço de fato correu sobre algo, não sobre lista vazia.
+  const totalNoCatalogo = cat.packages.reduce((n, p) => n + p.agents.length, 0);
+  assert.equal(totalReconstruido, totalNoCatalogo);
+  assert.ok(totalReconstruido > 0, 'nenhum agente reconstruído — acervo vazio?');
 });

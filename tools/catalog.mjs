@@ -68,27 +68,38 @@ export function gitShortSha(partindoDe) {
 
 // --- forma do papel no catálogo ---------------------------------------
 //
-// `persona` entra por INTEIRO — `background` e `strengths` inclusos (ver
-// o comentário em `construirPapel`, abaixo, para o ruling e a razão).
-// Todo o RESTO de `metadata` (boundary, capabilities, memory, context, e
-// qualquer campo que um AGENTS.md futuro venha a declarar) é copiado por
-// INTEIRO para o nível raiz do papel no catálogo — de propósito, por
-// cópia dinâmica das chaves que o próprio arquivo declara, não por uma
-// lista fixa de campos conhecidos hoje. Enumerar ("boundary vai,
-// capabilities vai, mais nada") foi exatamente a classe de furo que esta
-// fase caçou o dia inteiro em rules.mjs (E15/E16/E17: lista fixa que fica
-// cega para o caso novo); o mesmo risco existe aqui — um `metadata.tools`
-// que apareça num AGENTS.md futuro ficaria invisível no catálogo se esta
-// função só soubesse os nomes de hoje.
+// `metadata` entra ANINHADO, na mesma forma que tem no arquivo — ruling
+// do coordenador, fix round 3, revertendo a decisão de ACHATAR
+// (`boundary`/`capabilities`/`memory`/`context`/`persona` no topo do
+// papel) que esta própria tarefa tinha tomado nos rounds 1 e 2.
 //
-// `name` e `title` entram apesar de o esboço do brief não os listar: são
-// o nome e o título do PAPEL (distintos de `persona.display_name`, que é
-// a máscara humana) e o editor da Fase 2 precisa deles para reescrever o
-// frontmatter de `AGENTS.md` — sem eles, o editor teria de inventar esses
-// dois campos ao salvar, corrompendo um pacote de terceiro que os
-// declarou diferente do slug. Mesma razão para `memory`/`context`: existem
-// nos 42 papéis de hoje (conferido por grep antes de escrever isto) e,
-// assim como boundary/capabilities, afetam o comportamento do agente.
+// A razão do round 3: achatar não dava nada de real à vitrine — um hop
+// de propriedade a menos (`a.boundary` em vez de `a.metadata.boundary`),
+// ergonomia, não correção — e CRIAVA as duas convenções que a prova de
+// suficiência da revisão expôs: (1) a ordem de chave de topo do
+// frontmatter deixava de vir do dado e passava a depender da uniformidade
+// incidental dos 42 arquivos de hoje, e (2) reconstruir o AGENTS.md
+// exigia saber, de memória, QUAIS campos achatados voltam para dentro de
+// `metadata` — uma lista que não existia em lugar nenhum do catalog.json.
+// Com `metadata` aninhado como no disco, as duas desaparecem por
+// construção: a ordem INTERNA de `metadata` já é a ordem com que
+// `js-yaml` leu o arquivo (preservada por cópia direta, sem reordenar
+// nada) e sobrevive a `JSON.stringify`/`JSON.parse` (que preservam ordem
+// de inserção); e não há mais "campo achatado" para re-classificar —
+// `metadata` é um bloco só, exatamente como no arquivo.
+//
+// `persona` mora DENTRO de `metadata`, como no disco — não é mais campo
+// de topo do papel. `background`/`strengths` continuam dentro dela,
+// decisão do fix round 1 (ver CHANGELOG no relatório): a razão de
+// incluí-los nunca foi sobre posição no objeto, foi sobre eles entrarem
+// ou não — e entram, íntegros, onde a persona de fato mora.
+//
+// `name`, `title`, `reportsTo`, `skills` continuam de fora de `metadata`
+// porque são de fato de FORA de `metadata` no arquivo — são os únicos
+// campos de topo do frontmatter real, ao lado do próprio `metadata`.
+// Ficam no catálogo pela mesma razão do round 1: o editor da Fase 2
+// precisa deles para reescrever o frontmatter sem inventar nada.
+//
 // Caminho endereçável a partir da raiz do acervo. Usa o nome REAL do
 // diretório (`basename(pkg.dir)`), não `pkg.slug`: os dois coincidem nos
 // 8 pacotes de hoje, mas `pkg.slug` vem de `company.frontmatter.slug`
@@ -102,41 +113,16 @@ function caminhoDoItem(pkg, item) {
 
 function construirPapel(pkg, agente) {
   const fm = agente.frontmatter ?? {};
-  const meta = fm.metadata ?? {};
-  // `persona` entra por INTEIRO, `background`/`strengths` incluídos.
-  //
-  // Ruling do coordenador, fix round 1 — revertendo a decisão anterior
-  // DELE MESMO, contra ele: a razão original para excluir os dois era
-  // "custam token em toda chamada e não mudam comportamento". Essa razão
-  // é verdadeira sobre o ARTEFATO EMITIDO (o que o runtime lê a cada
-  // invocação) e falsa sobre `catalog.json`, que é dado para a vitrine e
-  // nunca entra em prompt — confundir os dois consumidores foi o erro.
-  // Medido: os dois campos somam 24 KB nos 42 papéis (10,3% do catálogo
-  // de 234 KB) contra os 1.513 chars médios de `body` POR PAPEL — que já
-  // entra e é 2,5× maior. Excluir por tamanho enquanto se inclui o maior
-  // de todos não se sustentava. E sem eles, o editor da Fase 2 não podia
-  // reconstruir o papel inteiro: salvar uma edição apagaria a persona
-  // completa (incluindo a CICATRIZ do `background`, a linha que faz o
-  // papel ser confiável) e reclassificaria o pacote de 0 aviso para W03
-  // em todo papel editado — consequência que a Task 7 original nomeou
-  // sem resolver, porque era decisão de produto, não de ferramental.
-  const persona = { ...(meta.persona ?? {}) };
-
-  const papel = {
+  return {
     slug: agente.slug,
     name: fm.name,
     title: fm.title,
     reportsTo: fm.reportsTo ?? null,
     skills: fm.skills ?? [],
-    persona,
+    metadata: fm.metadata ?? {},
     body: agente.body ?? '',
     path: caminhoDoItem(pkg, agente),
   };
-  for (const [chave, valor] of Object.entries(meta)) {
-    if (chave === 'persona') continue;
-    papel[chave] = valor;
-  }
-  return papel;
 }
 
 function construirSkill(pkg, skill) {
