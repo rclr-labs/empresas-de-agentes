@@ -86,6 +86,141 @@ test('newline no fim ou no início da string também sobrevive', () => {
   assert.deepEqual(recarregar(obj), obj);
 });
 
+// --- Tabela adversarial de ida-e-volta (revisão ampla, 2026-10-27) ------
+//
+// O `\r` foi a QUINTA camada da mesma família de defeito: contenção de
+// token → flag cravada → curinga ausente → literal sem verbo → `\r` logo
+// abaixo do `\n` corrigido. O revisor varreu 49 formas para achá-lo. Esta
+// tabela existe para que a sexta camada não precise de outra varredura
+// manual: não guarda UM caractere, guarda a CLASSE — caractere de
+// controle e indicador de YAML — afirmada por `yaml.load` com igualdade
+// profunda, que é o único juiz que enxerga tanto o documento inválido
+// (estoura) quanto o *line folding* (passa limpo e corrompe).
+//
+// A prova de 85/85 sobre o acervo real NÃO alcança nada disto, e
+// estruturalmente não pode: zero arquivo do acervo tem controle em
+// frontmatter. Quem produz estas formas é o editor da Fase 2, a partir de
+// formulário e de texto colado — e lá não há parser para reclamar.
+const TABELA_ADVERSARIAL = {
+  // Caracteres de controle. CR em três posições, porque o modo de falha
+  // muda com a posição: no meio é documento inválido, no fim e junto do
+  // LF é folding silencioso.
+  'CR no meio': 'a\rb',
+  'CR no fim': 'a\r',
+  'CR no início': '\ra',
+  'CRLF': 'a\r\nb',
+  'LF': 'a\nb',
+  'LF no fim': 'a\n',
+  'CR + gatilho de aspas (emoji)': 'a\r\u{1F600}',
+  'CR + gatilho de aspas (?)': 'a?\rb',
+  'TAB no meio': 'a\tb',
+  'TAB no fim': 'a\t',
+  'TAB no início': '\ta',
+  'VT': 'a\v b',
+  'FF': 'a\f b',
+  'NUL': 'a\0b',
+  'BS': 'a\bb',
+  'BEL': 'a\x07b',
+  'ESC': 'a\x1bb',
+  'DEL': 'a\x7fb',
+  'barra invertida': 'a\\b',
+  'aspas': 'a"b',
+  'barra + aspas + quebra': 'a\\"\nb',
+  // Indicadores de YAML.
+  'ancora': '&x',
+  'alias': '*x',
+  'tag': '!!str',
+  'diretiva': '%YAML',
+  'arroba': '@x',
+  'acento grave': '`x',
+  'dois-pontos no fim': 'a:',
+  'dois-pontos no meio': 'a:b',
+  'dois-pontos + espaço': 'a: b',
+  'hash no fim': 'a #',
+  'hash no meio': 'a #b',
+  'interrogação': 'a?',
+  'só interrogação': '?',
+  'traço no início': '-a',
+  'só traço': '-',
+  'três pontos': '...',
+  'separador de documento': '---',
+  'bloco literal': '|texto',
+  'bloco dobrado': '>texto',
+  'chaves': '{a}',
+  'colchetes': '[b]',
+  'vírgula': 'a,b',
+  'vazio': '',
+  'só espaço': ' ',
+  'espaço duplo no meio': 'a  b',
+  'espaço no fim': 'a ',
+  // Grafias que o core schema releria como outro TIPO.
+  'hex': '0x1f',
+  'octal': '0o17',
+  'binário': '0b101',
+  'inf': '.inf',
+  'nan': '.nan',
+  'tilde': '~',
+  'True': 'True',
+  'Null': 'Null',
+  'expoente': '1e3',
+  'mais quarenta e dois': '+42',
+  'zero duplo': '00',
+  'underscore numérico': '1_000',
+  'reservada yes': 'yes',
+  'reservada on': 'on',
+  'data': '2026-10-24',
+};
+
+test('tabela adversarial: todo VALOR sobrevive à ida e volta, com igualdade profunda', () => {
+  for (const [nome, valor] of Object.entries(TABELA_ADVERSARIAL)) {
+    const obj = { k: valor };
+    assert.deepEqual(recarregar(obj), obj,
+      `[${nome}] ${JSON.stringify(valor)} não sobreviveu — emitido ${JSON.stringify(emitYaml(obj))}`);
+  }
+});
+
+// LIMITE DECLARADO (ver chaveEmYaml em tools/yaml-emit.mjs e SCHEMA.md):
+// `chaveEmYaml` não reaplica RESERVADAS/NUMERICA porque uma CHAVE `true`
+// ou `42` é coagida de volta para a mesma string ao entrar no objeto JS.
+// O argumento vale para a grafia CANÔNICA e NÃO vale para grafia não
+// canônica do mesmo valor: como chave, `~` volta "null", `0x1f` volta
+// "31", `.inf` volta "Infinity", `True` volta "true", `1e3` volta "1000",
+// `+42` volta "42", `00` volta "0". Fechar isso é política de citação de
+// chave, não caractere a escapar — está nomeado, não corrigido, e nenhuma
+// chave do acervo ou do schema tem essa forma. As formas abaixo ficam
+// FORA do laço de chave por isso, nomeadas uma a uma: a lista é o limite,
+// não um "skip" genérico.
+const CHAVES_FORA_DO_ALCANCE = new Set([
+  'hex', 'octal', 'binário', 'inf', 'nan', 'tilde',
+  'True', 'Null', 'expoente', 'mais quarenta e dois', 'zero duplo',
+]);
+
+test('tabela adversarial: toda CHAVE sobrevive à ida e volta, fora das grafias não canônicas declaradas', () => {
+  for (const [nome, valor] of Object.entries(TABELA_ADVERSARIAL)) {
+    if (CHAVES_FORA_DO_ALCANCE.has(nome)) continue;
+    const obj = { [valor]: 1 };
+    assert.deepEqual(recarregar(obj), obj,
+      `[${nome}] como chave: ${JSON.stringify(valor)} não sobreviveu — emitido ${JSON.stringify(emitYaml(obj))}`);
+  }
+});
+
+test('tabela adversarial: a premissa de chaveEmYaml vale para a grafia canônica', () => {
+  // A razão documentada para NÃO citar chave numérica/booleana: o YAML a
+  // resolve para escalar, e o objeto JS a coage de volta para a MESMA
+  // string. Este teste é o que torna essa afirmação verificada em vez de
+  // confiada — e é o contraponto positivo de CHAVES_FORA_DO_ALCANCE.
+  for (const chave of ['true', 'false', 'null', '42', '-42', '0', '4.2']) {
+    const obj = { [chave]: 1 };
+    assert.deepEqual(recarregar(obj), obj, `chave canônica ${chave} mudou de grafia`);
+  }
+  // E segue sem aspas cosméticas — exceto `-42`, que PERIGOSO cita pelo
+  // traço de abertura (um `- ` abriria sequência), não pelo número.
+  for (const chave of ['true', 'false', 'null', '42', '0', '4.2']) {
+    assert.ok(!emitYaml({ [chave]: 1 }).startsWith('"'),
+      `chave ${chave} saiu citada sem necessidade`);
+  }
+});
+
 test('preserva emoji e acento', () => {
   const obj = { icon: '🗂️', nome: 'Clara Mendes', frase: 'Como vamos saber que ficou pronto?' };
   assert.deepEqual(recarregar(obj), obj);

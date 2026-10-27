@@ -378,6 +378,47 @@ doc=$(grep -ohE "[EWA][0-9]{2}" SCHEMA.md | sort -u)
 diff <(echo "$impl") <(echo "$doc") && echo "catalogo completo" || echo "DIVERGE"
 ```
 
+### Limites declarados do emissor de YAML (`tools/yaml-emit.mjs`)
+
+O emissor é puro e não tem parser para se conferir — o browser da Fase 2 o
+importa direto, e lá **nada reclama** do que ele escrever errado. Por isso
+o que ele cobre e o que ele não cobre é regra declarada, não detalhe de
+implementação. A guarda viva é a **tabela adversarial de ida-e-volta** em
+`test/yaml-emit.test.mjs`, afirmada por `yaml.load` com igualdade
+profunda.
+
+**Cobre, desde 2026-10-27 (revisão ampla):**
+
+- **Todo caractere de controle** (ponto de código abaixo de `0x20`, mais
+  `DEL`) força aspas e sai escapado — `\n`, `\r` e `\t` pelos escapes
+  nomeados, o resto como `\xNN`. Antes só `\n` entrava, e `\r` passava
+  cru: no escalar plano virava documento inválido ("a multiline key may
+  not be an implicit key") e no escalar já citado por outro motivo sofria
+  *line folding* (`"a\rb"` relia como `"a b"`), perda silenciosa. Os
+  demais controles faziam `js-yaml` recusar o documento inteiro.
+- **`:` no fim da string** força aspas, como `: ` já forçava: `k: a:`
+  estoura em "bad indentation of a mapping entry".
+- **Grafia não decimal de número**, em posição de VALOR: `0x1f`, `0o17`,
+  `0b101`, `.inf`, `.nan` (com sinal e em qualquer caixa) saem citados,
+  porque o core schema do YAML 1.2 os relê como número — string virando
+  número em silêncio.
+
+**NÃO cobre, nomeado e deliberado:**
+
+- **Grafia não canônica em posição de CHAVE.** `chaveEmYaml` não reaplica
+  `RESERVADAS`/`NUMERICA` porque uma chave `true` ou `42` é coagida de
+  volta para a MESMA string ao entrar no objeto JS — aspas ali seriam
+  cosméticas. O argumento vale para a grafia canônica e **não** vale para
+  a não canônica do mesmo valor: como chave, `~` volta `"null"`, `Null`
+  volta `"null"`, `True` volta `"true"`, `0x1f` volta `"31"`, `0o17` volta
+  `"15"`, `.inf` volta `"Infinity"`, `.nan` volta `"NaN"`, `1e3` volta
+  `"1000"`, `+42` volta `"42"` e `00` volta `"0"`. É perda silenciosa, mas
+  fechá-la é uma **política de citação de chave** (quais grafias citar, e
+  se citar `true`/`42` junto por simetria), não um caractere a escapar.
+  Nenhuma chave do acervo nem do schema tem essa forma. As formas estão
+  listadas uma a uma em `CHAVES_FORA_DO_ALCANCE`, no teste — a lista é o
+  limite, não um `skip` genérico.
+
 ## 8. Bindings: quatro estados, não dois
 
 `bindings/*.yml` traduz `metadata.capabilities` (e os campos de topo

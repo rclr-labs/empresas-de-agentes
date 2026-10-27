@@ -15,13 +15,29 @@
 // de sintaxe, precisam de aspas — regra padrão de qualquer emissor YAML.
 const RESERVADAS = /^(true|false|null|yes|no|on|off|~)$/i;
 const NUMERICA = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+// As OUTRAS grafias que o core schema do YAML 1.2 também resolve para
+// número — e que `NUMERICA` (decimal) não alcança. Medido reparseando com
+// `yaml.load`: `0x1f` volta 31, `0o17` volta 15, `0b101` volta 5, `.inf`
+// volta Infinity e `.nan` volta NaN. É string virando NÚMERO em
+// silêncio, a mesma classe de perda do `\r`: nenhum parser reclama, o
+// dado só muda de tipo. Nenhum dos 85 arquivos do acervo casa estas
+// grafias (medido antes de escrever isto), então a paridade byte-a-byte
+// não muda.
+const NUMERICA_NAO_DECIMAL = /^[-+]?(0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$|^[-+]?\.(inf|nan)$/i;
 const DATA = /^\d{4}-\d{2}-\d{2}/;
 // "#" só é início de comentário em YAML quando precedido de espaço (ou é
 // o primeiro caractere, já coberto pela classe de abertura) — por isso
 // o teste é `\s#`, não `#\s`: "C#" dentro de uma frase, sem espaço
 // ANTES do #, é seguro sem aspas, e o acervo confirma isso em
 // `stack-dotnet/SKILL.md` ("...C# — SDK..." não citado).
-const PERIGOSO = /^[\s>|*&!%@`#?,[\]{}'"-]|: |\s#|\s$|^$/;
+//
+// `:` no FIM da string entra junto com `: ` (dois-pontos + espaço), por
+// isso `:(\s|$)` e não `: `: medido com `yaml.load`, o escalar plano
+// `k: a:` estoura em "bad indentation of a mapping entry" — o parser lê o
+// `:` final como abertura de mapa aninhado, igual ao que faz com `a: b`.
+// Era o único indicador de YAML da tabela adversarial que ainda produzia
+// documento inválido depois do fix dos caracteres de controle.
+const PERIGOSO = /^[\s>|*&!%@`#?,[\]{}'"-]|:(\s|$)|\s#|\s$|^$/;
 
 // Convenção AUTORAL do acervo, medida nos 85 arquivos (não exigida pela
 // gramática YAML): todo valor com "?", "*" ou emoji/símbolo em QUALQUER
@@ -39,34 +55,71 @@ const SIMBOLO_AUTORAL = /[?*]|\p{Extended_Pictographic}/u;
 // mesmo domínio sai sem aspas (`ref: ../../COMPANY.md`), por isso o
 // ponto só pesa dentro de `[...]`.
 
-// Escapa para dentro de aspas duplas, nesta ORDEM exata: backslash
-// primeiro, newline depois, aspas por último. Inverter os dois primeiros
-// quebra: escapar "\n" (newline real → sequência "\n") ANTES de escapar
-// backslash faz o escape de backslash re-processar o backslash que o
-// passo anterior acabou de inserir, dobrando-o ("\n" viraria "\\n", que
-// religa como backslash+"n" literal, não newline). Medido reparseando os
-// dois caminhos com `yaml.load`: só backslash→newline→aspas fecha
-// `"a\nb"` de volta em "a\nb" (com newline real).
-function citar(s) {
-  return `"${s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/"/g, '\\"')}"`;
-}
+// Caractere de CONTROLE força aspas mesmo sem nenhum outro gatilho, e tem
+// de sair ESCAPADO dentro delas. Três comportamentos distintos, os três
+// medidos reparseando com `yaml.load`:
+//
+//   - `\n` ou `\r` cru num escalar PLANO é YAML estruturalmente inválido
+//     ("a multiline key may not be an implicit key");
+//   - `\n` ou `\r` cru num escalar JÁ CITADO por outro motivo sofre *line
+//     folding* do YAML citado: `"a\rb"` relê como "a b" e `"a\r\nb"` como
+//     "a \nb" — perda SILENCIOSA de dado;
+//   - os demais controles (TAB, VT, FF, NUL, ESC, BEL, BS, DEL) fazem
+//     `js-yaml` recusar o documento inteiro ("the stream contains
+//     non-printable characters", "null byte is not allowed in input").
+//
+// A guarda cobriu só `\n` de 2026-10-27 até a revisão ampla do mesmo dia,
+// e `\r` passava cru LOGO ABAIXO dela — a quinta camada da mesma família
+// (o fix do `\n` fechou a quarta). Por isso o critério aqui não é um
+// caractere, é a CLASSE inteira (todo ponto de código abaixo de 0x20,
+// mais DEL), e a tabela adversarial de ida-e-volta em
+// test/yaml-emit.test.mjs é o que a mantém fechada.
+//
+// Nenhum dos 85 arquivos do acervo tem controle em valor de frontmatter;
+// isto é necessário para o editor da vitrine (Fase 2), que gera
+// frontmatter a partir de formulário e de texto colado — e lá NÃO há
+// parser para reclamar, então o que não for escapado aqui corrompe em
+// silêncio.
+const ehControle = (c) => {
+  const n = c.codePointAt(0);
+  return n < 0x20 || n === 0x7f;
+};
+const temControle = (s) => [...s].some(ehControle);
 
-// Newline literal força aspas mesmo sem nenhum outro gatilho: um escalar
-// plano com "\n" dentro é YAML estruturalmente inválido ("a multiline key
-// may not be an implicit key"), e um escalar já citado por OUTRO motivo
-// que contenha newline cru sofre line folding do YAML citado — o
-// newline vira espaço na releitura, perda silenciosa de dado. Nenhum dos
-// 85 arquivos do acervo tem newline em valor de frontmatter; isto é
-// necessário para o editor da vitrine (Fase 2), que gera frontmatter a
-// partir de formulário.
-const TEM_NEWLINE = /\n/;
+// Escapes nomeados que o YAML de aspas duplas define. O resto da classe
+// sai como `\xNN`, a forma hexadecimal que a mesma gramática aceita —
+// conferida com `yaml.load` na tabela adversarial, não suposta.
+const ESCAPE_NOMEADO = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
+
+// Escapa para dentro de aspas duplas numa passada SÓ, caractere a
+// caractere. Antes eram `.replace` encadeados, e a ordem entre eles era
+// uma armadilha documentada: escapar `\n` (newline real → sequência
+// "\n") ANTES de escapar backslash fazia o escape de backslash
+// re-processar o backslash que o passo anterior acabou de inserir,
+// dobrando-o — `"a\nb"` religava como backslash + "n" literal. Uma
+// passada só elimina a armadilha por CONSTRUÇÃO, em vez de depender de
+// manter a ordem certa a cada escape novo: foi justamente um escape novo
+// (`\r`) entrando na cadeia errada que produziu a quinta camada deste
+// defeito.
+function citar(s) {
+  let saida = '';
+  for (const c of s) {
+    if (c === '\\') saida += '\\\\';
+    else if (c === '"') saida += '\\"';
+    else if (ehControle(c)) {
+      saida += ESCAPE_NOMEADO[c] ?? `\\x${c.codePointAt(0).toString(16).padStart(2, '0')}`;
+    } else saida += c;
+  }
+  return `"${saida}"`;
+}
 
 function escalar(v) {
   if (v === null || v === undefined) return 'null';
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   if (typeof v === 'number') return String(v);
   const s = String(v);
-  if (TEM_NEWLINE.test(s) || RESERVADAS.test(s) || NUMERICA.test(s) || DATA.test(s)
+  if (temControle(s) || RESERVADAS.test(s) || NUMERICA.test(s)
+    || NUMERICA_NAO_DECIMAL.test(s) || DATA.test(s)
     || PERIGOSO.test(s) || SIMBOLO_AUTORAL.test(s)) {
     return citar(s);
   }
@@ -74,28 +127,43 @@ function escalar(v) {
 }
 
 function escalarEmFluxo(v) {
-  if (typeof v === 'string' && v.includes('.') && !TEM_NEWLINE.test(v) && !RESERVADAS.test(v)
-    && !NUMERICA.test(v) && !DATA.test(v) && !PERIGOSO.test(v) && !SIMBOLO_AUTORAL.test(v)) {
+  if (typeof v === 'string' && v.includes('.') && !temControle(v) && !RESERVADAS.test(v)
+    && !NUMERICA.test(v) && !NUMERICA_NAO_DECIMAL.test(v) && !DATA.test(v)
+    && !PERIGOSO.test(v) && !SIMBOLO_AUTORAL.test(v)) {
     return citar(v);
   }
   return escalar(v);
 }
 
 // Chave de mapa tem perigo que valor não tem, e perigo que valor também
-// tem (newline) — por isso é variante de escalar(), não a mesma função.
-// NÃO reaplica RESERVADAS/NUMERICA/DATA: uma chave YAML "true" ou "42"
+// tem (caractere de controle) — por isso é variante de escalar(), não a
+// mesma função.
+//
+// NÃO reaplica RESERVADAS/NUMERICA/DATA: uma chave YAML `true` ou `42`
 // sem aspas resolve para o escalar booleano/numérico correspondente,
 // mas ao entrar num objeto JS a propriedade é coagida de volta para a
 // MESMA string ("true", "42") — não há perda, então citar por isso seria
 // aspas cosméticas, não corretivas. O que É corretivo, medido ao vivo
 // pela revisão: "a #b" (espaço+hash no meio é comentário — o par some
 // inteiro, silencioso), "key " (espaço final — perdido na releitura,
-// silencioso), "a: b" (dois-pontos+espaço — chave YAML inválida, estoura
-// no reparse), "" (chave vazia — YAML inválido), e newline (mesma razão
-// do valor).
+// silencioso), "a: b" e "a:" (dois-pontos abrindo mapa — chave YAML
+// inválida, estoura no reparse), "" (chave vazia — YAML inválido), e
+// caractere de controle (mesma razão do valor).
+//
+// LIMITE CONHECIDO, nomeado e deliberadamente NÃO corrigido nesta onda:
+// o argumento da coerção acima vale para a grafia CANÔNICA (`true`,
+// `42`, `-42`, `0`) e NÃO vale para grafia não canônica do mesmo valor.
+// Medido com `yaml.load`, como CHAVE: `~` volta "null", `Null` volta
+// "null", `True` volta "true", `0x1f` volta "31", `0o17` volta "15",
+// `.inf` volta "Infinity", `.nan` volta "NaN", `1e3` volta "1000", `+42`
+// volta "42" e `00` volta "0" — a chave muda de grafia na releitura, em
+// silêncio. Fechar isso é uma POLÍTICA de citação de chave (quais
+// grafias citar, e se citar `true`/`42` junto por simetria), não um
+// caractere a escapar; nenhuma chave do acervo nem do schema tem essa
+// forma. Declarado em SCHEMA.md como limite do emissor.
 function chaveEmYaml(chave) {
   const s = String(chave);
-  if (TEM_NEWLINE.test(s) || PERIGOSO.test(s)) {
+  if (temControle(s) || PERIGOSO.test(s)) {
     return citar(s);
   }
   return s;
