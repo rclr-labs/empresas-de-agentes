@@ -270,10 +270,48 @@ export function descascarRunner(padrao) {
   return padrao;
 }
 
+/**
+ * Casa `texto` contra `padrao` com a semântica de glob de shell que
+ * `tools/writers.mjs` usa de fato no hook emitido (`case "$cmd" in $p)` —
+ * só `*` (zero ou mais caracteres quaisquer), case-sensitive, âncora nas
+ * duas pontas. `?` e `[...]` não aparecem em padrão nenhum do acervo hoje
+ * (conferido antes de escrever isto); se um dia aparecerem, este helper os
+ * trata como literais, não como glob — ficam fora de escopo, não incorretos
+ * por omissão silenciosa.
+ *
+ * Existe porque E17 (achado de 2026-10-27, revisão da própria Task 3) media
+ * cobertura de `deny` por CONTENÇÃO DE TOKEN — "o padrão começa com o
+ * cliente e contém a palavra" — e isso aceitava
+ * `"psql nunca rode DROP em producao"` como se bloqueasse alguma coisa. É a
+ * mesma classe de defeito que esta fase inteira caça (presença de token
+ * tratada como garantia de efeito), agora dentro da guarda que deveria
+ * pegá-la. Cobertura real é: existe padrão que, como GLOB, casaria um
+ * comando destrutivo de verdade — não que contém a palavra em algum lugar.
+ */
+export function globCasa(padrao, texto) {
+  const escapado = padrao
+    .split('*')
+    .map((parte) => parte.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*');
+  return new RegExp(`^${escapado}$`).test(texto);
+}
+
 // Clientes de SQL cujo `deny` precisa do trio DROP/TRUNCATE/DELETE nas duas
 // grafias — ver E17 em `validateGovernance`.
 const CLIENTES_SQL = Object.freeze(['psql', 'mysql', 'mariadb', 'sqlite3']);
 const VERBOS_DESTRUTIVOS = Object.freeze(['DROP', 'TRUNCATE', 'DELETE']);
+
+/**
+ * Comando destrutivo representativo para `cliente` executando `grafia`
+ * (`DROP`/`drop` etc.) — usado só para testar cobertura de `deny` via
+ * `globCasa`, nunca executado. A forma exata (`-c "<verbo> table x"`) é
+ * arbitrária; o que importa é começar com `cliente` (para casar
+ * `cliente*`) e conter `grafia` na caixa exata recebida (para distinguir
+ * cobertura de DROP de cobertura de drop).
+ */
+function comandoRepresentativo(cliente, grafia) {
+  return `${cliente} -c "${grafia} table x"`;
+}
 
 function temRede(cap) {
   return cap.network === true || (Array.isArray(cap.network) && cap.network.length > 0);
@@ -627,28 +665,38 @@ export function validateGovernance(pkg) {
     // pode ter item não-string (E19 já cobre o relato; aqui só não se pode
     // quebrar `.some` sobre ele).
     //
-    // A cobertura por grafia é verificada em CASO ORIGINAL (`d.includes(grafia)`),
-    // não após `.toLowerCase()` dos dois lados — essa foi a armadilha do
-    // rascunho inicial desta regra: baixar a caixa de `padrao` E de `deny`
-    // antes de comparar faz "DROP" e "drop" colapsarem no mesmo texto, e um
-    // único `psql*DROP*` passava a "cobrir" a grafia minúscula que nunca
-    // apareceu — o próprio defeito que esta regra existe para impedir,
-    // escondido dentro da checagem que deveria pegá-lo. Só o prefixo do
-    // cliente é comparado sem caixa (`d.toLowerCase().startsWith(cliente)`);
-    // o verbo — DROP vs drop — é comparado como está escrito.
+    // A cobertura por grafia é medida por EFEITO, via `globCasa` contra um
+    // `comandoRepresentativo` — não por conter o token em algum lugar do
+    // padrão. Fix-round 1 desta tarefa (achado do coordenador, 2026-10-27):
+    // a versão anterior checava `d.toLowerCase().startsWith(cliente) &&
+    // d.includes(grafia)`, e isso aceitava
+    // `"psql nunca rode DROP em producao"` como cobertura — a string
+    // começa com "psql", contém "DROP", e não é glob nenhum: não casaria
+    // comando algum no hook real (`case "$cmd" in $p)` de
+    // `tools/writers.mjs`). Era a mesma classe de defeito que esta fase
+    // inteira caça — presença de token tratada como garantia de efeito —
+    // agora dentro da própria guarda que deveria pegá-la. Medir por efeito
+    // também é o que deixa um `deny: ["psql*"]` sozinho (mais largo que o
+    // pedido, mas cobertura real) passar limpo — a versão por token o
+    // reprovaria.
+    //
+    // O verbo — DROP vs drop — é comparado na caixa exata em que aparece em
+    // `comandoRepresentativo`: é isso que mantém a distinção de grafia que
+    // esta regra existe para forçar (ver E17 em `SCHEMA.md`).
     const deny = listaDeTexto(cap.execute?.deny);
     for (const cliente of CLIENTES_SQL) {
       if (!allow.some((g) => descascarRunner(g).toLowerCase().startsWith(cliente))) continue;
       const faltando = [];
       for (const verbo of VERBOS_DESTRUTIVOS) {
         for (const grafia of [verbo, verbo.toLowerCase()]) {
-          const coberto = deny.some((d) => d.toLowerCase().startsWith(cliente) && d.includes(grafia));
+          const representativo = comandoRepresentativo(cliente, grafia);
+          const coberto = deny.some((d) => globCasa(d, representativo));
           if (!coberto) faltando.push(`${cliente}*${grafia}*`);
         }
       }
       if (faltando.length) {
         erros.push(erro('E17', 'deny-de-sql-incompleto', where,
-          `permite "${cliente}" em execute.allow e o deny não cobre ${faltando.join(', ')} — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias`));
+          `permite "${cliente}" em execute.allow e o deny não cobre ${faltando.join(', ')} — SQL não é sensível a caixa, logo o trio DROP/TRUNCATE/DELETE precisa das duas grafias, como glob que de fato casa o comando`));
       }
     }
   }

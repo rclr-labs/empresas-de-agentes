@@ -511,3 +511,34 @@ test('E17: cliente SQL atrás de runner exige o mesmo trio — o runner não esc
   assert.equal(e17.length, 1);
   assert.match(e17[0].message, /psql/);
 });
+
+// Fix-round 1 (achado do coordenador, 2026-10-27): a checagem de cobertura
+// media CONTENÇÃO DE TOKEN — "o padrão começa com o cliente e contém a
+// palavra" — e isso aceitava uma string de prosa como se fosse glob que
+// bloqueia algo. Este teste é o caso exato: o padrão de "deny" para DROP foi
+// substituído por um comentário, que não é glob válido e não casaria
+// nenhum comando real pelo hook de `tools/writers.mjs`.
+test('E17: deny com prosa em vez de glob não cobre nada — contenção de token não é efeito', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*'], deny: [
+      'psql nunca rode DROP em producao', 'psql*drop*',
+      'psql*TRUNCATE*', 'psql*truncate*', 'psql*DELETE*', 'psql*delete*',
+      'sudo *'] },
+    network: false } });
+  const e17 = validatePackage(pkg).errors.filter((e) => e.code === 'E17');
+  assert.equal(e17.length, 1,
+    `a prosa não casa nenhum comando como glob, logo DROP (maiúsculo) continua descoberto: ${JSON.stringify(e17, null, 2)}`);
+  assert.match(e17[0].message, /DROP/);
+});
+
+// O espelho do teste acima: um deny MAIS LARGO que o pedido (bloqueia todo
+// "psql", não só o trio) é cobertura real — medir por efeito, não por
+// forma, tem de aceitar isto. A versão por contenção de token reprovaria,
+// porque "psql*" não contém a palavra "DROP"/"TRUNCATE"/"DELETE".
+test('E17: deny "psql*" sozinho cobre o trio por ser mais largo — cobertura por efeito, não por forma', () => {
+  const pkg = pacoteMinimo({ slug: 'bi', capabilities: {
+    read: ['database'], write: ['report'],
+    execute: { allow: ['psql -c*'], deny: ['psql*', 'sudo *'] }, network: false } });
+  assert.deepEqual(validatePackage(pkg).errors.filter((e) => e.code === 'E17'), []);
+});
