@@ -126,7 +126,25 @@ function escalar(v) {
   return s;
 }
 
+// Caractere ESTRUTURAL de sequência em fluxo, em QUALQUER posição — não
+// só na abertura, que é o único lugar onde `PERIGOSO` o pega. Dentro de
+// `[...]` a vírgula separa itens e as chaves/colchetes abrem coleção, e o
+// escalar plano ali não os protege: medido com `yaml.load`,
+// `deny: [a,b]` relê como DOIS itens ("a" e "b") — perda silenciosa, um
+// item virando dois —, e `deny: [a]b]`/`deny: [a}b]`/`deny: [a{b]`
+// estouram o documento. Em BLOCO os mesmos caracteres são literais
+// inofensivos, por isso o gatilho é só do caminho de fluxo.
+//
+// Achado na revisão ampla de 2026-10-27: o caminho de fluxo é um TERCEIRO
+// caminho de código (`escalarEmFluxo`), distinto de valor em bloco e de
+// chave, e a tabela adversarial cobria só os outros dois. É o caminho das
+// oito CHAVES_EM_FLUXO — `read`, `write`, `allow`, `deny`, `delegate`,
+// `approve`, `writes`, `network` —, exatamente os campos que o editor da
+// Fase 2 gera a partir de formulário.
+const ESTRUTURAL_EM_FLUXO = /[,[\]{}]/;
+
 function escalarEmFluxo(v) {
+  if (typeof v === 'string' && ESTRUTURAL_EM_FLUXO.test(v)) return citar(v);
   if (typeof v === 'string' && v.includes('.') && !temControle(v) && !RESERVADAS.test(v)
     && !NUMERICA.test(v) && !NUMERICA_NAO_DECIMAL.test(v) && !DATA.test(v)
     && !PERIGOSO.test(v) && !SIMBOLO_AUTORAL.test(v)) {

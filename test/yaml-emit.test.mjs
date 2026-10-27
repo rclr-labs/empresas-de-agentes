@@ -148,7 +148,12 @@ const TABELA_ADVERSARIAL = {
   'bloco dobrado': '>texto',
   'chaves': '{a}',
   'colchetes': '[b]',
-  'vírgula': 'a,b',
+  'vírgula no meio': 'a,b',
+  'vírgula + espaço': 'a, b',
+  'fecha-colchete no meio': 'a]b',
+  'abre-colchete no meio': 'a[b',
+  'fecha-chave no meio': 'a}b',
+  'abre-chave no meio': 'a{b',
   'vazio': '',
   'só espaço': ' ',
   'espaço duplo no meio': 'a  b',
@@ -201,6 +206,24 @@ test('tabela adversarial: toda CHAVE sobrevive à ida e volta, fora das grafias 
     const obj = { [valor]: 1 };
     assert.deepEqual(recarregar(obj), obj,
       `[${nome}] como chave: ${JSON.stringify(valor)} não sobreviveu — emitido ${JSON.stringify(emitYaml(obj))}`);
+  }
+});
+
+// TERCEIRO caminho de código, e o que a revisão ampla achou descoberto:
+// valor dentro de sequência em FLUXO passa por `escalarEmFluxo`, não por
+// `escalar`. É o caminho das oito CHAVES_EM_FLUXO (`read`, `write`,
+// `allow`, `deny`, `delegate`, `approve`, `writes`, `network`) —
+// exatamente os campos que o editor da Fase 2 gera a partir de
+// formulário. Medido antes da correção: `deny: [a,b]` relia como DOIS
+// itens, um virando dois em silêncio; `a]b`, `a{b`, `a}b` e `a[b`
+// estouravam o documento. `deny` é a chave usada aqui porque é de forma
+// livre — `read`/`write` são vocabulário fechado (E02), e um teste de
+// emissor sobre elas testaria o vocabulário, não o emissor.
+test('tabela adversarial: todo valor dentro de sequência em FLUXO sobrevive à ida e volta', () => {
+  for (const [nome, valor] of Object.entries(TABELA_ADVERSARIAL)) {
+    const obj = { deny: [valor] };
+    assert.deepEqual(recarregar(obj), obj,
+      `[${nome}] em fluxo: ${JSON.stringify(valor)} não sobreviveu — emitido ${JSON.stringify(emitYaml(obj))}`);
   }
 });
 
