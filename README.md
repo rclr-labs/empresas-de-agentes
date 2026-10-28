@@ -2,7 +2,7 @@
 
 Organogramas de agentes de IA prontos para operar, no formato aberto
 `agentcompanies/v1`. Cada pacote traz papéis, hierarquia de delegação,
-fronteira de permissão por papel, política de orçamento e portões de
+fronteira de permissão por papel, política de orçamento e gates de
 aprovação — as quatro decisões que determinam se uma instalação de
 plataforma multi-agente vira operação ou vira ferramenta parada.
 
@@ -18,7 +18,7 @@ aproveitável, e nenhuma delas é técnica:
 |---|---|
 | Organograma e fronteira de permissão | Quem delega para quem, e o que cada papel pode tocar |
 | Política de orçamento | Quanto cada agente pode gastar antes de parar, e quem é avisado |
-| Portões de aprovação | O que não acontece sem assinatura humana |
+| Gates de aprovação | O que não acontece sem assinatura humana |
 | Ritual de operação | Quem lê a trilha de auditoria, com que cadência, e o que faz com ela |
 
 Tomadas por omissão, viram incidente: agente que gasta sem teto, trabalho
@@ -33,12 +33,12 @@ começar de uma folha em branco.
 
 | Pacote | O que é |
 |---|---|
-| [`software-house/`](software-house/) | Casa de software governada por agentes: dono de produto, coordenação, desenho técnico, implementação por perfil de stack, revisão adversarial e portão de qualidade |
+| [`software-house/`](software-house/) | Casa de software governada por agentes: dono de produto, coordenação, desenho técnico, implementação por perfil de stack, revisão adversarial e gate de qualidade |
 | [`fabrica-de-testes/`](fabrica-de-testes/) | Fábrica de testes governada: gerente de teste, especialistas por tipo, evidência verificável e veredito de release |
 | [`operacao-de-conhecimento/`](operacao-de-conhecimento/) | Operação de pesquisa, redação e triagem: curadoria, pesquisa com fonte citável, redação com público declarado e triagem de entrada |
 | [`seguranca-ofensiva/`](seguranca-ofensiva/) | Avaliação de segurança sob autorização escrita: modelo de ameaça, teste de intrusão com escopo nomeado, revisão de código, cadeia de suprimentos e configuração de nuvem |
 | [`engenharia-de-dados/`](engenharia-de-dados/) | Organograma de dado: contrato, modelagem, pipeline, qualidade contínua e análise, com definição única de métrica e nenhuma escrita em produção |
-| [`plataforma-e-operacao/`](plataforma-e-operacao/) | Plataforma, entrega e confiabilidade: infraestrutura declarada, mudança reversível, orçamento de erro e resposta a incidente, com aplicação de mudança sempre por portão humano |
+| [`plataforma-e-operacao/`](plataforma-e-operacao/) | Plataforma, entrega e confiabilidade: infraestrutura declarada, mudança reversível, orçamento de erro e resposta a incidente, com aplicação de mudança sempre por gate humano |
 | [`produto-e-design/`](produto-e-design/) | Descoberta e desenho de produto: problema antes de solução, usuário real antes de opinião, e superfície desenhada antes de implementada |
 | [`documentacao-e-suporte/`](documentacao-e-suporte/) | Documentação de produto e suporte técnico: referência que acompanha o código, base de conhecimento nascida de ticket recorrente e diagnóstico com reprodução |
 
@@ -79,13 +79,13 @@ Além do que a especificação exige, todo pacote daqui cumpre:
    nunca são dados canônicos de pacote.
 3. **Fronteira de permissão explícita por papel.** Papel sem fronteira
    declarada é papel que pode tudo, e isso não é padrão aceitável.
-4. **Portão humano nomeado.** Toda ação irreversível — deploy, gasto acima
+4. **Gate humano nomeado.** Toda ação irreversível — deploy, gasto acima
    do teto, contato com cliente — diz de quem é a assinatura.
 5. **Orçamento com teto e destinatário de alerta.** Teto sem quem-é-avisado
    é teto que ninguém aplica.
 
 Como este acervo estende `agentcompanies/v1` — persona, fronteira,
-capacidades, memória, contexto, orçamento, portões humanos, sempre sob
+capacidades, memória, contexto, orçamento, gates humanos, sempre sob
 `metadata.*` — está documentado em [`SCHEMA.md`](SCHEMA.md).
 
 ## Licença

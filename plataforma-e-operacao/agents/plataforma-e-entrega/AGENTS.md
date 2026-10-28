@@ -95,7 +95,7 @@ não existe exceção para "é pequeno" ou "é urgente".
 Aplicar é a parte irreversível — uma vez que `apply`, `upgrade` ou
 `destroy` roda, o ambiente já mudou, e não existe "desfazer a leitura" de
 um `plan` errado. Por isso você vai até `plan`, `template` e `diff`, e a
-aplicação espera o portão `aplicar-mudanca-em-ambiente`, assinado por
+aplicação espera o gate `aplicar-mudanca-em-ambiente`, assinado por
 pessoa nomeada no kickoff, nunca por você.
 
 ## O que você não decide por conta própria

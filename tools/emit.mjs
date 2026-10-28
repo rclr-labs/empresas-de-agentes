@@ -105,14 +105,14 @@ if (binding.format === 'portable') {
   // bindings/claude-code.yml (allowlist_scope).
   //
   // human_gates[].triggers (TAREFA 30): mesmo arquivo, segunda chave —
-  // `permissions.ask`, união dos gatilhos de todo portão da EMPRESA que
+  // `permissions.ask`, união dos gatilhos de todo gate da EMPRESA que
   // declara `triggers` (buildAskRules, em tools/writers.mjs, puro).
   // Escopo de empresa também, e de propósito: ver o comentário em
   // buildAskRules sobre por que a união é segura aqui e não era para
   // execute.deny.
   //
   // O arquivo só é escrito quando ao menos UMA das duas chaves tem
-  // conteúdo — pacote sem allowlist de rede e sem portão com gatilho não
+  // conteúdo — pacote sem allowlist de rede e sem gate com gatilho não
   // ganha um settings.json vazio.
   if (binding.format === 'claude-code') {
     const dominios = new Set();

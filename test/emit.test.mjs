@@ -31,7 +31,7 @@ test('claude-code: emite um .md por agente, com name, description e tools', () =
   assert.deepEqual(arquivos, [
     '.claude', 'coordenacao.md', 'desenvolvimento-backend.md',
     'desenvolvimento-frontend.md', 'desenvolvimento-fullstack.md',
-    'desenvolvimento.md', 'portao-qualidade.md', 'product-owner.md',
+    'desenvolvimento.md', 'gate-qualidade.md', 'product-owner.md',
     'revisao.md', 'tech-lead.md',
   ]);
   const { frontmatter, body } = parseMarkdown(readFileSync(join(out, 'tech-lead.md'), 'utf8'));
@@ -200,7 +200,7 @@ test('claude-code: sem budget.max_turns declarado, maxTurns não aparece', () =>
   assert.equal(frontmatter.maxTurns, undefined);
 });
 
-test('claude-code: human_gates[].triggers emite permissions.ask com os globs; portão sem triggers não inventa nenhum', () => {
+test('claude-code: human_gates[].triggers emite permissions.ask com os globs; gate sem triggers não inventa nenhum', () => {
   // software-house: deploy-producao e remocao-de-dado-de-producao têm
   // triggers; gasto-acima-do-teto e contato-com-cliente não têm.
   const { out } = emitir(['--package', 'software-house', '--binding', 'claude-code']);
@@ -209,21 +209,21 @@ test('claude-code: human_gates[].triggers emite permissions.ask com os globs; po
   assert.ok(settings.permissions.ask.includes('Bash(kubectl apply:*)'));
   assert.ok(settings.permissions.ask.includes('Bash(helm upgrade:*)'));
   assert.ok(settings.permissions.ask.includes('Bash(terraform apply:*)'));
-  // nenhum glob fabricado para os portões sem triggers — a lista não
-  // cresce um item por portão, só por glob declarado.
-  const portoes = 4;
-  assert.ok(settings.permissions.ask.length < portoes * 3,
-    'a lista não pode ter crescido um glob fantasma por portão sem triggers');
+  // nenhum glob fabricado para os gates sem triggers — a lista não
+  // cresce um item por gate, só por glob declarado.
+  const gates = 4;
+  assert.ok(settings.permissions.ask.length < gates * 3,
+    'a lista não pode ter crescido um glob fantasma por gate sem triggers');
   rmSync(out, { recursive: true, force: true });
 });
 
-test('claude-code: NÃO emite settings.json quando nenhum papel declara allowlist E nenhum portão declara gatilho', () => {
+test('claude-code: NÃO emite settings.json quando nenhum papel declara allowlist E nenhum gate declara gatilho', () => {
   // operacao-de-conhecimento: human_gates sem nenhum padrão de comando
   // (publicar-para-fora, gasto-acima-do-teto, contato-com-cliente) e
   // nenhum papel com network como lista de domínio.
   const { out } = emitir(['--package', 'operacao-de-conhecimento', '--binding', 'claude-code']);
   assert.ok(!existsSync(join(out, '.claude', 'settings.json')),
-    'operacao-de-conhecimento não tem allowlist de rede nem portão com gatilho de comando');
+    'operacao-de-conhecimento não tem allowlist de rede nem gate com gatilho de comando');
   rmSync(out, { recursive: true, force: true });
 });
 
@@ -239,7 +239,7 @@ test('claude-code: emite .claude/settings.json com sandbox.network.allowedDomain
   rmSync(out, { recursive: true, force: true });
 });
 
-test('claude-code: software-house GANHA settings.json pelos gatilhos de portão — mesmo sem allowlist de rede', () => {
+test('claude-code: software-house GANHA settings.json pelos gatilhos de gate — mesmo sem allowlist de rede', () => {
   // TAREFA 30 muda este caso: antes, software-house não tinha allowlist
   // de rede nenhuma e por isso não ganhava settings.json. Agora
   // deploy-producao e remocao-de-dado-de-producao declaram triggers, e
@@ -352,20 +352,20 @@ test('portable: um JSON por pacote, com budget preservado', () => {
   const manifesto = JSON.parse(readFileSync(join(out, 'agent-manifest.json'), 'utf8'));
   assert.equal(manifesto.package, 'software-house');
   assert.equal(manifesto.agents.length, 9); // tarefa 19: cinco papéis → nove
-  const pq = manifesto.agents.find((a) => a.slug === 'portao-qualidade');
+  const pq = manifesto.agents.find((a) => a.slug === 'gate-qualidade');
   // NOTA: o brief original desta tarefa esperava
   // `pq.capabilities.approve` igual a ['deploy-producao']. Não é o que o
   // pacote real declara: software-house/COMPANY.md diz explicitamente que
   // "capabilities.approve fica vazio em todos os nove papéis,
   // deliberadamente" — nenhum signer de human_gates é um papel, todos são
   // "pessoa nomeada no kickoff", e E14 reprovaria qualquer approve que
-  // apontasse para um desses portões. A asserção certa é que o valor REAL
+  // apontasse para um desses gates. A asserção certa é que o valor REAL
   // (vazio) sobrevive intacto ao portable, não que um valor que o pacote
   // nunca declarou apareça.
   assert.deepEqual(pq.capabilities.approve, [],
     'portable não perde approve — aqui, vazio por desenho do pacote, preservado como vazio');
   assert.ok(pq.capabilities.budget, 'portable não perde budget');
-  assert.ok(manifesto.human_gates.length >= 4, 'os portões da empresa viajam no manifesto');
+  assert.ok(manifesto.human_gates.length >= 4, 'os gates da empresa viajam no manifesto');
   rmSync(out, { recursive: true, force: true });
 });
 

@@ -104,4 +104,4 @@ dependência contra vulnerabilidade conhecida é trabalho de
 não duplica `npm audit` para manter esta análise inteiramente local. Você
 não altera código de produção; exigir correção é seu trabalho, aplicar a
 correção é de quem opera o sistema. Você não divulga achado para fora —
-isso passa pelo portão da `lideranca-de-seguranca`.
+isso passa pelo gate da `lideranca-de-seguranca`.

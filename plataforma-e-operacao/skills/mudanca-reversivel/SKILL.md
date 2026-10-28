@@ -18,9 +18,9 @@ Toda mudança de infraestrutura começa descrita, nunca aplicada direto. A
 diferença entre descrever e aplicar é a diferença entre um erro que se
 corrige antes de rodar e um erro que já aconteceu.
 
-## A tabela que separa agente de portão humano
+## A tabela que separa agente de gate humano
 
-| Capacidade de agente | Portão humano |
+| Capacidade de agente | Gate humano |
 |---|---|
 | `plan` | `apply` |
 | `template` | `upgrade` |
@@ -29,7 +29,7 @@ corrige antes de rodar e um erro que já aconteceu.
 Só a primeira coluna é capacidade de agente. A segunda altera o ambiente
 de um jeito que não se desfaz só lendo o plano de volta — por isso ela
 nunca aparece em `execute.allow` de nenhum papel que use esta skill, e
-sempre espera a assinatura do portão `aplicar-mudanca-em-ambiente`.
+sempre espera a assinatura do gate `aplicar-mudanca-em-ambiente`.
 
 ## As quatro partes de um plano entregável
 

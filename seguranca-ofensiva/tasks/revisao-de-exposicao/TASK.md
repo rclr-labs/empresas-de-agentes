@@ -23,7 +23,7 @@ jeitos mais caros de este pacote parecer saudável sem estar.
    relatório registrou e a organização esqueceu.
 3. **Escopos vencidos ainda sendo usados.** Uma avaliação rodando contra um
    escopo cuja janela já terminou não é descuido administrativo — é
-   **incidente**, porque é exatamente a situação que o portão
+   **incidente**, porque é exatamente a situação que o gate
    `escopo-autorizado-por-escrito` existe para impedir. Trate como
    incidente, não como observação de rodapé.
 4. **Gasto por papel contra o teto.** `pentest-aplicacao` carrega o maior

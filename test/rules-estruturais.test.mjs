@@ -63,13 +63,13 @@ function pacoteMinimo({ capabilities = {} } = {}) {
 // descer nele (Critical da revisão ampla, 2026-10-27).
 //
 // Medido ponta a ponta pelo revisor numa cópia do acervo: um papel real com
-// `capabilities: "oops"` saía `0 erro, 0 aviso` no portão, e o artefato
+// `capabilities: "oops"` saía `0 erro, 0 aviso` no gate, e o artefato
 // emitido saía com `tools: ""` e os 18 padrões de deny do hook
 // DESAPARECIDOS. A causa era `const cap = meta.capabilities ?? {}`: com
 // escalar, `cap` ERA o escalar, e as cinco sondas de
 // `verificarTiposDeCapacidade` leem `cap.read`/`cap.network`/`cap.execute`
 // como `undefined` e fazem `continue`. Não é escalada de privilégio
-// (`tools: ""` não concede nada) — é o PORTÃO CERTIFICANDO LIMPO sobre um
+// (`tools: ""` não concede nada) — é o GATE CERTIFICANDO LIMPO sobre um
 // papel cuja metade legível por máquina da fronteira foi descartada, e a
 // fronteira é o produto deste acervo.
 test('E19: container de capabilities com tipo errado dá UM erro nomeando o container — e o pacote NÃO sai limpo', () => {
@@ -134,7 +134,7 @@ test('E19: write como string não produz enxurrada de E02', () => {
 });
 
 // `network: true` é forma válida, não erro de tipo — achado ao rodar o
-// portão real: operacao-de-conhecimento/agents/pesquisa/AGENTS.md usa
+// gate real: operacao-de-conhecimento/agents/pesquisa/AGENTS.md usa
 // `network: true` (rede sem allowlist de domínio) com `curl -s*` em
 // execute.allow, e `temRede` (tools/rules.mjs) já trata essa forma como
 // alcance declarado. Sem este teste, um futuro "simplificar para false ou
@@ -225,19 +225,19 @@ test('E04: approve para gate existente passa', () => {
 });
 
 // Gate malformado (sem "id") não pode poluir o Set de ids com `undefined`
-// e produzir, a jusante, um E04 que mente sobre a causa — "portão não
-// existe" quando o problema real é a declaração do portão. A regra deve
+// e produzir, a jusante, um E04 que mente sobre a causa — "gate não
+// existe" quando o problema real é a declaração do gate. A regra deve
 // nomear o defeito como E13 e NÃO emitir E04 para este caso, já que o
 // "approve" não referencia o gate malformado (que não tem id nenhum).
 test('E13: gate sem "id" é malformado, nomeado, e não poluiu o Set com undefined', () => {
   const erros = validateStructure(pacote({
-    gates: [{ description: 'portão sem id' }],
+    gates: [{ description: 'gate sem id' }],
     agents: [{ slug: 'a', capabilities: { approve: ['deploy'] } }],
   }));
   assert.ok(erros.some((e) => e.code === 'E13'), 'gate malformado é nomeado');
   const e04 = erros.filter((e) => e.code === 'E04');
   assert.equal(e04.length, 1, 'approve a "deploy" ainda falha, mas por gate inexistente, não por poluição');
-  assert.doesNotMatch(e04[0].message, /undefined/, 'a mensagem de E04 não cita "undefined" como portão existente');
+  assert.doesNotMatch(e04[0].message, /undefined/, 'a mensagem de E04 não cita "undefined" como gate existente');
 });
 
 test('E13: human_gates que não é lista falha nomeando o tipo recebido', () => {

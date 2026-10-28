@@ -224,7 +224,7 @@ test('catalog: os seis campos de pacote que o spec §6 nomeia para o editor exis
     assert.ok(p.description, `${p.slug}: sem description`);
     assert.ok(Array.isArray(p.goals) && p.goals.length > 0, `${p.slug}: sem goals (metas)`);
     assert.ok(Array.isArray(p.metadata?.human_gates) && p.metadata.human_gates.length > 0,
-      `${p.slug}: sem metadata.human_gates (portões)`);
+      `${p.slug}: sem metadata.human_gates (gates)`);
     assert.ok(p.metadata?.budget?.monthly_cap, `${p.slug}: sem metadata.budget.monthly_cap (teto)`);
     assert.ok(p.license, `${p.slug}: sem license`);
   }

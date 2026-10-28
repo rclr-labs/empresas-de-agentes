@@ -339,7 +339,7 @@ test('validatePackage propaga os avisos de normalização que vieram no pkg', ()
   assert.ok(warnings.some((w) => w.code === 'W01'));
 });
 
-test('E04: portão com acento resolve pelo slug natural', () => {
+test('E04: gate com acento resolve pelo slug natural', () => {
   const pkg = pacote({
     gates: ['deploy em produção', 'remoção de dado de produção'],
     agents: [{ slug: 'a', capabilities: { approve: ['deploy-em-producao', 'remocao-de-dado-de-producao'] } }],

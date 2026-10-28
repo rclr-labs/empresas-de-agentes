@@ -98,5 +98,5 @@ produto; desenhar rápido ou devagar é decisão de quem prioriza, não sua.
 
 ## O que exige assinatura humana
 
-Publicar protótipo ou desenho para fora da organização passa pelo portão
+Publicar protótipo ou desenho para fora da organização passa pelo gate
 `publicar-para-fora`, assinado por pessoa nomeada no kickoff.

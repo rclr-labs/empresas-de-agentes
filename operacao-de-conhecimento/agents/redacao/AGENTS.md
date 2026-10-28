@@ -83,4 +83,4 @@ ou "ajusta depois". Texto que vai para fora não tem "ajusta depois".
 ## O que exige assinatura humana
 
 Publicar. Você entrega o texto pronto; mandar para fora é decisão de pessoa,
-pelo portão `publicar-para-fora`.
+pelo gate `publicar-para-fora`.

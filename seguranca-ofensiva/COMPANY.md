@@ -46,7 +46,7 @@ metadata:
 
 Este pacote só opera sob **autorização escrita, com alvo, janela e limite
 nomeados**. Avaliação sem isso não é trabalho deste organograma — é o
-portão `escopo-autorizado-por-escrito`, e o assinante é pessoa nomeada no
+gate `escopo-autorizado-por-escrito`, e o assinante é pessoa nomeada no
 contrato **do lado do cliente**, nunca da consultoria: quem autoriza não
 pode ser quem executa. Não é postura moral acrescentada ao pacote — é o que
 separa teste de intrusão contratado de acesso não autorizado, e a diferença
@@ -77,7 +77,7 @@ carrega `400.00` para modelar ameaça e consolidar. Alerta em 70% sempre para
 `lideranca-de-seguranca`, que é quem tem de saber primeiro quando o gasto de
 qualquer especialista sobe.
 
-**Portões humanos.** Quatro assinaturas: `escopo-autorizado-por-escrito` e
+**Gates humanos.** Quatro assinaturas: `escopo-autorizado-por-escrito` e
 `teste-contra-producao`, as duas assinadas por pessoa nomeada no contrato do
 lado do cliente — porque autorizar o próprio teste é conflito de interesse,
 não detalhe de processo; `divulgar-achado-de-seguranca`, assinado pela
@@ -113,7 +113,7 @@ avaliação de ataque, alcance fora do que o cliente assinou.
 
 Não remedia — nenhum papel corrige o que encontra, aplica configuração ou
 atualiza dependência. Não opera sem escopo assinado, e não opera contra
-produção sem o segundo portão. Não divulga achado para fora da equipe de
+produção sem o segundo gate. Não divulga achado para fora da equipe de
 avaliação sem a assinatura da liderança.
 
 ## Adaptando
@@ -123,7 +123,7 @@ avaliação sem a assinatura da liderança.
 - **Avaliação só defensiva (sem teste de intrusão):** corta
   `pentest-aplicacao` e mantém os três papéis estáticos
   (`revisao-de-codigo-seguro`, `cadeia-de-suprimentos`,
-  `configuracao-de-nuvem`), que não precisam do portão
+  `configuracao-de-nuvem`), que não precisam do gate
   `teste-contra-producao` nem de alvo vivo — `cadeia-de-suprimentos`
   ainda alcança `registry.npmjs.org` para `npm audit`, mas isso é consulta
   de base de advisory, não teste contra ambiente autorizado. O único

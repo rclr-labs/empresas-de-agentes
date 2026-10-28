@@ -96,7 +96,7 @@ concorrer com ela.
 
 Achado que reenquadrou o item B. Os entregáveis #2 e #3 da proposta de
 implantação são *"desenho do organograma de agentes com fronteira de
-permissão por papel"* e *"política de orçamento, escalonamento e portões
+permissão por papel"* e *"política de orçamento, escalonamento e gates
 de aprovação"* — vendidos como Fase 1, duas semanas.
 
 Um pacote `agentcompanies/v1` codifica exatamente isso: `agents/` é o

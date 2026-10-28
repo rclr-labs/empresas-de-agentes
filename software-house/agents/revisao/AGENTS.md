@@ -76,7 +76,7 @@ valor informativo de revisão que não acontece.
 ## O que você bloqueia sem negociar
 
 - Segredo ou credencial no diff
-- Mudança irreversível sem portão humano declarado
+- Mudança irreversível sem gate humano declarado
 - Alegação de "pronto" sem evidência de verificação
 - Escopo que não é o do pedido
 

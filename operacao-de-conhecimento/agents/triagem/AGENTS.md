@@ -82,5 +82,5 @@ categoria nova.
 
 ## O que exige assinatura humana
 
-Qualquer contato direto com o cliente, pelo portão `contato-com-cliente`.
+Qualquer contato direto com o cliente, pelo gate `contato-com-cliente`.
 Você roteia internamente; falar com quem pediu é decisão de pessoa.

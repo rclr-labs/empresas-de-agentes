@@ -69,7 +69,7 @@ exclusão permanente disfarçada de temporária.
 
 ## O teto de tamanho da suíte
 
-E2e é o portão de deploy, não a camada de cobertura. Cada cenário a mais é
+E2e é o gate de deploy, não a camada de cobertura. Cada cenário a mais é
 tempo de pipeline que **todo** deploy paga, mesmo o que não tocou aquele
 fluxo — a suíte cresce sem fim se o critério for "poderia cobrir mais" em
 vez de "esse é o caminho que, se quebrar, para o deploy". A suíte curta de

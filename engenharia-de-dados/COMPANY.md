@@ -65,7 +65,7 @@ produção — é regra do pacote inteiro, não decisão papel a papel.
 forma mais comum de dois relatórios discordarem do mesmo número: um
 painel soma excluindo cancelamento, outro inclui, e os dois chamam o
 resultado pelo mesmo nome. Por isso a definição de uma métrica já
-publicada só muda pelo portão `alterar-definicao-de-metrica` — assinado
+publicada só muda pelo gate `alterar-definicao-de-metrica` — assinado
 por `lideranca-de-dados`, porque é decisão de domínio sobre o que o
 número significa, não sobre o limite do próprio papel. `analytics-bi`
 consome a definição publicada; ele nunca a redefine para fechar um
@@ -80,7 +80,7 @@ escrever checagem contínua é trabalho de código, não de relatório;
 `300.00` cada. Alerta em 70% sempre para `lideranca-de-dados`, que é quem
 precisa saber primeiro quando o gasto de qualquer especialista sobe.
 
-**Portões humanos.** Quatro assinaturas. `acesso-a-dado-pessoal` e
+**Gates humanos.** Quatro assinaturas. `acesso-a-dado-pessoal` e
 `escrever-em-producao` são sempre pessoa nomeada no kickoff — acessar
 dado pessoal identificável e escrever em produção são exatamente os dois
 jeitos deste pacote causar dano irreversível, e nenhum papel assina sobre
@@ -90,13 +90,13 @@ contrato de dado é quem decide quando uma definição publicada pode
 mudar. `gasto-acima-do-teto` é sempre pessoa nomeada e nunca listado em
 `capabilities.approve` de nenhum papel.
 
-## Dado pessoal: portão, não checagem de código
+## Dado pessoal: gate, não checagem de código
 
 `acesso-a-dado-pessoal` existe porque dado pessoal identificável não é só
 mais um tipo de dado a modelar — é dado cujo acesso indevido tem
 consequência fora do pipeline. Quem quiser compor qualidade de dado com
 privacidade de dado encontra o papel `privacidade` em `fabrica-de-testes`:
-lá a checagem é sobre exposição em release; aqui o portão é sobre acesso
+lá a checagem é sobre exposição em release; aqui o gate é sobre acesso
 durante construção e operação contínua. Os dois cobrem momentos
 diferentes do mesmo risco.
 
@@ -114,15 +114,15 @@ todo dia.
 
 ## O que este pacote deliberadamente não faz
 
-Não escreve em produção sem o portão `escrever-em-producao` — esse portão,
+Não escreve em produção sem o gate `escrever-em-producao` — esse gate,
 não a ausência de `DROP`/`TRUNCATE`/`DELETE` em `execute.allow`, é a
 fronteira real. `psql -c*` e `mysql -e*` admitem qualquer SQL por
 construção, `DROP` incluído; o `deny` de palavra-chave em cada papel é
 defesa em profundidade sobre esse allow largo, não a fronteira em si — e
 por isso cobre as três palavras, nos clientes que o papel permite, em
 maiúscula e minúscula. Não acessa
-dado pessoal identificável sem o portão `acesso-a-dado-pessoal`. Não
-redefine métrica publicada fora do portão `alterar-definicao-de-metrica`.
+dado pessoal identificável sem o gate `acesso-a-dado-pessoal`. Não
+redefine métrica publicada fora do gate `alterar-definicao-de-metrica`.
 
 ## Adaptando
 

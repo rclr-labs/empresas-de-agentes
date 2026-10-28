@@ -183,16 +183,16 @@ export const CHAVES_DERIVADAS = Object.freeze({
 // `budget` e `capability_vocabulary`), `authors`, `kind`, `requirements`,
 // `schema`, `tags`, `version` — e o corpo inteiro, 2,6 a 5,1 KB cada. Dos
 // seis campos de pacote que o spec §6 nomeia para o editor (nome,
-// descrição, metas, portões, teto, `license`), DOIS não existiam no
+// descrição, metas, gates, teto, `license`), DOIS não existiam no
 // catálogo: metas e teto.
 //
 // `human_gates` içado no topo foi REMOVIDO junto. Três razões: com o
 // frontmatter inteiro espalhado, `metadata.human_gates` chega íntegro e o
 // içado passou a ser verdade duplicada (atualizar a cópia esquecida
 // recria o defeito); o `?? []` do içado FABRICAVA lista vazia para um
-// pacote que não declara portão nenhum, o que é afirmar algo que o
+// pacote que não declara gate nenhum, o que é afirmar algo que o
 // arquivo não diz; e nenhum consumidor existia (`grep` em `test/`,
-// `tools/` e `bindings/`: zero). Os "portões" do spec §6 seguem
+// `tools/` e `bindings/`: zero). Os "gates" do spec §6 seguem
 // atendidos, em `metadata.human_gates` — o lugar onde o arquivo os
 // escreve.
 function construirPacote(pkg) {
@@ -261,7 +261,7 @@ function formatarErros(erros) {
  * completo, quando o próprio desenho do acervo (W03 existir como aviso,
  * não erro) já decidiu que isso é degradação aceitável, não motivo de
  * reprovação. Erro é "este papel pode tudo" ou "esta identidade colide";
- * aviso é "este card não tem ícone" — categorias diferentes, portões
+ * aviso é "este card não tem ícone" — categorias diferentes, gates
  * diferentes.
  */
 export function buildCatalog(raiz, opts = {}) {

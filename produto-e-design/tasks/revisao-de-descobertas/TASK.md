@@ -1,6 +1,6 @@
 ---
 name: Revisão semanal das descobertas
-description: Ritual de operação — ler hipóteses abertas, achados acumulados e a fila do portão de contato com usuário
+description: Ritual de operação — ler hipóteses abertas, achados acumulados e a fila do gate de contato com usuário
 assignee: descoberta-de-produto
 recurring: true
 ---
@@ -22,7 +22,7 @@ sem dono é o gasto mais invisível deste pacote.
 3. **Achados que viraram decisão, e achados que ficaram no relatório.**
    Achado que não move nenhuma decisão em semanas é achado que não devia
    ter sido priorizado, ou decisão que está sendo adiada sem dizer.
-4. **Fila esperando o portão de contato com usuário.** Quantos pedidos de
+4. **Fila esperando o gate de contato com usuário.** Quantos pedidos de
    entrevista ou teste estão parados esperando assinatura, e há quanto
    tempo. Fila que cresce aqui significa pesquisa que não acontece.
 5. **O número que mais engana.** Volume de pesquisa subindo pode significar

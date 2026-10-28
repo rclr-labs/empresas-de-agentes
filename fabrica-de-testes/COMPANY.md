@@ -81,7 +81,7 @@ escopo de release.
 **Orçamento.** Teto **por execução**, não por mês — teste é trabalho em
 rajada, e teto mensal esconde a execução que custou dez vezes o normal.
 
-**Portões humanos.** Três: tocar produção, passar da carga acordada e
+**Gates humanos.** Três: tocar produção, passar da carga acordada e
 divulgar achado de segurança. Os três são irreversíveis de maneiras
 diferentes, e nenhum é decisão de agente. `tocar-producao` e
 `carga-acima-do-acordado` declaram `triggers` — o glob de comando que pede

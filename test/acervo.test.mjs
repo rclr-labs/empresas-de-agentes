@@ -30,7 +30,7 @@ test('software-house: nove papéis depois da expansão', () => {
   assert.deepEqual(pkg.agents.map((a) => a.slug).sort(), [
     'coordenacao', 'desenvolvimento', 'desenvolvimento-backend',
     'desenvolvimento-frontend', 'desenvolvimento-fullstack',
-    'portao-qualidade', 'product-owner', 'revisao', 'tech-lead',
+    'gate-qualidade', 'product-owner', 'revisao', 'tech-lead',
   ]);
 });
 
@@ -102,13 +102,13 @@ test('todo pacote do acervo: nenhuma chave de topo nova — só o que a spec per
   }
 });
 
-test('nenhum papel assina o portão de teto sobre os próprios limites', () => {
+test('nenhum papel assina o gate de teto sobre os próprios limites', () => {
   // Teste estreito, de propósito — e isso é aceitável aqui porque o
-  // portão de teto tem razão própria para nunca ter um papel como signer,
+  // gate de teto tem razão própria para nunca ter um papel como signer,
   // mesmo quando esse papel seria tecnicamente elegível: alertar a si
   // mesmo é notificação, autorizar o próprio estouro é conflito. A
   // cobertura universal — nenhum approve pode discordar do signer
-  // declarado, de qualquer portão — é o teste seguinte, que espelha a
+  // declarado, de qualquer gate — é o teste seguinte, que espelha a
   // regra E14 do validador em vez de uma lista de padrões de nome.
   for (const nome of listPackages(RAIZ)) {
     const pkg = loadPackage(join(RAIZ, nome));
@@ -118,22 +118,22 @@ test('nenhum papel assina o portão de teto sobre os próprios limites', () => {
       if (!/gasto|teto|or[çc]amento/i.test(id)) continue;
       const signer = typeof g === 'string' ? null : g.signer;
       assert.ok(!slugs.has(signer),
-        `${nome}: o portão "${id}" é assinado pelo papel "${signer}". Alertar a si mesmo é notificação; autorizar o próprio estouro é conflito — o signer tem de ser pessoa nomeada`);
+        `${nome}: o gate "${id}" é assinado pelo papel "${signer}". Alertar a si mesmo é notificação; autorizar o próprio estouro é conflito — o signer tem de ser pessoa nomeada`);
     }
     for (const a of pkg.agents) {
       const aprova = a.frontmatter.metadata?.capabilities?.approve ?? [];
       const propria = aprova.find((x) => /gasto|teto/i.test(x));
       assert.ok(!propria,
-        `${nome}/${a.slug} lista "${propria}" em approve — nenhum papel aprova o portão do próprio teto`);
+        `${nome}/${a.slug} lista "${propria}" em approve — nenhum papel aprova o gate do próprio teto`);
     }
   }
 });
 
 test('nenhum pacote do acervo produz E14 — approve sempre concorda com o signer declarado', () => {
   // Cobertura universal, escrita a partir do princípio (approve == "eu
-  // assino"), não do padrão de nome do portão encontrado na última
+  // assino"), não do padrão de nome do gate encontrado na última
   // rodada. É esta a diferença entre a guarda acima — que só pega o
-  // portão de teto — e esta, que pega qualquer portão, de qualquer
+  // gate de teto — e esta, que pega qualquer gate, de qualquer
   // pacote, cujo approve discorde do signer.
   for (const nome of listPackages(RAIZ)) {
     const { errors } = relatorio(nome);
@@ -142,8 +142,8 @@ test('nenhum pacote do acervo produz E14 — approve sempre concorda com o signe
   }
 });
 
-test('TAREFA 30: só os portões com padrão de comando real declaram triggers', () => {
-  // human_gates[].triggers é opcional e aditivo — um portão sem padrão de
+test('TAREFA 30: só os gates com padrão de comando real declaram triggers', () => {
+  // human_gates[].triggers é opcional e aditivo — um gate sem padrão de
   // comando (contato com cliente, divulgar achado de segurança, gasto
   // acima do teto) não pode ganhar um glob inventado só para preencher o
   // campo. software-house: deploy-producao e remocao-de-dado-de-producao
@@ -287,7 +287,7 @@ test('fabrica-de-testes: nenhum especialista pode emitir veredito', () => {
   const { pkg } = relatorio('fabrica-de-testes');
   for (const a of pkg.agents.filter((x) => x.slug !== 'polaris')) {
     assert.deepEqual(a.frontmatter.metadata.capabilities.approve, [],
-      `${a.slug} não assina portão — veredito é de polaris`);
+      `${a.slug} não assina gate — veredito é de polaris`);
     assert.deepEqual(a.frontmatter.metadata.capabilities.delegate, [],
       `${a.slug} não delega — especialista é folha`);
   }
@@ -322,11 +322,11 @@ test('fabrica-de-testes: contrato-api e api-funcional têm fronteiras distintas'
     'o funcional declara que cria dado de teste; o de contrato não');
 });
 
-test('fabrica-de-testes: desempenho-e-carga exige portão humano de carga', () => {
+test('fabrica-de-testes: desempenho-e-carga exige gate humano de carga', () => {
   const { pkg } = relatorio('fabrica-de-testes');
   const d = pkg.agents.find((a) => a.slug === 'desempenho-e-carga');
   assert.ok(d.frontmatter.metadata.boundary.cannot.some((t) => /carga|volume/i.test(t)),
-    'passar da carga acordada é portão humano, não decisão do agente');
+    'passar da carga acordada é gate humano, não decisão do agente');
 });
 
 test('fabrica-de-testes: polaris delega para os oito especialistas', () => {
@@ -336,7 +336,7 @@ test('fabrica-de-testes: polaris delega para os oito especialistas', () => {
   assert.ok(!p.frontmatter.metadata.capabilities.delegate.includes('polaris'));
 });
 
-test('fabrica-de-testes: nenhum especialista lê database sem portão humano declarado', () => {
+test('fabrica-de-testes: nenhum especialista lê database sem gate humano declarado', () => {
   const { pkg } = relatorio('fabrica-de-testes');
   const integridade = pkg.agents.find((a) => a.slug === 'integridade-de-dados');
   assert.ok(integridade.frontmatter.metadata.capabilities.read.includes('database'),
@@ -397,26 +397,26 @@ test('produto-e-design: nenhum papel escreve código', () => {
   }
 });
 
-test('produto-e-design: só pesquisa-ux condiciona o contato com usuário ao portão — os outros dois negam sem condição', () => {
-  // O teste anterior só verificava que o portão `contato-com-usuario`
+test('produto-e-design: só pesquisa-ux condiciona o contato com usuário ao gate — os outros dois negam sem condição', () => {
+  // O teste anterior só verificava que o gate `contato-com-usuario`
   // existe e que o `cannot` de pesquisa-ux menciona usuário — mas
   // descoberta-de-produto e design-ui também negam "falar diretamente
   // com usuário" no `cannot`, então o mesmo regex casaria com qualquer
   // um dos três e "só pesquisa-ux" podia ser falso sem o teste notar.
   // A fronteira que de fato distingue: só a cláusula de pesquisa-ux é
-  // CONDICIONADA ao portão ("sem portão humano") — as outras duas
-  // proíbem sem exceção, porque não têm o portão como válvula.
+  // CONDICIONADA ao gate ("sem gate humano") — as outras duas
+  // proíbem sem exceção, porque não têm o gate como válvula.
   const { pkg } = relatorio('produto-e-design');
   const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
   assert.ok(ids.includes('contato-com-usuario'),
-    'falar com usuário real é portão humano: tem gente de verdade do outro lado');
-  const condicionamPeloPortao = pkg.agents
+    'falar com usuário real é gate humano: tem gente de verdade do outro lado');
+  const condicionamPeloGate = pkg.agents
     .filter((a) => a.frontmatter.metadata.boundary.cannot.some(
-      (t) => /usu[áa]rio/i.test(t) && /portão humano/i.test(t)))
+      (t) => /usu[áa]rio/i.test(t) && /gate humano/i.test(t)))
     .map((a) => a.slug)
     .sort();
-  assert.deepEqual(condicionamPeloPortao, ['pesquisa-ux'],
-    'só pesquisa-ux condiciona o contato com usuário ao portão; se descoberta-de-produto ou ' +
+  assert.deepEqual(condicionamPeloGate, ['pesquisa-ux'],
+    'só pesquisa-ux condiciona o contato com usuário ao gate; se descoberta-de-produto ou ' +
     'design-ui ganhassem a mesma válvula, ou se pesquisa-ux a perdesse, a exclusividade colapsa');
 });
 
@@ -437,11 +437,11 @@ test('seguranca-ofensiva: zero erro e zero aviso', () => {
   assert.deepEqual(warnings, [], warnings.map((w) => `${w.code} ${w.path ?? w.file}: ${w.message}`).join('\n'));
 });
 
-test('seguranca-ofensiva: autorização escrita é portão humano com assinante nomeado', () => {
+test('seguranca-ofensiva: autorização escrita é gate humano com assinante nomeado', () => {
   const { pkg } = relatorio('seguranca-ofensiva');
   const gates = pkg.company.frontmatter.metadata.human_gates ?? [];
   const autorizacao = gates.find((g) => g.id === 'escopo-autorizado-por-escrito');
-  assert.ok(autorizacao, 'o escopo autorizado é portão, não campo de configuração');
+  assert.ok(autorizacao, 'o escopo autorizado é gate, não campo de configuração');
   assert.ok(autorizacao.signer, 'e tem assinante nomeado');
 });
 
@@ -469,11 +469,11 @@ test('seguranca-ofensiva: nenhum papel aplica mudança em ambiente', () => {
   }
 });
 
-test('seguranca-ofensiva: só a liderança divulga achado, e por portão', () => {
+test('seguranca-ofensiva: só a liderança divulga achado, e por gate', () => {
   const { pkg } = relatorio('seguranca-ofensiva');
   for (const a of pkg.agents.filter((x) => x.slug !== 'lideranca-de-seguranca')) {
     assert.deepEqual(a.frontmatter.metadata.capabilities.approve, [],
-      `${a.slug} não assina portão — divulgação é da liderança`);
+      `${a.slug} não assina gate — divulgação é da liderança`);
   }
 });
 
@@ -535,25 +535,25 @@ test('REGRA DO PACOTE: nenhum papel aplica mudança em ambiente', () => {
   for (const a of pkg.agents) {
     for (const g of a.frontmatter.metadata.capabilities.execute?.allow ?? []) {
       assert.ok(!/(apply|upgrade|destroy|rollout restart|delete)/i.test(g),
-        `${a.slug}: "${g}" aplica mudança. plan, template e diff são de agente; apply é portão humano`);
+        `${a.slug}: "${g}" aplica mudança. plan, template e diff são de agente; apply é gate humano`);
     }
   }
 });
 
-test('plataforma-e-operacao: aplicar mudança e deploy são portões humanos nomeados', () => {
+test('plataforma-e-operacao: aplicar mudança e deploy são gates humanos nomeados', () => {
   const { pkg } = relatorio('plataforma-e-operacao');
   const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
   assert.ok(ids.includes('aplicar-mudanca-em-ambiente'));
   assert.ok(ids.includes('acesso-a-dado-de-producao'));
 });
 
-test('plataforma-e-operacao: só resposta-a-incidente lê produção, e por portão', () => {
+test('plataforma-e-operacao: só resposta-a-incidente lê produção, e por gate', () => {
   const { pkg } = relatorio('plataforma-e-operacao');
   const comProducao = pkg.agents.filter((a) =>
     (a.frontmatter.metadata.capabilities.read ?? []).includes('database'));
   assert.deepEqual(comProducao.map((a) => a.slug), ['resposta-a-incidente']);
   assert.ok(comProducao[0].frontmatter.metadata.capabilities.approve.length === 0,
-    'ele usa o portão, não o assina');
+    'ele usa o gate, não o assina');
 });
 
 test('engenharia-de-dados: cinco papéis, liderança na raiz', () => {
@@ -627,7 +627,7 @@ test('PAR DE RISCO: suporte-nivel-2 reproduz, triagem só roteia', () => {
   // e executa) tivesse colapsado — campo irrelevante para o par de
   // risco mascarando a convergência que o teste deveria pegar. O que de
   // fato separa os dois: suporte-nivel-2 lê `database` (acesso a
-  // produção pelo portão, com caso aberto) e roda `kubectl`/`psql`;
+  // produção pelo gate, com caso aberto) e roda `kubectl`/`psql`;
   // triagem não lê banco e só tem leitura de repositório.
   assert.ok(s.frontmatter.metadata.capabilities.read.includes('database'),
     'suporte-nivel-2 lê database: reproduzir o caso exige olhar o dado por trás dele');
@@ -643,7 +643,7 @@ test('PAR DE RISCO: suporte-nivel-2 reproduz, triagem só roteia', () => {
     'backstop: se a fronteira de execução colapsar por qualquer outro caminho, isto também acusa');
 });
 
-test('documentacao-e-suporte: nenhum papel fala com cliente sem portão', () => {
+test('documentacao-e-suporte: nenhum papel fala com cliente sem gate', () => {
   const { pkg } = relatorio('documentacao-e-suporte');
   const ids = (pkg.company.frontmatter.metadata.human_gates ?? []).map((g) => g.id);
   assert.ok(ids.includes('responder-ao-cliente'));

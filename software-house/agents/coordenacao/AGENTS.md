@@ -37,7 +37,7 @@ metadata:
       allow: ["git log*", "git diff*"]
       deny: ["git push*", "git merge*", "sudo *"]
     network: false
-    delegate: [product-owner, tech-lead, portao-qualidade]
+    delegate: [product-owner, tech-lead, gate-qualidade]
     budget:
       currency: BRL
       monthly_cap: 400.00

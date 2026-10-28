@@ -85,7 +85,7 @@ para quem só lê.
 - **Espera por condição, nunca por tempo fixo.** `sleep(2000)` falha quando o
   ambiente está lento e esconde defeito quando o ambiente está rápido — nos
   dois casos, a suíte está medindo o relógio, não o produto.
-- **A suíte é curta de propósito.** E2e é o portão de deploy, não a camada
+- **A suíte é curta de propósito.** E2e é o gate de deploy, não a camada
   de cobertura: cada cenário a mais é tempo de pipeline que todo deploy
   paga, mesmo o que não mexeu naquele fluxo.
 

@@ -79,13 +79,13 @@ function executeDenyHooks(agent) {
 
 // human_gates[].triggers → permissions.ask, TAREFA 30. Escopo de EMPRESA
 // (todo o pacote), não de agente — ao contrário de execute.deny. É a
-// escolha certa aqui, não o mesmo risco: um portão humano existe para
+// escolha certa aqui, não o mesmo risco: um gate humano existe para
 // QUALQUER agente do pacote que tente o comando, não para um papel só, e
 // `ask` apenas PAUSA para confirmação — não nega como `deny` — então não
 // há como a união de gatilhos bloquear o que outro papel tem permissão
 // explícita para fazer (a razão pela qual a união de `execute.deny` foi
-// rejeitada em bindings/claude-code.yml `source`). Só os portões que
-// DECLARAM `triggers` contribuem; um portão sem gatilho de comando
+// rejeitada em bindings/claude-code.yml `source`). Só os gates que
+// DECLARAM `triggers` contribuem; um gate sem gatilho de comando
 // (contato com cliente, divulgar achado de segurança) não inventa um glob
 // — fica em not_emitted (ver applyBinding, chave `approve`).
 //
