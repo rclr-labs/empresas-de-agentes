@@ -100,7 +100,7 @@ const SANDBOX = [
   '    metadata: { human_gates: [{ id: "g", description: "g", signer: "p" }] } } },',
   '  agents: [{ path: "agents/a/AGENTS.md", slug: "a", body: "corpo", frontmatter: {',
   '    name: "A", title: "A", slug: "a", reportsTo: null, skills: ["s"],',
-  '    metadata: { boundary: { can: ["ler"], cannot: [] },',
+  '    metadata: { boundary: { can: ["ler"], cannot: ["fazer deploy"] },',
   '      capabilities: { read: ["repository"], write: [], execute: { allow: [], deny: [] }, network: false },',
   '      persona: { display_name: "Ana Vieira", icon: "X", pronouns: "ela/dela",',
   '        headline: "h", background: ["a", "b", "c"], strengths: ["x"], signature_question: "q?" } } } }],',

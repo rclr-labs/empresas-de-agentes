@@ -783,6 +783,20 @@ function escreveOuExecuta(cap) {
   return escreve || executa;
 }
 
+/**
+ * Uma metade de `boundary` (`can` ou `cannot`) conta como vazia quando não
+ * sobra nenhuma string não-branca — lista vazia (`[]`), item em branco
+ * (`['']`, `['   ']`), ou o campo nem sendo lista (`""`, por exemplo):
+ * `listaDeTexto` já trata não-array como `[]`, então esta função cobre as
+ * três formas sem checagem de tipo própria. Medido em 2026-10-28 contra o
+ * acervo real (42 papéis, via script de varredura): ZERO papéis têm
+ * qualquer metade vazia por este critério — a regra que usa isto
+ * (E20) é puramente aditiva.
+ */
+function metadeDeFronteiraVazia(lista) {
+  return !listaDeTexto(lista).some((s) => s.trim().length > 0);
+}
+
 export function validateGovernance(pkg) {
   const erros = [];
   const slugs = new Set(pkg.agents.map((a) => a.slug));
@@ -792,10 +806,50 @@ export function validateGovernance(pkg) {
     const meta = mapaOuVazio(agente.frontmatter?.metadata);
     const cap = mapaOuVazio(meta.capabilities);
 
-    // E06 — fronteira obrigatória
-    if (!meta.boundary || (!meta.boundary.can && !meta.boundary.cannot)) {
+    // E06 — fronteira obrigatória (boundary AUSENTE, ou sem can e sem cannot
+    // nenhum). `semFronteira` é calculado uma vez e reaproveitado por E20
+    // abaixo: é o que garante que as duas regras nunca disparam para o
+    // mesmo papel — E06 cobra a AUSÊNCIA do nó, E20 cobra o nó PRESENTE com
+    // alguma metade vazia, e um caso não pode ser as duas coisas ao mesmo
+    // tempo.
+    const semFronteira = !meta.boundary || (!meta.boundary.can && !meta.boundary.cannot);
+    if (semFronteira) {
       erros.push(erro('E06', 'fronteira-ausente', where,
         'papel sem metadata.boundary. Papel sem fronteira declarada é papel que pode tudo, e isso não é padrão aceitável'));
+    }
+
+    // E20 — boundary PRESENTE, mas com alguma metade vazia. Achado em
+    // 2026-10-28, construindo o editor da vitrine: o único campo daquela
+    // fatia é exatamente `boundary.can`/`boundary.cannot`, e esvaziar os
+    // dois é dois cliques — e até aqui, `boundary: { can: [], cannot: [] }`
+    // passava com ZERO erros. Mesma forma do Critical de `capabilities` com
+    // tipo errado (E19): o gate certificava limpo um papel cuja fronteira
+    // não diz nada.
+    //
+    // Código NOVO, não extensão de E06: E06 significa "declare boundary", e
+    // o conserto para um `boundary` presente e vazio é outro — "preencha
+    // can/cannot" — então o mesmo código serviria dois consertos distintos
+    // atrás da mesma mensagem.
+    //
+    // As DUAS metades são exigidas, não só "nem as duas vazias": a tese do
+    // acervo (vitrine) é que o papel declara o que PODE e o que NÃO PODE —
+    // duas promessas, não uma. `can` vazio com `cannot` cheio entrega só a
+    // metade negativa do contrato (e vice-versa), e isso é a mesma classe
+    // de fronteira incompleta que levou à regra, só que pela metade oposta.
+    //
+    // É ERRO, não aviso: a consequência de uma metade vazia é idêntica à de
+    // `boundary` ausente (E06) — um papel sem limite real declarado nessa
+    // direção — e o gate da vitrine já trata aviso como bloqueio (exige 0
+    // erro E 0 aviso), então rebaixar para aviso não mudaria o
+    // comportamento observável, só a severidade reportada para fora.
+    if (!semFronteira) {
+      const canVazio = metadeDeFronteiraVazia(meta.boundary.can);
+      const cannotVazio = metadeDeFronteiraVazia(meta.boundary.cannot);
+      if (canVazio || cannotVazio) {
+        const metades = [canVazio && 'can', cannotVazio && 'cannot'].filter(Boolean);
+        erros.push(erro('E20', 'fronteira-metade-vazia', where,
+          `boundary.${metades.join(' e ')} ${metades.length > 1 ? 'estão vazios' : 'está vazio'} (lista vazia, item em branco, ou tipo que não é lista de texto). Um papel declara o que PODE e o que NÃO PODE — as duas metades são exigidas, e metade vazia não declara limite nenhum nessa direção`));
+      }
     }
 
     // E07 — quem escreve ou executa precisa de teto
