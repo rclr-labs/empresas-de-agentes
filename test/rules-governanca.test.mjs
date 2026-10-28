@@ -70,6 +70,64 @@ test('E06: papel com boundary passa', () => {
   assert.ok(!codigos(pacote({ agents: [{ slug: 'a' }] })).includes('E06'));
 });
 
+// E20 — boundary PRESENTE com alguma metade vazia. Diferente de E06 (que
+// cobra AUSÊNCIA de boundary): aqui o nó existe, e o defeito é a vitrine
+// medir — esvaziar can/cannot pelo editor é dois cliques, e sem esta regra
+// o gate certifica limpo um papel sem fronteira nenhuma. Todo caso aqui
+// precisa de `boundary` PRESENTE para não morrer na guarda de E06 antes de
+// chegar na regra que o teste quer provar.
+test('E20: cannot vazio com can preenchido falha', () => {
+  const erros = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: ['ler código'], cannot: [] } }],
+  }));
+  assert.ok(erros.includes('E20'), erros.join(','));
+  assert.ok(!erros.includes('E06'), 'E06 não deve duplicar: boundary existe');
+});
+
+test('E20: can vazio com cannot preenchido falha — as duas metades são exigidas', () => {
+  const erros = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: [], cannot: ['fazer deploy'] } }],
+  }));
+  assert.ok(erros.includes('E20'), erros.join(','));
+});
+
+test('E20: can e cannot vazios falha', () => {
+  const erros = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: [], cannot: [] } }],
+  }));
+  assert.ok(erros.includes('E20'), erros.join(','));
+});
+
+test('E20: item presente mas em branco conta como vazio', () => {
+  const comEspacos = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: ['ler código'], cannot: ['   '] } }],
+  }));
+  assert.ok(comEspacos.includes('E20'), comEspacos.join(','));
+
+  const comVazio = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: ['ler código'], cannot: [''] } }],
+  }));
+  assert.ok(comVazio.includes('E20'), comVazio.join(','));
+});
+
+test('E20: cannot como string em vez de lista também conta como vazio — não duplica guarda de E19', () => {
+  // E19 não valida o TIPO de boundary.can/cannot hoje (só capabilities.*) —
+  // medido antes de escrever esta regra. `listaDeTexto` trata não-array
+  // como lista vazia, então essa forma cai na mesma guarda de "vazio", sem
+  // precisar de uma checagem de tipo própria para boundary.
+  const erros = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: ['ler código'], cannot: '' } }],
+  }));
+  assert.ok(erros.includes('E20'), erros.join(','));
+});
+
+test('E20: as duas metades preenchidas com texto real passa', () => {
+  const erros = codigos(pacote({
+    agents: [{ slug: 'a', boundary: { can: ['ler código'], cannot: ['fazer deploy'] } }],
+  }));
+  assert.ok(!erros.includes('E20'), erros.join(','));
+});
+
 test('E07: papel que escreve sem orçamento nenhum falha', () => {
   const erros = validateGovernance(pacote({
     agents: [{ slug: 'a', capabilities: { write: ['code'] } }],
@@ -250,7 +308,10 @@ test('E11: quem aprova sem escrever passa', () => {
 
 test('W03: papel sem persona avisa, não falha', () => {
   const { errors, warnings } = validatePackage(pacote({
-    agents: [{ slug: 'a', persona: null }],
+    // boundary explícito e com as duas metades preenchidas: o default de
+    // `pacote()` tem `cannot: []`, e sem este override o teste colidiria
+    // com E20 (metade vazia) — um defeito que este teste não quer provar.
+    agents: [{ slug: 'a', persona: null, boundary: { can: ['ler código'], cannot: ['fazer deploy'] } }],
   }));
   assert.ok(warnings.some((w) => w.code === 'W03'));
   assert.ok(!errors.some((e) => e.code.startsWith('E')) || errors.length === 0);
