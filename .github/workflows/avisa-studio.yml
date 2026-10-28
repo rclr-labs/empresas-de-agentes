@@ -44,10 +44,15 @@ jobs:
           GH_TOKEN: ${{ secrets.STUDIO_DISPATCH_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "STUDIO_DISPATCH_TOKEN ausente — a vitrine não foi avisada."
+            # Avisa e segue, em vez de falhar. Mesmo raciocínio do workflow do
+            # Studio: um X vermelho por segredo ainda não mintado treina as
+            # pessoas a ignorar o X — e aí ele não avisa nada no dia em que
+            # algo quebrar de verdade. Este workflow não é gate de nada; ele
+            # toca um sino. Sino que não toca não reprova o commit.
+            echo "::warning::STUDIO_DISPATCH_TOKEN ausente — a vitrine não foi avisada."
             echo "Enquanto o segredo não existir, republicar é manual:"
             echo "  gh workflow run vitrine -R rclr-labs/agent-studio"
-            exit 1
+            exit 0
           fi
           gh api repos/rclr-labs/agent-studio/dispatches \
             -f event_type=acervo-atualizado
