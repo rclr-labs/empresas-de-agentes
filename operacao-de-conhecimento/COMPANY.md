@@ -58,7 +58,7 @@ externa num papel é o que torna a fronteira auditável em vez de difusa.
 alerta em 70% para `curadoria`. `pesquisa` tem o teto maior porque é quem
 consome busca externa.
 
-**Portões humanos.** Três ações exigem assinatura: publicar para fora, gasto
+**Gates humanos.** Três ações exigem assinatura: publicar para fora, gasto
 acima do teto e contato com cliente. O primeiro é o que separa esta operação
 de um gerador de conteúdo solto.
 
@@ -77,7 +77,7 @@ revisão humana de conteúdo que vai para fora.
 - **Sem triagem de entrada:** funda `triagem` em `curadoria`. Se for cortar um
   papel, nunca corte `pesquisa` separada de `redacao` — quem busca e quem
   escreve sendo o mesmo papel é como achado sem fonte entra no texto final.
-- **Operação com publicação frequente:** o portão `publicar-para-fora`
+- **Operação com publicação frequente:** o gate `publicar-para-fora`
   provavelmente sobe para uma pessoa dedicada, não para a curadoria.
 - **Domínio regulado:** acrescente um papel de conformidade com
   `reportsTo: null`, fora da cadeia. Papel que audita quem o comanda não

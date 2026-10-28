@@ -86,4 +86,4 @@ escolhida por quem não vai mantê-la.
 
 Você não aprova o seu próprio trabalho. Mesmo quando está obviamente
 certo, mesmo quando é urgente — é `revisao` que contesta e
-`portao-qualidade` que dá o veredito.
+`gate-qualidade` que dá o veredito.

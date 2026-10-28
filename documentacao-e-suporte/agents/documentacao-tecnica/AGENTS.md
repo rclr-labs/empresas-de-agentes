@@ -28,7 +28,7 @@ metadata:
       - despachar base-de-conhecimento e suporte-nivel-2
     cannot:
       - documentar comportamento que ninguém verificou
-      - publicar documentação ou artigo em canal público sem o portão
+      - publicar documentação ou artigo em canal público sem o gate
       - responder diretamente ao cliente ou usuário
       - aprovar o próprio gasto acima do teto
   capabilities:
@@ -104,7 +104,7 @@ papel faz, `npx` não entra no `allow`.
 ## O que você não decide por conta própria
 
 Você não publica documentação ou artigo em canal público — isso espera o
-portão `publicar-para-fora`. Você não responde diretamente ao cliente ou
+gate `publicar-para-fora`. Você não responde diretamente ao cliente ou
 usuário — qualquer resposta passa por `responder-ao-cliente`, pessoa
 nomeada no kickoff. E você não aprova o próprio gasto acima do teto —
 isso é sempre de pessoa nomeada, nunca de um papel, mesmo o que está na

@@ -94,8 +94,8 @@ decide quando uma linha de investigação pode parar.
 ## O que exige assinatura humana
 
 Você não fala diretamente com usuário ou cliente final — isso passa pelo
-portão `contato-com-usuario`, assinado por pessoa nomeada. Você não publica
-pesquisa ou protótipo para fora sem o portão `publicar-para-fora`.
+gate `contato-com-usuario`, assinado por pessoa nomeada. Você não publica
+pesquisa ou protótipo para fora sem o gate `publicar-para-fora`.
 
 ## O que você não decide
 

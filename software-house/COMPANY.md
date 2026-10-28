@@ -1,6 +1,6 @@
 ---
 name: Casa de Software
-description: Organograma de uma casa de software governada por agentes — coordenação, desenho técnico, implementação, revisão adversarial e portão de qualidade
+description: Organograma de uma casa de software governada por agentes — coordenação, desenho técnico, implementação, revisão adversarial e gate de qualidade
 slug: software-house
 schema: agentcompanies/v1
 kind: company
@@ -64,7 +64,7 @@ irreversíveis.
 coordenação recebe demanda e prioriza; product owner é dono do valor e
 escreve o critério de aceite; tech lead desenha; desenvolvimento
 implementa (genérico, ou especializado em frontend, backend e
-fullstack); revisão contesta; portão de qualidade dá o veredito. O PO é
+fullstack); revisão contesta; gate de qualidade dá o veredito. O PO é
 dono do valor, a coordenação é dona da capacidade — a mesma pergunta
 "isso entra na fila?" tem duas respostas diferentes dependendo de quem a
 faz. Nenhum papel acumula implementar e aprovar o próprio trabalho.
@@ -75,11 +75,11 @@ Stack é skill anexável, não papel — quem adaptar não cria
 70% e destinatário nomeado. Papel que estoura o teto para — não pede
 desculpa depois.
 
-**Portões humanos.** Quatro ações não acontecem sem assinatura: deploy em
+**Gates humanos.** Quatro ações não acontecem sem assinatura: deploy em
 produção, gasto acima do teto, contato com cliente e remoção de dado de
-produção. Estão listadas em `metadata.human_gates` porque portão que
-não está escrito é portão que não existe. Nenhum papel deste pacote assina
-um desses portões: todo `signer` é pessoa nomeada no kickoff, porque um
+produção. Estão listadas em `metadata.human_gates` porque gate que
+não está escrito é gate que não existe. Nenhum papel deste pacote assina
+um desses gates: todo `signer` é pessoa nomeada no kickoff, porque um
 papel pode aprovar uma decisão de domínio, mas nunca o próprio estouro de
 teto ou o próprio release — por isso `capabilities.approve` fica vazio em
 todos os nove papéis, deliberadamente. `deploy-producao` e
@@ -105,7 +105,7 @@ uma recomendação universal:
 - **Time pequeno (1–3 pessoas):** funda `tech-lead` em `coordenacao` e
   mantenha `revisao` separada. Se for cortar um papel, nunca corte a
   revisão — é o papel que existe justamente para não concordar.
-- **Operação com cliente externo:** o portão de contato com cliente
+- **Operação com cliente externo:** o gate de contato com cliente
   provavelmente sobe para uma pessoa, não para a coordenação.
 - **Produto com regulação:** acrescente um papel de conformidade com
   `reportsTo: null`, fora da cadeia de entrega. Papel de conformidade que

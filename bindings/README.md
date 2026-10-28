@@ -99,7 +99,7 @@ percebe até o papel fazer algo que devia ter sido negado.
 `test/bindings-arquivos.test.mjs` tem um teste nomeado exatamente "REGRA
 CENTRAL" que varre os oito pacotes, calcula toda capacidade em uso via
 `capabilityKeys`, e falha nomeando a capacidade que qualquer binding deixou
-descoberta. Esse teste é o portão: nenhum binding novo, e nenhuma mudança a
+descoberta. Esse teste é o gate: nenhum binding novo, e nenhuma mudança a
 um existente, entra sem passar por ele.
 
 ## 5. `skills`, `memory` e `context` são capacidade endereçável

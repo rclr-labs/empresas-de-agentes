@@ -75,7 +75,7 @@ os outros dois; `base-de-conhecimento` e `suporte-nivel-2` carregam
 `250.00` cada. Alerta em 70% sempre para `documentacao-tecnica`, que é
 quem precisa saber primeiro quando o gasto de qualquer um dos dois sobe.
 
-**Portões humanos.** Quatro assinaturas, todas de pessoa nomeada no
+**Gates humanos.** Quatro assinaturas, todas de pessoa nomeada no
 kickoff. `responder-ao-cliente` existe porque falar com quem abriu o
 ticket é decisão de pessoa, não de papel — nenhum dos três papéis deste
 pacote tem acesso direto ao cliente, por mais correta que a resposta
@@ -85,9 +85,9 @@ para reproduzir um caso relatado. `gasto-acima-do-teto` é sempre pessoa
 nomeada e nunca listado em `capabilities.approve` de nenhum papel — nem
 do papel raiz.
 
-## Responder ao cliente é portão humano, não capacidade de papel
+## Responder ao cliente é gate humano, não capacidade de papel
 
-Um papel de suporte que fala com cliente sem portão é o risco central
+Um papel de suporte que fala com cliente sem gate é o risco central
 deste pacote: a resposta errada chega direto a quem abriu o ticket, sem
 ninguém entre o diagnóstico e a palavra final. Por isso os três papéis
 negam contato direto com cliente ou usuário na própria prosa, e a
@@ -112,9 +112,9 @@ essa diferença é o próprio achado.
 ## O que este pacote deliberadamente não faz
 
 Não responde diretamente ao cliente ou usuário — toda resposta espera o
-portão `responder-ao-cliente`. Não publica documentação ou artigo em
-canal público sem o portão `publicar-para-fora`. Não acessa dado de
-produção para reproduzir um caso sem o portão `acesso-a-dado-de-producao`
+gate `responder-ao-cliente`. Não publica documentação ou artigo em
+canal público sem o gate `publicar-para-fora`. Não acessa dado de
+produção para reproduzir um caso sem o gate `acesso-a-dado-de-producao`
 e um caso aberto associado.
 
 ## Adaptando

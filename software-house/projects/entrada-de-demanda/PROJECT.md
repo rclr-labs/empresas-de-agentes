@@ -33,6 +33,6 @@ existir — e é a única etapa cujo defeito contamina todas as outras.
 
 | Sinal | Significa |
 |---|---|
-| Demanda devolvida por falta de critério | O portão está funcionando |
+| Demanda devolvida por falta de critério | O gate está funcionando |
 | Retrabalho caindo mês a mês | O critério está sendo escrito bem |
 | Fila crescendo sem fim | Falta capacidade ou falta dizer não |

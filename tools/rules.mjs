@@ -154,7 +154,7 @@ const isListaDeTextoValida = (v) => Array.isArray(v) && v.every((x) => typeof x 
  * validada, e com `?? {}` ele chegava aqui indistinguível de ausência.
  * Medido em 2026-10-27 (Critical da revisão ampla): `capabilities: "oops"`
  * num papel real passava 0 erro e 0 aviso, e o artefato emitido saía com
- * `tools: ""` e os 18 padrões de deny do hook DESAPARECIDOS — o portão
+ * `tools: ""` e os 18 padrões de deny do hook DESAPARECIDOS — o gate
  * certificando limpo sobre um papel sem fronteira de máquina nenhuma.
  * `[1,2,3]`, `42` e `null` se comportavam igual. Ausência (`undefined`)
  * NÃO é E19: papel pode não declarar `capabilities`, e quem cobra o que
@@ -557,13 +557,13 @@ export function allFiles(pkg) {
   ];
 }
 
-// Deriva id de portão a partir da prosa. A dobra de diacrítico (NFD +
+// Deriva id de gate a partir da prosa. A dobra de diacrítico (NFD +
 // remoção das marcas combinantes) NÃO é cosmética: sem ela,
 // "deploy em produção" vira "deploy-em-produ-o", e o autor que escrever o
 // slug natural "deploy-em-producao" em capabilities.approve recebe um E04
-// falso — a regra acusa portão inexistente para um portão que existe.
-// Foi medido: dois dos quatro portões de software-house mangavam.
-function slugificarPortao(texto) {
+// falso — a regra acusa gate inexistente para um gate que existe.
+// Foi medido: dois dos quatro gates de software-house mangavam.
+function slugificarGate(texto) {
   return texto
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -571,8 +571,8 @@ function slugificarPortao(texto) {
 
 // Retorna { gates, erros }, não só a lista: um gate sem "id" resolvível
 // não pode simplesmente entrar no Set de ids como `undefined` — medido:
-// isso produzia, a jusante, um E04 que acusa "portão não existe" quando o
-// problema real é a declaração malformada do próprio portão. Aqui o
+// isso produzia, a jusante, um E04 que acusa "gate não existe" quando o
+// problema real é a declaração malformada do próprio gate. Aqui o
 // defeito é nomeado (E13) e o gate malformado é descartado do Set, em vez
 // de poluí-lo.
 function gatesDo(pkg) {
@@ -580,7 +580,7 @@ function gatesDo(pkg) {
   const erros = [];
   if (raw == null) return { gates: [], erros };
   if (!Array.isArray(raw)) {
-    erros.push(erro('E13', 'portao-malformado', 'COMPANY.md',
+    erros.push(erro('E13', 'gate-malformado', 'COMPANY.md',
       `metadata.human_gates deveria ser uma lista; veio ${typeof raw}`));
     return { gates: [], erros };
   }
@@ -588,14 +588,14 @@ function gatesDo(pkg) {
   raw.forEach((g, i) => {
     // Alias de formato: lista de string crua vira {id} com slug derivado.
     if (typeof g === 'string') {
-      gates.push({ id: slugificarPortao(g), description: g });
+      gates.push({ id: slugificarGate(g), description: g });
       return;
     }
     if (isPlainObject(g) && typeof g.id === 'string' && g.id.length > 0) {
       gates.push(g);
       return;
     }
-    erros.push(erro('E13', 'portao-malformado', 'COMPANY.md',
+    erros.push(erro('E13', 'gate-malformado', 'COMPANY.md',
       `metadata.human_gates[${i}] não é string nem objeto com "id" válido: ${JSON.stringify(g)}`));
   });
   return { gates, erros };
@@ -712,8 +712,8 @@ export function validateStructure(pkg) {
     // E04 — approve referencia gate existente
     for (const gate of listaDeTexto(cap.approve)) {
       if (!gateIds.has(gate)) {
-        erros.push(erro('E04', 'portao-inexistente', where,
-          `aprova "${gate}", que não está em metadata.human_gates da empresa. Portões: ${[...gateIds].join(', ') || 'nenhum'}`));
+        erros.push(erro('E04', 'gate-inexistente', where,
+          `aprova "${gate}", que não está em metadata.human_gates da empresa. Gates: ${[...gateIds].join(', ') || 'nenhum'}`));
       }
     }
 
@@ -831,12 +831,12 @@ export function validateGovernance(pkg) {
     // E11 — quem implementa não aprova
     if (listaDeTexto(cap.write).includes('code') && listaDeTexto(cap.approve).length > 0) {
       erros.push(erro('E11', 'segregacao-violada', where,
-        'o mesmo papel escreve código e assina portão humano. Segregação de função: quem implementa não aprova, e quem aprova não implementa'));
+        'o mesmo papel escreve código e assina gate humano. Segregação de função: quem implementa não aprova, e quem aprova não implementa'));
     }
 
     // E14 — approve tem de concordar com signer.
-    // `approve` significa "este papel PODE ASSINAR este portão". Se o
-    // signer do portão é outra pessoa ou outro papel, a declaração é
+    // `approve` significa "este papel PODE ASSINAR este gate". Se o
+    // signer do gate é outra pessoa ou outro papel, a declaração é
     // falsa: o papel não assina nada.
     // Esta regra nasceu de uma guarda em TESTE que era estreita demais —
     // ela filtrava por /gasto|teto|orcamento/, escrita a partir do caso
@@ -847,11 +847,11 @@ export function validateGovernance(pkg) {
     // Guarda escrita a partir da instância protege a instância; regra
     // escrita a partir do princípio protege a classe.
     for (const gateId of listaDeTexto(cap.approve)) {
-      const portao = gatesDo(pkg).gates.find((g) => g.id === gateId);
-      if (!portao) continue; // ausência é E04, não duplica aqui
-      if (portao.signer !== agente.slug) {
+      const gate = gatesDo(pkg).gates.find((g) => g.id === gateId);
+      if (!gate) continue; // ausência é E04, não duplica aqui
+      if (gate.signer !== agente.slug) {
         erros.push(erro('E14', 'approve-discorda-do-signer', where,
-          `aprova "${gateId}", mas o signer desse portão é "${portao.signer}". approve significa "pode assinar": se quem assina é outra pessoa ou outro papel, este papel não aprova nada — remova o portão de approve, ou declare este papel como signer`));
+          `aprova "${gateId}", mas o signer desse gate é "${gate.signer}". approve significa "pode assinar": se quem assina é outra pessoa ou outro papel, este papel não aprova nada — remova o gate de approve, ou declare este papel como signer`));
       }
     }
 
@@ -918,7 +918,7 @@ export function validateGovernance(pkg) {
     // E17 — deny de SQL completo. Duas lições de 2026-10-26: `mysql -e*`
     // ficou permitido com zero deny de mysql, e `psql*DROP*` não bloqueava
     // `psql -c "drop table users"` — o deny protegia a grafia que ninguém
-    // usa. O deny é defesa em profundidade; a fronteira real é o portão
+    // usa. O deny é defesa em profundidade; a fronteira real é o gate
     // humano. Mas defesa que cobre só metade da grafia é pior que nenhuma,
     // porque parece cobertura.
     //

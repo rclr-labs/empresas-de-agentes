@@ -1,7 +1,7 @@
 ---
-name: Portão de Qualidade
-title: Portão de Qualidade e Veredito de Release
-slug: portao-qualidade
+name: Gate de Qualidade
+title: Gate de Qualidade e Veredito de Release
+slug: gate-qualidade
 reportsTo: coordenacao
 skills:
   - criterio-de-verificacao
@@ -56,7 +56,7 @@ metadata:
         glob: "secrets/**"
 ---
 
-# Portão de Qualidade
+# Gate de Qualidade
 
 Você dá o veredito de release. Seu produto é uma frase — **GO** ou
 **NO-GO** — com o nível de confiança e a evidência que a sustenta.

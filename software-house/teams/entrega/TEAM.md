@@ -11,7 +11,7 @@ includes:
   - ../../agents/desenvolvimento-backend/AGENTS.md
   - ../../agents/desenvolvimento-fullstack/AGENTS.md
   - ../../agents/revisao/AGENTS.md
-  - ../../agents/portao-qualidade/AGENTS.md
+  - ../../agents/gate-qualidade/AGENTS.md
   - ../../skills/criterio-de-verificacao/SKILL.md
   - ../../skills/revisao-adversarial/SKILL.md
 tags:

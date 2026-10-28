@@ -48,7 +48,7 @@ bloqueante, nada é.
 ## Bloqueio sem negociação
 
 - Segredo ou credencial no diff
-- Ação irreversível sem portão humano
+- Ação irreversível sem gate humano
 - "Pronto" sem evidência de verificação
 - Mudança fora do escopo do pedido
 

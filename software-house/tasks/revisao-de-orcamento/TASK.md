@@ -15,7 +15,7 @@ ninguém lê.
 
 1. **Gasto por papel contra o teto.** Quem passou de 70% recebeu alerta?
    O alerta foi lido ou ignorado?
-2. **Trilha de auditoria.** Alguma ação irreversível aconteceu sem portão
+2. **Trilha de auditoria.** Alguma ação irreversível aconteceu sem gate
    humano? Isso não é observação, é incidente.
 3. **Exceções.** O que ficou parado esperando decisão humana, e por
    quanto tempo? Fila de espera por assinatura é o gargalo mais invisível
@@ -28,4 +28,4 @@ ninguém lê.
 Custo total caindo parece bom e pode ser péssimo: pode significar que os
 agentes estão trabalhando menos porque a fila travou esperando aprovação
 humana. Leia custo sempre ao lado de **vazão** e de **tempo parado em
-portão**.
+gate**.

@@ -1,6 +1,6 @@
 ---
 name: Plataforma e Operação
-description: Organograma de plataforma, entrega e confiabilidade — infraestrutura declarada, mudança reversível, orçamento de erro e resposta a incidente, com aplicação de mudança sempre por portão humano
+description: Organograma de plataforma, entrega e confiabilidade — infraestrutura declarada, mudança reversível, orçamento de erro e resposta a incidente, com aplicação de mudança sempre por gate humano
 slug: plataforma-e-operacao
 schema: agentcompanies/v1
 kind: company
@@ -48,14 +48,14 @@ Este pacote é o único do acervo cujo trabalho natural seria **aplicar
 mudança em ambiente** — e é exatamente por isso que nenhum papel aqui
 aplica. `plan`, `template` e `diff` são capacidade de agente, porque
 descrevem o que mudaria sem alterar nada; `apply`, `upgrade` e `destroy`
-são portão humano, porque alteram o mundo de um jeito que não se desfaz só
+são gate humano, porque alteram o mundo de um jeito que não se desfaz só
 lendo o código de volta. Quem quiser inverter essa linha está tomando uma
 decisão de risco, não configurando uma ferramenta.
 
 ## As quatro decisões, tomadas
 
 **Organograma e fronteira.** Quatro papéis. `lideranca-de-plataforma`
-define a política de mudança, revisa o plano antes do portão e despacha os
+define a política de mudança, revisa o plano antes do gate e despacha os
 outros três; `plataforma-e-entrega` escreve infraestrutura como código e
 pipeline, e entrega plano com caminho de volta; `confiabilidade-sre` mede
 SLO e administra o orçamento de erro; `resposta-a-incidente` investiga ao
@@ -72,8 +72,8 @@ carregam `300.00` cada. Alerta em 70% sempre para
 `lideranca-de-plataforma`, que é quem precisa saber primeiro quando o
 gasto de qualquer especialista sobe.
 
-**Portões humanos.** Quatro assinaturas, todas por pessoa nomeada no
-kickoff, nunca por um papel: `aplicar-mudanca-em-ambiente`, o portão que
+**Gates humanos.** Quatro assinaturas, todas por pessoa nomeada no
+kickoff, nunca por um papel: `aplicar-mudanca-em-ambiente`, o gate que
 converte plano revisável em mudança real; `acesso-a-dado-de-producao`,
 porque ler dado vivo durante um incidente é excepcional, não rotina;
 `alterar-slo`, porque afrouxar uma meta de confiabilidade acordada é
@@ -89,7 +89,7 @@ errada já aconteceu, e corrigi-la é um trabalho novo, não a leitura de um
 arquivo. Por isso `plataforma-e-entrega` só vai até `plan`, `template` e
 `diff`, mesmo tendo o conhecimento técnico para ir além; e por isso
 nenhum papel deste pacote tem `apply`, `upgrade` ou `destroy` em
-`execute.allow` — a aplicação espera sempre por quem assina o portão
+`execute.allow` — a aplicação espera sempre por quem assina o gate
 `aplicar-mudanca-em-ambiente`, pessoa nomeada no kickoff, nunca um papel.
 
 ## O par de risco deste pacote
@@ -106,17 +106,17 @@ pressão do momento em vez de refletir o que o usuário de fato precisa.
 
 Não aplica mudança em ambiente — nenhum papel roda `apply`, `upgrade`,
 `destroy` ou reinicia processo em produção. Não lê dado de produção fora
-do portão `acesso-a-dado-de-producao`, e só `resposta-a-incidente` o
+do gate `acesso-a-dado-de-producao`, e só `resposta-a-incidente` o
 solicita, com incidente aberto. Não afrouxa SLO ou orçamento de erro sem o
-portão `alterar-slo`.
+gate `alterar-slo`.
 
 ## Adaptando
 
 - **Time sem on-call:** corta `resposta-a-incidente`. Sem rotação de
-  resposta a incidente, o portão `acesso-a-dado-de-producao` deixa de ter
+  resposta a incidente, o gate `acesso-a-dado-de-producao` deixa de ter
   um papel que o solicita no fluxo normal, e o acesso excepcional a
   produção vira processo humano direto — alguém da operação abre o pedido
-  e o assinante do portão decide, sem um papel deste acervo no meio.
+  e o assinante do gate decide, sem um papel deste acervo no meio.
 - **Operação sem nuvem própria:** funde `plataforma-e-entrega` na
   `lideranca-de-plataforma`. Sem infraestrutura própria para declarar e
   entregar, não há trabalho que justifique um papel dedicado a escrevê-la

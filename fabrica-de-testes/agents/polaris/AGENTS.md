@@ -29,7 +29,7 @@ metadata:
       - interromper execução que estourou o teto
     cannot:
       - executar checagem por conta própria
-      - testar contra produção sem portão humano
+      - testar contra produção sem gate humano
       - emitir GO sem evidência anexada
   capabilities:
     read: [repository, documentation, audit_trail, test_evidence]

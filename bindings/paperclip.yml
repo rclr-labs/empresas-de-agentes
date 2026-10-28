@@ -8,7 +8,7 @@ source: >-
   confundir SOBREVIVER NO ARQUIVO com SER APLICADO PELO RUNTIME. A spec
   base (§5–§13) define `AGENTS.md` com `name`, `title`, `reportsTo`,
   `skills` e o corpo — e PARA POR AÍ. `budget`, permissão de execução,
-  restrição de rede e portão de aprovação não aparecem em lugar nenhum do
+  restrição de rede e gate de aprovação não aparecem em lugar nenhum do
   formato base; §15 os nomeia só como EXEMPLO do que uma extensão de
   fornecedor carrega, num arquivo `.paperclip.yaml` separado que este
   acervo não escreve. Logo: o arquivo sobrevive (cópia byte a byte,

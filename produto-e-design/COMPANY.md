@@ -62,7 +62,7 @@ o validador falha se algum escrever `code`.
 (`300.00` cada) e alerta em 70% para `descoberta-de-produto`, que é quem
 encomenda e por isso quem sente primeiro o gasto subindo.
 
-**Portões humanos.** Três ações exigem assinatura: contato com usuário ou
+**Gates humanos.** Três ações exigem assinatura: contato com usuário ou
 cliente final, publicar para fora e gasto acima do teto. O primeiro é o mais
 importante dos três.
 
@@ -71,13 +71,13 @@ semana, as hipóteses abertas e os achados acumulados. Descoberta que não
 termina é o gasto mais invisível deste pacote, porque não aparece como
 defeito — aparece como relatório que continua crescendo.
 
-## Por que falar com usuário é portão humano, não capacidade de agente
+## Por que falar com usuário é gate humano, não capacidade de agente
 
 Tem gente de verdade do outro lado. Uma entrevista mal roteirizada, uma
 pergunta que sugere a resposta, uma sessão que o próprio pesquisador
 contamina ao improvisar — queimam a amostra, e amostra queimada não se
 recupera reagendando. `pesquisa-ux` desenha o roteiro e analisa a sessão;
-quem efetivamente fala com a pessoa do outro lado passa pelo portão
+quem efetivamente fala com a pessoa do outro lado passa pelo gate
 `contato-com-usuario`, assinado por alguém nomeado no kickoff. Capacidade de
 agente é o que o agente pode fazer sozinho sem risco de dano irreversível —
 e entrevista malconduzida é dano irreversível para aquela amostra.
@@ -92,7 +92,7 @@ conta própria.
 ## Adaptando
 
 - **Time sem pesquisador dedicado:** funda `pesquisa-ux` em
-  `descoberta-de-produto`, mas mantém o portão `contato-com-usuario` —
+  `descoberta-de-produto`, mas mantém o gate `contato-com-usuario` —
   quem acumula o papel de pesquisador continua precisando de assinatura
   nomeada antes de falar com usuário real.
 - **Produto sem interface:** corta `design-ui`. Produto que não tem

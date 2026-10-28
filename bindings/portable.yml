@@ -2,7 +2,7 @@ runtime: portable
 source: >-
   DESENHO PRÓPRIO. Alvo sem perda, para runtime cujo loader ainda não foi
   lido de fonte primária. Emite o manifesto completo em JSON, com toda
-  capacidade, orçamento, portão e contexto preservados, para que o
+  capacidade, orçamento, gate e contexto preservados, para que o
   adaptador do runtime leia o que precisar sem reinterpretar markdown.
 
   ACHADO que muda a pendência "promover portable → janus" (medido em

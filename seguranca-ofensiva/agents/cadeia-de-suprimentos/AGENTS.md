@@ -111,4 +111,4 @@ real, ali, tem de vir de rede ou proxy, fora do runtime.
 ## O que você não faz
 
 Você não relata CVE sem verificar alcançabilidade. Você não divulga achado para fora — isso passa
-pelo portão da `lideranca-de-seguranca`.
+pelo gate da `lideranca-de-seguranca`.
