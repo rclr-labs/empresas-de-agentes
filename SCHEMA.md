@@ -31,7 +31,7 @@ e propor upstream — não declarar e torcer.
 
 ## 2. Chaves canônicas
 
-Sete chaves, todas dentro de `metadata`:
+Oito chaves, todas dentro de `metadata`:
 
 | Chave | Onde aparece | O que declara |
 |---|---|---|
@@ -42,6 +42,7 @@ Sete chaves, todas dentro de `metadata`:
 | `context` | `AGENTS.md` | De onde o agente lê contexto antes de agir, e o que fica fora |
 | `budget` | `COMPANY.md` **e** `AGENTS.md` (sob `capabilities.budget`) | Teto de gasto, moeda, limiar de alerta e destinatário — a empresa inteira em `COMPANY.md`, o papel individual em `AGENTS.md` |
 | `human_gates` | `COMPANY.md` | A lista de ações que não acontecem sem assinatura humana nomeada |
+| `task_protocol` | `COMPANY.md` | O enum de status de Delivery Report e o que cada status faz no runtime — ver §9 |
 
 `budget` aparece duas vezes porque os dois tetos respondem perguntas
 diferentes: `metadata.budget` em `COMPANY.md` é o que a empresa inteira pode
@@ -84,6 +85,7 @@ com aviso — nenhum dos dois é perdido em silêncio.
 | `memoria` | `memory` |
 | `contexto` | `context` |
 | `vocabulario_de_capacidades` | `capability_vocabulary` |
+| `protocolo_de_tarefa` | `task_protocol` |
 
 Dois aliases diferentes apontam para o mesmo canônico (`destinatario_do_alerta`
 e `alerta_para`, ambos → `alert_to`): é por isso que a colisão entre dois
@@ -275,7 +277,7 @@ Este catálogo é gerado a partir do código (`tools/rules.mjs` e
 qualquer erro, `0` se só houver avisos. Essa é a única garantia que o
 CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 
-### Erros (`E01`–`E20`) — reprovam o pacote
+### Erros (`E01`–`E22`) — reprovam o pacote
 
 | Código | Regra (`rule`) | O que rejeita | Consequência sem a regra |
 |---|---|---|---|
@@ -299,6 +301,8 @@ CLI oferece — um teto que dependesse de alguém ler um aviso não seria teto.
 | E18 | `persona-invalida` | Para cada papel com `metadata.persona` declarada, três invariantes verificáveis DENTRO do pacote, todos sobre o que está DECLARADO: `display_name` com caractere fora de `[A-Za-z ]` (acento, diacrítico, símbolo); `background`, quando EXISTE (`isListaDeTextoValida`), que não tem exatamente 3 linhas; ou o corpo do agente (`AGENTS.md`) contendo o `display_name` por extenso | `display_name` tem de funcionar em pt-BR e em inglês — acento quebra isso. `background` declarado com menos de 3 linhas perde a linha que funciona como cicatriz, a que faz o modelo seguir a regra quando ela custa; cada linha extra além de 3 é zelo que a vitrine não pede. O corpo nunca menciona o `display_name`: o papel é o papel, não a pessoa, e o nome no prompt custa token em toda chamada sem servir ao modelo — só serve ao humano e à vitrine, fora do corpo. Verifica tipo antes de conteúdo: `display_name`/`background` com TIPO errado (número, string no lugar de lista) é `E19`, não `E18` — ver `verificarTiposDePersona`. Unicidade de ícone, nome e sobrenome ENTRE pacotes é invariante de acervo, não de pacote — fica para `validateAcervo(pkgs)` (Task 5); `validatePackage(pkg)` recebe um pacote só e não pode decidir unicidade global. **A divisão com `W03`:** E18 é o que está DECLARADO e está ERRADO (o papel mente sobre si); AUSÊNCIA de `display_name`/`icon`/`pronouns`/`background` nunca é E18 — isso é `W03`, persona incompleta, degradação de vitrine, não defeito de governança. `background` entrou nesse lado da divisão no ruling de 2026-10-27 (fix-round 2): a persona não entra no prompt, exceto `signature_question` — `background` custa token sem mudar comportamento, então sua ausência é card pobre, não mentira sobre si |
 | E19 | `tipo-de-campo-invalido` | Campo de `capabilities` com tipo diferente do esperado: o próprio CONTAINER `metadata.capabilities` que não é objeto (escalar, lista ou `null`); `read`/`write`/`delegate`/`approve` que não é lista de texto; `execute` que não é objeto, ou `execute.allow`/`execute.deny` que não é lista de texto; `network` que não é `true`, `false` nem lista de texto; `budget` que não é objeto. Desde E18, também `metadata.persona.display_name` que não é texto, e `metadata.persona.background` que não é lista de texto | O validador roda no navegador, sobre o que o editor está digitando — tipo errado é o caso ESPERADO ali, não exceção. Antes desta regra, campo de tipo errado derrubava o validador com `TypeError` (`padrao.match`, `allow.find`, "not iterable") em vez de reprovar o pacote, e no caso de `write` como string nem derrubava: produzia uma dúzia de `E02` espúrios, um por caractere, porque `for...of` itera string. Falhar aberto num validador que roda sobre conteúdo em edição é tela branca com stack; E19 falha fechado, com mensagem nomeada. O caso do CONTAINER entrou em 2026-10-27 (Critical da revisão ampla): `metadata.capabilities` era lido como `?? {}`, então um escalar (`capabilities: "oops"`, `[1,2,3]`, `42`, `null`) FICAVA sendo o escalar, e as cinco sondas de tipo liam `cap.read`/`cap.network`/`cap.execute` como `undefined` e seguiam em frente — o pacote saía certificado em 0 erro e 0 aviso, e o artefato emitido saía com `tools: ""` e os padrões de `deny` do hook desaparecidos. O princípio que a correção aplica, e que vale para qualquer container novo: **validar a FORMA de um nó antes de descer nele**, e receber o valor CRU (não um `?? {}`) para que AUSÊNCIA e MALFORMAÇÃO sigam distinguíveis — ausência de `capabilities` não é E19, e quem cobra fronteira que falta é `E06` |
 | E20 | `fronteira-metade-vazia` | `metadata.boundary` PRESENTE (então `E06` não disparou), mas `can` ou `cannot` vazio: lista vazia (`[]`), lista só com item em branco (`['']`, `['   ']`), ou o campo nem sendo lista de texto (ex. `cannot: ""`) — as três formas contam como vazio, medidas antes de escrever a regra. As DUAS metades são exigidas: `can` vazio com `cannot` cheio (ou o inverso) também reprova | Achado em 2026-10-28, construindo o editor da vitrine: o único campo daquela fatia é `boundary.can`/`boundary.cannot`, e esvaziar os dois é dois cliques. Até esta regra, `boundary: { can: [], cannot: [] }` passava com ZERO erros — mesma forma do Critical de `capabilities` com tipo errado (`E19`): o gate certificava limpo um papel cuja fronteira não diz nada. **Por que código novo, não extensão de `E06`:** `E06` significa "declare `boundary`" e o conserto é criar o nó; aqui o nó já existe e o conserto é preencher `can`/`cannot` — dois consertos diferentes atrás do mesmo código confundiriam quem lê o erro. **Por que as duas metades são exigidas:** a tese do acervo é que o papel declara o que PODE e o que NÃO PODE — duas promessas, não uma; `can` vazio com `cannot` cheio entrega só a metade negativa do contrato (e vice-versa). **Por que é erro, não aviso:** a consequência de uma metade vazia é idêntica à de `boundary` ausente (`E06`) — um papel sem limite real declarado naquela direção — e o gate da vitrine já trata aviso como bloqueio (exige 0 erro **e** 0 aviso), então rebaixar a severidade não mudaria o comportamento, só a leitura de fora. Medido contra os 42 papéis do acervo antes de escrever a regra: ZERO têm qualquer metade vazia — a regra é puramente aditiva. `E19` não valida o TIPO de `boundary.can`/`cannot` (só de `capabilities.*`); a forma `cannot: ""` cai na mesma guarda de "vazio" (`listaDeTexto` trata não-array como lista vazia), sem precisar de checagem de tipo própria |
+| E21 | `protocolo-mapa-invalido` | `metadata.task_protocol.statuses` ausente de lista, entrada sem `id`, `on_runtime` fora do vocabulário fechado, ou `escalate_to_role` sem `escalate_to` nomeando papel do pacote | Status de Delivery Report sem mecanismo real por trás — a mesma segurança decorativa de E04, numa fronteira diferente |
+| E22 | `protocolo-skill-diverge` | A skill referenciada por `metadata.task_protocol.skill_ref` documenta, em prosa, um conjunto de `status:` diferente do declarado em `statuses[].id` | Prosa e declaração discordam sobre o próprio protocolo — quem lê a skill confia num enum que a empresa não reconhece |
 
 ### Decisão: curinga de runner não é fronteira
 
@@ -341,7 +345,7 @@ onda de revisão deixaria a suíte vermelha em papel publicado. A medição
 está comentada na issue, que segue aberta. Nenhum papel do acervo usa hoje
 a forma sem espaço (`npx*`, `npm*`).
 
-### Avisos (`W01`–`W05`) — não reprovam o pacote
+### Avisos (`W01`–`W06`) — não reprovam o pacote
 
 | Código | O que sinaliza | Consequência de ignorar |
 |---|---|---|
@@ -350,6 +354,7 @@ a forma sem espaço (`npx*`, `npm*`).
 | W03 | Persona incompleta: falta `metadata.persona.display_name`, `.icon`, `.pronouns` ou `.background` (um aviso por campo ausente) | O card da vitrine degrada — mostra o slug no lugar do nome, fica sem ícone, sem pronome, ou sem histórico — mas o papel continua válido e a fronteira continua intacta. **A divisão com `E18`:** W03 é o que FALTA (persona incompleta); E18 é o que está declarado e está ERRADO (persona malformada — ASCII, 3 linhas de um `background` que existe, vazamento no corpo). `background` ausente entrou aqui no ruling de 2026-10-27 (fix-round 2), corrigindo o ruling anterior (fix-round 1), que tinha dividido `display_name`/`icon`/`pronouns` para W03 mas deixado `background` ausente cair em E18 por omissão — mesma razão dos outros três: a persona não entra no prompt, exceto `signature_question`, então `background`/`headline` custam token sem mudar comportamento; sua ausência é card pobre, não papel que mente sobre si. Inverter isso e fazer qualquer um dos quatro campos ausente reprovar o pacote seria incoerente com `display_name` ausente já ser aviso desde antes desta regra, e quebraria pacote de terceiro que não se importa com esta vitrine |
 | W04 | Papel sem `skills` declaradas | Papel sem skill associada — não impede o pacote de validar, mas é informação incompleta |
 | W05 | `ressalva-de-allowlist-ausente` — papel declara domínio em `network` e comando de `COMANDOS_DE_REDE` em `execute.allow`, e o corpo não traz a ressalva `allowlist_scope` | Quem adapta o papel para um runtime onde a allowlist não é fronteira de SO (OpenCode V2, janus `kind=cli`) confia numa restrição que o comando atravessa |
+| W06 | `protocolo-sem-skill` | Pacote declara `task_protocol.skill_ref` e nenhum papel anexa essa skill em `skills:` | O protocolo existe só em `metadata`, sem nenhum papel instruído a seguir a prosa dele — ainda pode ser lido só pela plataforma |
 
 ### Regras de acervo (`A01`) — o invariante que um pacote não pode decidir
 
@@ -671,3 +676,56 @@ human_gates:
   e `carga-acima-do-acordado`. Os demais gates dos dois pacotes — gasto
   acima do teto, contato com cliente, divulgar achado de segurança — não
   têm padrão de comando real e por isso não declaram `triggers`.
+
+## 9. `task_protocol` — o enum de status do Delivery Report
+
+Fecha, dentro do schema validável, a lacuna que o pacote de agentes do
+cliente Jacto (`sdlc-ai-centric`) resolveu só em prosa: o status com que um
+agente encerra uma tarefa (`done`/`partial`/`blocked`/
+`needs_clarification`/`failed`, por exemplo) e o que cada status dispara no
+runtime.
+
+```yaml
+metadata:
+  task_protocol:
+    version: 1
+    skill_ref: task-envelope
+    statuses:
+      - id: done
+        description: todos os critérios atendidos e verificados
+        on_runtime: wake_blocked
+      - id: failed
+        description: esgotou budget.max_iterations
+        on_runtime: escalate_to_role
+        escalate_to: tech-lead
+```
+
+**Opcional e aditivo**, como `human_gates`: pacote sem `task_protocol`
+continua válido.
+
+`on_runtime` é vocabulário fechado (`capabilities/v1.mjs`,
+`VOCABULARY.task_protocol_on_runtime`): `wake_blocked`,
+`create_followup_issue`, `wake_on_unblock`, `notify_assignee_chain`,
+`escalate_to_role`. `escalate_to_role` exige `escalate_to` nomeando um
+papel do próprio pacote — `E21` reprova os dois jeitos de declarar isso
+errado (mecanismo fora do vocabulário, ou escalonamento sem destino
+resolvível).
+
+**A skill continua escrita à mão.** `skill_ref` aponta para uma
+`skills/<slug>/SKILL.md` que documenta o protocolo em prosa, do jeito que
+um agente lê — mas `E22` cruza o enum que essa prosa documenta (linha
+`status: a | b | c` no corpo) contra `statuses[].id`, para que a mesma
+classe de defeito de `E10` (prosa e declaração discordando) não reapareça
+numa fronteira nova.
+
+### 9.1 Classificação nos bindings — por que `preserves`, não `translates`
+
+O campo sobrevive byte a byte em `paperclip` e `portable` (`preserves`); em
+`claude-code` e `opencode` não há onde emiti-lo hoje (`not_emitted`) — os
+dois TÊM frontmatter de agente arbitrário, mas nenhum emissor gera nada a
+partir de `task_protocol`. Nenhum dos quatro bindings classifica isto como
+`translates`: isso exigiria medição de que o runtime-alvo LÊ o campo e AGE
+sobre ele automaticamente — no caso do Paperclip, que a API de issues
+resolve o próprio ciclo de vida a partir de `metadata.task_protocol`, não
+que um agente LEIA o campo e chame a API manualmente. Essa medição não foi
+feita; a célula entra com `inferido: true` até que seja.
