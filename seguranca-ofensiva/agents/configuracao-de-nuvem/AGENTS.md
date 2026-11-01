@@ -5,6 +5,7 @@ slug: configuracao-de-nuvem
 reportsTo: lideranca-de-seguranca
 skills:
   - achado-com-prova-de-exploracao
+  - task-envelope
 metadata:
   persona:
     display_name: Carla Tavares

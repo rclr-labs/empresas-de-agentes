@@ -5,6 +5,7 @@ slug: plataforma-e-entrega
 reportsTo: lideranca-de-plataforma
 skills:
   - mudanca-reversivel
+  - task-envelope
 metadata:
   persona:
     display_name: Vera Macedo

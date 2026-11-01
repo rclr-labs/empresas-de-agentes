@@ -5,6 +5,7 @@ slug: curadoria
 reportsTo: null
 skills:
   - publico-declarado
+  - task-envelope
 metadata:
   persona:
     display_name: Heitor Cruz

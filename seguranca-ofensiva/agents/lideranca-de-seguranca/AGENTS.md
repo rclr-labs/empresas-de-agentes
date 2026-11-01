@@ -6,6 +6,7 @@ reportsTo: null
 skills:
   - escopo-autorizado
   - achado-com-prova-de-exploracao
+  - task-envelope
 metadata:
   persona:
     display_name: Sofia Duarte

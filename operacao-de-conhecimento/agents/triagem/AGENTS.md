@@ -5,6 +5,7 @@ slug: triagem
 reportsTo: curadoria
 skills:
   - publico-declarado
+  - task-envelope
 metadata:
   persona:
     display_name: Gilberto Paiva

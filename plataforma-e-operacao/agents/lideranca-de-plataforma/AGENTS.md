@@ -5,6 +5,7 @@ slug: lideranca-de-plataforma
 reportsTo: null
 skills:
   - mudanca-reversivel
+  - task-envelope
 metadata:
   persona:
     display_name: Mateus Leal

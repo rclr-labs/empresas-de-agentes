@@ -5,6 +5,7 @@ slug: design-ui
 reportsTo: descoberta-de-produto
 skills:
   - achado-com-evidencia-de-sessao
+  - task-envelope
 metadata:
   persona:
     display_name: Lucas Freitas

@@ -5,6 +5,7 @@ slug: desempenho-e-carga
 reportsTo: polaris
 skills:
   - evidencia-replayavel
+  - task-envelope
 metadata:
   persona:
     display_name: Nina Serra

@@ -5,6 +5,7 @@ slug: pipeline-de-dados
 reportsTo: lideranca-de-dados
 skills:
   - contrato-de-dado
+  - task-envelope
 metadata:
   persona:
     display_name: Elisa Campos

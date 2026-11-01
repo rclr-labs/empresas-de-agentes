@@ -5,6 +5,7 @@ slug: contrato-api
 reportsTo: polaris
 skills:
   - evidencia-replayavel
+  - task-envelope
 metadata:
   persona:
     display_name: Rogerio Pinto

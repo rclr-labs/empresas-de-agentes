@@ -5,6 +5,7 @@ slug: resposta-a-incidente
 reportsTo: lideranca-de-plataforma
 skills:
   - orcamento-de-erro
+  - task-envelope
 metadata:
   persona:
     display_name: Julia Rocha

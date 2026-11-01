@@ -18,13 +18,13 @@ daqui reprova o pacote (`E22`).
 ## Entrada — Task Envelope
 
 ```yaml
-task_id: "ENG-142"
-assignee: "desenvolvimento-backend"
+task_id: "TASK-142"
+assignee: "<slug do papel responsável>"
 acceptance_criteria:
-  - "Given payload válido, When POST /v1/pedidos, Then 201 + Location"
+  - "critério objetivo e verificável, no formato Given/When/Then"
 definition_of_done:
   - "Testes verdes"
-  - "Critério de verificação (skill criterio-de-verificacao) atendido"
+  - "Critério de verificação (skill criterio-de-verificacao, quando existir) atendido"
 ```
 
 `acceptance_criteria` vazio ou ambíguo → não implementar; responder
@@ -33,17 +33,17 @@ definition_of_done:
 ## Saída — Delivery Report
 
 ```yaml
-task_id: "ENG-142"
-agent: "desenvolvimento-backend"
+task_id: "TASK-142"
+agent: "<slug do papel que executou>"
 status: done | partial | blocked | needs_clarification | failed
 verification:
   commands_run:
-    - cmd: "npm test"
+    - cmd: "comando ou checagem que prova o resultado"
       result: pass
 acceptance_criteria_status:
-  - criterion: "Given payload válido ... Then 201"
+  - criterion: "o mesmo critério declarado no envelope de entrada"
     met: true
-    evidence: "nome do teste que prova"
+    evidence: "nome do teste, log ou artefato que prova"
 ```
 
 **Nunca** declarar `done` sem comando executado em
@@ -58,4 +58,4 @@ acceptance_criteria_status:
 | `partial` | Vira issue de follow-up para o restante |
 | `blocked` | A plataforma acorda quando a dependência resolver |
 | `needs_clarification` | Quem recebe a pergunta responde; nenhum trabalho novo começa |
-| `failed` | Escala para `tech-lead` com o histórico das tentativas |
+| `failed` | Escala para o papel declarado em `escalate_to` (ver `metadata.task_protocol.statuses` em `COMPANY.md` deste pacote), com o histórico das tentativas |

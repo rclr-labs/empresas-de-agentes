@@ -6,6 +6,7 @@ reportsTo: polaris
 skills:
   - evidencia-replayavel
   - suite-que-nao-falha-sozinha
+  - task-envelope
 metadata:
   persona:
     display_name: Victor Teles

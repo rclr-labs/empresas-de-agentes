@@ -5,6 +5,7 @@ slug: pesquisa-ux
 reportsTo: descoberta-de-produto
 skills:
   - achado-com-evidencia-de-sessao
+  - task-envelope
 metadata:
   persona:
     display_name: Paula Matos

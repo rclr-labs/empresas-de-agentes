@@ -6,6 +6,7 @@ reportsTo: null
 skills:
   - contrato-de-dado
   - metrica-com-definicao-unica
+  - task-envelope
 metadata:
   persona:
     display_name: Pedro Guedes

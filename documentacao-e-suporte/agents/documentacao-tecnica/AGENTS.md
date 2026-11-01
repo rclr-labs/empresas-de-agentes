@@ -5,6 +5,7 @@ slug: documentacao-tecnica
 reportsTo: null
 skills:
   - doc-que-acompanha-o-codigo
+  - task-envelope
 metadata:
   persona:
     display_name: Rita Xavier
