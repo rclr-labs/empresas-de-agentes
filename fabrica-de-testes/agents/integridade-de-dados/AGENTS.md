@@ -5,6 +5,7 @@ slug: integridade-de-dados
 reportsTo: polaris
 skills:
   - evidencia-replayavel
+  - task-envelope
 metadata:
   persona:
     display_name: Nilton Prado

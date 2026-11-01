@@ -5,6 +5,7 @@ slug: base-de-conhecimento
 reportsTo: documentacao-tecnica
 skills:
   - doc-que-acompanha-o-codigo
+  - task-envelope
 metadata:
   persona:
     display_name: Davi Neves

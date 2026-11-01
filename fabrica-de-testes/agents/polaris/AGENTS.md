@@ -6,6 +6,7 @@ reportsTo: null
 skills:
   - veredito-com-confianca
   - evidencia-replayavel
+  - task-envelope
 metadata:
   persona:
     display_name: Nair Teixeira

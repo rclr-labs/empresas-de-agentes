@@ -5,6 +5,7 @@ slug: confiabilidade-sre
 reportsTo: lideranca-de-plataforma
 skills:
   - orcamento-de-erro
+  - task-envelope
 metadata:
   persona:
     display_name: Hugo Barros

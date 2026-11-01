@@ -5,6 +5,7 @@ slug: analytics-bi
 reportsTo: lideranca-de-dados
 skills:
   - metrica-com-definicao-unica
+  - task-envelope
 metadata:
   persona:
     display_name: Felipe Dantas

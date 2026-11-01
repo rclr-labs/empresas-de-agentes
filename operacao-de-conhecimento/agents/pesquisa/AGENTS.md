@@ -5,6 +5,7 @@ slug: pesquisa
 reportsTo: curadoria
 skills:
   - fonte-citavel
+  - task-envelope
 metadata:
   persona:
     display_name: Zuleica Amorim

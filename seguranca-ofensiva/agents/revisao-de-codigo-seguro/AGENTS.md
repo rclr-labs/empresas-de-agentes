@@ -5,6 +5,7 @@ slug: revisao-de-codigo-seguro
 reportsTo: lideranca-de-seguranca
 skills:
   - achado-com-prova-de-exploracao
+  - task-envelope
 metadata:
   persona:
     display_name: Beatriz Pires

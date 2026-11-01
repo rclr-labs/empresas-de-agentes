@@ -5,6 +5,7 @@ slug: qualidade-de-dados
 reportsTo: lideranca-de-dados
 skills:
   - contrato-de-dado
+  - task-envelope
 metadata:
   persona:
     display_name: Yara Pacheco

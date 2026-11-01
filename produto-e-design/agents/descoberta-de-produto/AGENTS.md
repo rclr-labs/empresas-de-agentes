@@ -5,6 +5,7 @@ slug: descoberta-de-produto
 reportsTo: null
 skills:
   - hipotese-invalidavel
+  - task-envelope
 metadata:
   persona:
     display_name: Ana Vieira

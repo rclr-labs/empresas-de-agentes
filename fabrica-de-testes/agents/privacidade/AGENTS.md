@@ -5,6 +5,7 @@ slug: privacidade
 reportsTo: polaris
 skills:
   - evidencia-replayavel
+  - task-envelope
 metadata:
   persona:
     display_name: Celina Fontes

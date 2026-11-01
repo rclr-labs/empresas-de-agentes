@@ -5,6 +5,7 @@ slug: suporte-nivel-2
 reportsTo: documentacao-tecnica
 skills:
   - reproducao-antes-do-diagnostico
+  - task-envelope
 metadata:
   persona:
     display_name: Luiza Reis
