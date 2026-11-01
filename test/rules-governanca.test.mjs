@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateStructure, validateGovernance, validatePackage } from '../tools/rules.mjs';
+import { validateStructure, validateGovernance, validatePackage, validateWarnings } from '../tools/rules.mjs';
 
 function pacote({ companyBudget = null, agents = [], gates = [] } = {}) {
   return {
@@ -1058,4 +1058,28 @@ test('E22: skill_ref que não corresponde a nenhuma skill do pacote não dispara
   });
   pkg.skills = [];
   assert.ok(!codigosEstrutura(pkg).includes('E22'));
+});
+
+const avisosDe = (pkg) => validateWarnings(pkg).map((w) => w.code);
+
+test('W06: task_protocol com skill_ref que nenhum papel anexa', () => {
+  const pkg = pacoteComProtocolo({
+    skill_ref: 'task-envelope',
+    statuses: [{ id: 'done', on_runtime: 'wake_blocked' }],
+  });
+  // nenhum agente de pacoteComProtocolo() tem "task-envelope" em skills (só "x")
+  assert.ok(avisosDe(pkg).includes('W06'));
+});
+
+test('W06: não dispara quando algum papel anexa a skill', () => {
+  const pkg = pacoteComProtocolo(
+    { skill_ref: 'task-envelope', statuses: [{ id: 'done', on_runtime: 'wake_blocked' }] },
+  );
+  pkg.agents[0].frontmatter.skills = ['x', 'task-envelope'];
+  assert.ok(!avisosDe(pkg).includes('W06'));
+});
+
+test('W06: não dispara quando task_protocol não declara skill_ref', () => {
+  const pkg = pacoteComProtocolo({ statuses: [{ id: 'done', on_runtime: 'wake_blocked' }] });
+  assert.ok(!avisosDe(pkg).includes('W06'));
 });

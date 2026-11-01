@@ -1179,6 +1179,19 @@ export function validateGovernance(pkg) {
 
 export function validateWarnings(pkg) {
   const avisos = [...(pkg.warnings ?? [])];
+  // W06 — protocolo declarado, skill de referência inexistente em todo
+  // papel do pacote. Aviso, não erro: o protocolo pode ser consumido só
+  // pela plataforma (ex. o Studio lendo metadata.task_protocol direto),
+  // sem nenhum papel precisar ler a prosa da skill.
+  const taskProtocolMeta = mapaOuVazio(pkg.company.frontmatter?.metadata?.task_protocol);
+  if (taskProtocolMeta.skill_ref) {
+    const anexada = pkg.agents.some((a) =>
+      (a.frontmatter?.skills ?? []).includes(taskProtocolMeta.skill_ref));
+    if (!anexada) {
+      avisos.push({ code: 'W06', path: 'COMPANY.md',
+        message: `metadata.task_protocol.skill_ref "${taskProtocolMeta.skill_ref}" declarado, e nenhum papel do pacote anexa essa skill em "skills:"` });
+    }
+  }
   for (const agente of pkg.agents) {
     const meta = mapaOuVazio(agente.frontmatter?.metadata);
     // W03 — persona incompleta. Aviso, não erro: o papel continua válido,
