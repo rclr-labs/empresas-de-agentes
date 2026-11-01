@@ -6,6 +6,7 @@ reportsTo: tech-lead
 skills:
   - revisao-adversarial
   - criterio-de-verificacao
+  - task-envelope
 metadata:
   persona:
     display_name: Sonia Andrade

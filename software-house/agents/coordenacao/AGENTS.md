@@ -5,6 +5,7 @@ slug: coordenacao
 reportsTo: null
 skills:
   - criterio-de-verificacao
+  - task-envelope
 metadata:
   persona:
     display_name: Marta Lima

@@ -321,7 +321,7 @@ test('yaml-emit: reemitir todo papel do acervo não muda um byte', () => {
     const reemitido = toMarkdown(f);
     assert.equal(reemitido, original, `${join(nome, f.path)} mudou na reemissão`);
   }
-  assert.equal(total, 85, `esperado 85 arquivos no acervo, achou ${total}`);
+  assert.equal(total, 86, `esperado 86 arquivos no acervo, achou ${total}`);
 });
 
 test('PARIDADE semântica: todo frontmatter real do acervo faz ida e volta sem perda', () => {

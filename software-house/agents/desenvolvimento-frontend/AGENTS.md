@@ -6,6 +6,7 @@ reportsTo: tech-lead
 skills:
   - criterio-de-verificacao
   - stack-node
+  - task-envelope
 metadata:
   persona:
     display_name: Alice Nunes

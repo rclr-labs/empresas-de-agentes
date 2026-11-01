@@ -50,6 +50,26 @@ metadata:
         - "TRUNCATE TABLE*"
         - "terraform destroy*"
         - "kubectl delete*"
+  task_protocol:
+    version: 1
+    skill_ref: task-envelope
+    statuses:
+      - id: done
+        description: todos os critérios atendidos e verificados
+        on_runtime: wake_blocked
+      - id: partial
+        description: parte entregue; o restante vira issue de follow-up
+        on_runtime: create_followup_issue
+      - id: blocked
+        description: dependência externa não resolvida
+        on_runtime: wake_on_unblock
+      - id: needs_clarification
+        description: requisito ambíguo
+        on_runtime: notify_assignee_chain
+      - id: failed
+        description: esgotou budget.max_iterations
+        on_runtime: escalate_to_role
+        escalate_to: tech-lead
 ---
 
 # Casa de Software

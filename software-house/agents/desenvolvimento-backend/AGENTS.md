@@ -10,6 +10,7 @@ skills:
   - stack-php
   - stack-python
   - stack-dotnet
+  - task-envelope
 metadata:
   persona:
     display_name: Caio Moraes

@@ -5,6 +5,7 @@ slug: desenvolvimento
 reportsTo: tech-lead
 skills:
   - criterio-de-verificacao
+  - task-envelope
 metadata:
   persona:
     display_name: Bruno Castro

@@ -5,6 +5,7 @@ slug: tech-lead
 reportsTo: coordenacao
 skills:
   - criterio-de-verificacao
+  - task-envelope
 metadata:
   persona:
     display_name: Clara Mendes

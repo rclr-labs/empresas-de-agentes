@@ -5,6 +5,7 @@ slug: gate-qualidade
 reportsTo: coordenacao
 skills:
   - criterio-de-verificacao
+  - task-envelope
 metadata:
   persona:
     display_name: Jairo Melo
