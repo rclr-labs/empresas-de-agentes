@@ -216,6 +216,9 @@ not_emitted:
   approve:
     mechanism: "permissions.ask, emitido em .claude/settings.json a partir de human_gates[].triggers"
     falta: "capabilities.approve referencia human_gates[].id, não um padrão de comando; o ask emitido é de empresa, não amarrado a qual agente aprova, e não registra o signer nomeado"
+  task_protocol:
+    mechanism: "frontmatter de sub-agente aceita chave arbitrária sob metadata — o dado tem onde ser copiado"
+    falta: "nenhum emissor (tools/writers.mjs) gera nada a partir de metadata.task_protocol hoje; sem rastreador de issue no runtime, o status fica documentado, não automatizado"
 citations:
   read.repository: "code.claude.com/docs/en/tools-reference — nomes de tool confirmados (lido em 2026-10-24)"
   read.documentation: "code.claude.com/docs/en/tools-reference"
@@ -244,5 +247,8 @@ citations:
   context:
     inferido: true
     source: "nenhum campo 'context' na frontmatter de sub-agente documentada — ausência confirmada por leitura de code.claude.com/docs/en/sub-agents"
+  task_protocol:
+    inferido: true
+    source: "code.claude.com/docs/en/sub-agents não documenta rastreador de issue nenhum — not_emitted por ausência de mecanismo de ciclo de vida, não por ausência de campo de frontmatter"
 unsupported: []
 unsupported_metadata: []

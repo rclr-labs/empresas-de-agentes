@@ -56,6 +56,7 @@ preserves:
   - skills
   - memory
   - context
+  - task_protocol
 loses: []
 # Fix round 1: uma única citação, texto idêntico para toda chave — o
 # motivo é literalmente o mesmo para as 21 capacidades (o manifesto é
@@ -83,5 +84,6 @@ citations:
   skills: *desenho-proprio
   memory: *desenho-proprio
   context: *desenho-proprio
+  task_protocol: *desenho-proprio
 unsupported: []
 unsupported_metadata: []

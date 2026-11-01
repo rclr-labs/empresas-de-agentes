@@ -48,6 +48,7 @@ preserves:
   - approve
   - memory
   - context
+  - task_protocol
 loses: []
 # Fix round 1: citações unificadas por GRUPO semântico, texto idêntico
 # para toda chave do mesmo grupo. Isso não é só estilo — é o que permite
@@ -83,5 +84,8 @@ citations:
   network.allowlist: *extensao-de-fornecedor
   budget: *extensao-de-fornecedor
   approve: *extensao-de-fornecedor
+  task_protocol:
+    inferido: true
+    source: "nenhuma medição de que a API de issues do Paperclip lê metadata.task_protocol para resolver o próprio ciclo de vida — o campo sobrevive na cópia byte a byte (§5–§13 não o definem), mas quem AGE sobre o enum de status é o agente, chamando a API manualmente, não o runtime lendo o frontmatter"
 unsupported: []
 unsupported_metadata: []

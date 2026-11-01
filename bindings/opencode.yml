@@ -136,6 +136,9 @@ not_emitted:
   read.database:
     mechanism: "ação <server>_<tool> (permissions.mdx), allow/deny da ferramenta MCP inteira"
     falta: "o pacote não declara qual servidor MCP expõe o banco; mesmo com o nome, a ação só concede/nega a ferramenta inteira, sem distinguir leitura de escrita dentro dela"
+  task_protocol:
+    mechanism: "frontmatter de sub-agente aceita chave arbitrária sob metadata — o dado tem onde ser copiado"
+    falta: "nenhum emissor (tools/writers.mjs) gera nada a partir de metadata.task_protocol hoje; sem rastreador de issue no runtime, o status fica documentado, não automatizado"
 citations:
   read.repository:
     inferido: true
@@ -176,5 +179,8 @@ citations:
     source: "ausência confirmada em packages/schema/src/config/agent.ts (ConfigAgent.Info sem campo skills) + permissions.mdx (ação `skill` é controle de acesso, não declaração), lidos 2026-10-25"
   memory: "packages/schema/src/config/agent.ts — ausência confirmada, lido 2026-10-25"
   context: "packages/schema/src/config/agent.ts — ausência confirmada, lido 2026-10-25"
+  task_protocol:
+    inferido: true
+    source: "packages/schema/src/config/agent.ts (ConfigAgent.Info) não documenta rastreador de issue nenhum — not_emitted por ausência de mecanismo de ciclo de vida, não por ausência de campo de frontmatter"
 unsupported: []
 unsupported_metadata: []
