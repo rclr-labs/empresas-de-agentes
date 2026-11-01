@@ -180,6 +180,7 @@ export function portableManifest(pkg) {
       capability_vocabulary: meta.capability_vocabulary ?? 'capabilities/v1',
       budget: meta.budget ?? null,
       human_gates: meta.human_gates ?? [],
+      task_protocol: meta.task_protocol ?? null,
       agents: pkg.agents.map((a) => ({
         slug: a.slug,
         name: a.frontmatter.name,

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { writers } from '../tools/writers.mjs';
+import { writers, portableManifest } from '../tools/writers.mjs';
 import { loadPackage, listPackages } from '../tools/schema.mjs';
 import { applyBinding } from '../tools/bindings.mjs';
 import { parseMarkdown } from '../tools/schema.mjs';
@@ -380,6 +380,25 @@ test('portable: zero perda em todo agente de todo pacote', () => {
       assert.deepEqual(lost, [], `${nome}/${a.slug} perdeu capacidade no portable`);
     }
   }
+});
+
+test('portable: task_protocol sobrevive no manifesto — portable.yml declara preserves, writers.mjs tinha que cumprir', () => {
+  const taskProtocol = { version: 1, statuses: [{ id: 'done', on_runtime: 'wake_blocked' }] };
+  const pkg = {
+    slug: 'fixture',
+    company: {
+      frontmatter: {
+        name: 'fixture',
+        license: 'MIT',
+        metadata: { task_protocol: taskProtocol },
+      },
+    },
+    agents: [],
+    projects: [],
+  };
+  const { content } = portableManifest(pkg);
+  assert.deepEqual(JSON.parse(content).task_protocol, taskProtocol,
+    'bindings/portable.yml classifica task_protocol em preserves — o manifesto tem que gravá-lo de fato');
 });
 
 test('paperclip: identidade — o pacote sai íntegro', () => {

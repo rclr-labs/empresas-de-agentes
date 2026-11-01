@@ -354,13 +354,13 @@ a forma sem espaço (`npx*`, `npm*`).
 | W03 | Persona incompleta: falta `metadata.persona.display_name`, `.icon`, `.pronouns` ou `.background` (um aviso por campo ausente) | O card da vitrine degrada — mostra o slug no lugar do nome, fica sem ícone, sem pronome, ou sem histórico — mas o papel continua válido e a fronteira continua intacta. **A divisão com `E18`:** W03 é o que FALTA (persona incompleta); E18 é o que está declarado e está ERRADO (persona malformada — ASCII, 3 linhas de um `background` que existe, vazamento no corpo). `background` ausente entrou aqui no ruling de 2026-10-27 (fix-round 2), corrigindo o ruling anterior (fix-round 1), que tinha dividido `display_name`/`icon`/`pronouns` para W03 mas deixado `background` ausente cair em E18 por omissão — mesma razão dos outros três: a persona não entra no prompt, exceto `signature_question`, então `background`/`headline` custam token sem mudar comportamento; sua ausência é card pobre, não papel que mente sobre si. Inverter isso e fazer qualquer um dos quatro campos ausente reprovar o pacote seria incoerente com `display_name` ausente já ser aviso desde antes desta regra, e quebraria pacote de terceiro que não se importa com esta vitrine |
 | W04 | Papel sem `skills` declaradas | Papel sem skill associada — não impede o pacote de validar, mas é informação incompleta |
 | W05 | `ressalva-de-allowlist-ausente` — papel declara domínio em `network` e comando de `COMANDOS_DE_REDE` em `execute.allow`, e o corpo não traz a ressalva `allowlist_scope` | Quem adapta o papel para um runtime onde a allowlist não é fronteira de SO (OpenCode V2, janus `kind=cli`) confia numa restrição que o comando atravessa |
-| W06 | `protocolo-sem-skill` | Pacote declara `task_protocol.skill_ref` e nenhum papel anexa essa skill em `skills:` | O protocolo existe só em `metadata`, sem nenhum papel instruído a seguir a prosa dele — ainda pode ser lido só pela plataforma |
+| W06 | `protocolo-sem-skill` — pacote declara `task_protocol.skill_ref` e nenhum papel anexa essa skill em `skills:` | O protocolo existe só em `metadata`, sem nenhum papel instruído a seguir a prosa dele — ainda pode ser lido só pela plataforma |
 
 ### Regras de acervo (`A01`) — o invariante que um pacote não pode decidir
 
 `validatePackage(pkg)` recebe **um** pacote e, por isso, não pode decidir
 nada que dependa de olhar os outros sete. Todo o catálogo acima —
-`E01`–`E20`, `W01`–`W05` — é regra DENTRO de um pacote: roda sobre `pkg`
+`E01`–`E22`, `W01`–`W06` — é regra DENTRO de um pacote: roda sobre `pkg`
 sozinho, e um pacote de terceiro isolado já é entrada suficiente para
 avaliá-las todas. Fingir que uma regra DENTRO de um pacote pode certificar
 algo sobre o acervo INTEIRO seria a regra mentindo sobre o que ela de fato
@@ -379,7 +379,7 @@ e na Fase 2 também validando o pacote em edição, um só. Com `--package
 <alvo>` (um pacote só, de propósito), o CLI NÃO chama `validateAcervo` — ela
 decidiria unicidade sobre um recorte que o operador nunca pediu, e a
 pergunta "este pacote de terceiro é internamente consistente" já é
-respondida por `E01`–`E20` sem precisar do resto do acervo.
+respondida por `E01`–`E22` sem precisar do resto do acervo.
 
 **Chamada parcial não é recusada — é declarada.** `validateAcervo(pkgs)`
 devolve `{ errors, verificados }`, onde `verificados` é a lista de slugs que

@@ -252,9 +252,10 @@ function formatarErros(erros) {
  * pacote, ou se `validateAcervo` acusar colisão de identidade — catálogo
  * gerado de acervo inválido é vitrine mentindo com confiança.
  *
- * AVISO (W01-W05) NÃO falha a geração — decisão declarada, não omissão:
+ * AVISO (W01-W06) NÃO falha a geração — decisão declarada, não omissão:
  * todo aviso hoje documentado em rules.mjs (`validateWarnings`) é sobre
- * persona incompleta ou allowlist sem ressalva de prosa — "o papel
+ * persona incompleta, allowlist sem ressalva de prosa, ou protocolo de
+ * tarefa sem skill anexada — "o papel
  * continua válido... só o card da vitrine fica pobre" (comentário de W03
  * em rules.mjs). Bloquear a geração por aviso faria o catálogo nunca
  * existir para um pacote de terceiro que não preencheu a persona por
