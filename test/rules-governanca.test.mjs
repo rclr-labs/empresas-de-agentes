@@ -1013,3 +1013,49 @@ test('task_protocol com mapa de status válido passa limpo', () => {
   });
   assert.ok(!codigosEstrutura(pkg).includes('E21'));
 });
+
+function skill(slug, body) {
+  return { slug, path: `skills/${slug}/SKILL.md`, frontmatter: { name: slug }, body };
+}
+
+test('E22: skill documenta status diferente do declarado', () => {
+  const pkg = pacoteComProtocolo({
+    skill_ref: 'task-envelope',
+    statuses: [
+      { id: 'done', on_runtime: 'wake_blocked' },
+      { id: 'failed', on_runtime: 'escalate_to_role', escalate_to: 'tech-lead' },
+    ],
+  });
+  pkg.skills = [skill('task-envelope', 'status: done | partial | blocked')];
+  assert.ok(codigosEstrutura(pkg).includes('E22'));
+});
+
+test('E22: skill documenta exatamente o mesmo conjunto (ordem livre) passa', () => {
+  const pkg = pacoteComProtocolo({
+    skill_ref: 'task-envelope',
+    statuses: [
+      { id: 'done', on_runtime: 'wake_blocked' },
+      { id: 'failed', on_runtime: 'escalate_to_role', escalate_to: 'tech-lead' },
+    ],
+  });
+  pkg.skills = [skill('task-envelope', 'status: failed | done')];
+  assert.ok(!codigosEstrutura(pkg).includes('E22'));
+});
+
+test('E22: skill sem linha "status:" não dispara nada (nada a comparar)', () => {
+  const pkg = pacoteComProtocolo({
+    skill_ref: 'task-envelope',
+    statuses: [{ id: 'done', on_runtime: 'wake_blocked' }],
+  });
+  pkg.skills = [skill('task-envelope', 'nenhuma menção a status aqui')];
+  assert.ok(!codigosEstrutura(pkg).includes('E22'));
+});
+
+test('E22: skill_ref que não corresponde a nenhuma skill do pacote não dispara nada', () => {
+  const pkg = pacoteComProtocolo({
+    skill_ref: 'task-envelope',
+    statuses: [{ id: 'done', on_runtime: 'wake_blocked' }],
+  });
+  pkg.skills = [];
+  assert.ok(!codigosEstrutura(pkg).includes('E22'));
+});

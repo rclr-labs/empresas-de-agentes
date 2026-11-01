@@ -648,6 +648,16 @@ function taskProtocolDe(pkg, slugs) {
   return { protocol: { ...raw, statuses }, erros };
 }
 
+// Extrai o enum documentado numa linha "status: a | b | c" do corpo em
+// prosa de uma skill. `null` quando a skill não documenta status nenhum —
+// E22 não tem o que comparar, e isso não é defeito: skill sem domínio de
+// protocolo nenhum não precisa mencionar status.
+function statusEnumDoCorpoDaSkill(body) {
+  const m = /^\s*status:\s*([a-z0-9_]+(?:\s*\|\s*[a-z0-9_]+)+)/im.exec(body ?? '');
+  if (!m) return null;
+  return m[1].split('|').map((s) => s.trim()).filter(Boolean);
+}
+
 function enumDe(verbo) {
   if (verbo === 'read') return VOCABULARY.read;
   if (verbo === 'write') return VOCABULARY.write;
@@ -794,6 +804,28 @@ export function validateStructure(pkg) {
       }
       visto.push(atual);
       atual = chefeDe.get(atual);
+    }
+  }
+
+  // E22 — a skill que documenta o protocolo em prosa tem de concordar com
+  // o que a empresa declarou em metadata.task_protocol.statuses. Mesma
+  // família de E10 (prosa-contradiz-capacidade), fronteira diferente:
+  // aqui as duas metades são "prosa da skill" e "enum declarado", não
+  // "prosa do papel" e "capabilities".
+  if (taskProtocol?.skill_ref) {
+    const skillAlvo = pkg.skills.find((s) => s.slug === taskProtocol.skill_ref);
+    if (skillAlvo) {
+      const documentado = statusEnumDoCorpoDaSkill(skillAlvo.body);
+      if (documentado) {
+        const declarado = new Set(taskProtocol.statuses.map((s) => s.id));
+        const lido = new Set(documentado);
+        const divergem = declarado.size !== lido.size
+          || [...declarado].some((id) => !lido.has(id));
+        if (divergem) {
+          erros.push(erro('E22', 'protocolo-skill-diverge', skillAlvo.path,
+            `skill "${taskProtocol.skill_ref}" documenta status [${documentado.join(', ')}], e metadata.task_protocol.statuses (COMPANY.md) declara [${[...declarado].join(', ')}] — as duas metades do protocolo têm de concordar`));
+        }
+      }
     }
   }
 
