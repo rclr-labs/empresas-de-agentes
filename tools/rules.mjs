@@ -601,6 +601,53 @@ function gatesDo(pkg) {
   return { gates, erros };
 }
 
+/**
+ * Retorna { protocol, erros } — nunca lança. `protocol` é `null` quando o
+ * pacote não declara `task_protocol` (opcional e aditivo, como human_gates).
+ * Mesma forma de gatesDo: o defeito é NOMEADO (E21) e a entrada malformada
+ * é descartada da lista usada a jusante (Task 3/4), em vez de poluí-la.
+ */
+function taskProtocolDe(pkg, slugs) {
+  const raw = pkg.company.frontmatter?.metadata?.task_protocol;
+  const erros = [];
+  if (raw == null) return { protocol: null, erros };
+  if (!isPlainObject(raw)) {
+    erros.push(erro('E21', 'protocolo-mapa-invalido', 'COMPANY.md',
+      `metadata.task_protocol deveria ser um objeto; veio ${typeof raw}`));
+    return { protocol: null, erros };
+  }
+  const statusesRaw = raw.statuses;
+  if (!Array.isArray(statusesRaw)) {
+    erros.push(erro('E21', 'protocolo-mapa-invalido', 'COMPANY.md',
+      `metadata.task_protocol.statuses deveria ser uma lista; veio ${typeof statusesRaw}`));
+    return { protocol: { ...raw, statuses: [] }, erros };
+  }
+  const statuses = [];
+  statusesRaw.forEach((s, i) => {
+    if (!isPlainObject(s) || typeof s.id !== 'string' || s.id.length === 0) {
+      erros.push(erro('E21', 'protocolo-mapa-invalido', 'COMPANY.md',
+        `metadata.task_protocol.statuses[${i}] não é objeto com "id" válido: ${JSON.stringify(s)}`));
+      return;
+    }
+    if (!VOCABULARY.task_protocol_on_runtime.includes(s.on_runtime)) {
+      erros.push(erro('E21', 'protocolo-mapa-invalido', 'COMPANY.md',
+        `statuses[${i}] ("${s.id}").on_runtime "${s.on_runtime}" fora do vocabulário. Permitidos: ${VOCABULARY.task_protocol_on_runtime.join(', ')}`));
+      return;
+    }
+    if (s.on_runtime === 'escalate_to_role') {
+      if (typeof s.escalate_to !== 'string' || s.escalate_to.length === 0) {
+        erros.push(erro('E21', 'protocolo-mapa-invalido', 'COMPANY.md',
+          `statuses[${i}] ("${s.id}") usa on_runtime "escalate_to_role" sem "escalate_to"`));
+      } else if (!slugs.has(s.escalate_to)) {
+        erros.push(erro('E21', 'protocolo-mapa-invalido', 'COMPANY.md',
+          `statuses[${i}] ("${s.id}").escalate_to "${s.escalate_to}" não é papel deste pacote. Papéis: ${[...slugs].join(', ')}`));
+      }
+    }
+    statuses.push(s);
+  });
+  return { protocol: { ...raw, statuses }, erros };
+}
+
 function enumDe(verbo) {
   if (verbo === 'read') return VOCABULARY.read;
   if (verbo === 'write') return VOCABULARY.write;
@@ -610,7 +657,8 @@ function enumDe(verbo) {
 export function validateStructure(pkg) {
   const slugs = new Set(pkg.agents.map((a) => a.slug));
   const { gates, erros: gateErros } = gatesDo(pkg);
-  const erros = [...gateErros];
+  const { protocol: taskProtocol, erros: protocoloErros } = taskProtocolDe(pkg, slugs);
+  const erros = [...gateErros, ...protocoloErros];
   const gateIds = new Set(gates.map((g) => g.id));
 
   // E01 — license

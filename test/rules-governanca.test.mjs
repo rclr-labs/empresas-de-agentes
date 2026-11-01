@@ -926,3 +926,90 @@ test('E18/E19: display_name como número (tipo errado) dá E19, não E18', () =>
     `tipo errado é E19, não E18: ${JSON.stringify(errors, null, 2)}`);
   assert.equal(errors.filter((e) => e.code === 'E19').length, 1);
 });
+
+function pacoteComProtocolo(taskProtocol, { agentsExtra = [] } = {}) {
+  return {
+    slug: 'teste',
+    company: {
+      path: 'COMPANY.md',
+      frontmatter: {
+        slug: 'teste', license: 'MIT',
+        metadata: { human_gates: [], task_protocol: taskProtocol },
+      },
+      body: '',
+    },
+    agents: [
+      {
+        path: 'agents/tech-lead/AGENTS.md', slug: 'tech-lead',
+        frontmatter: {
+          slug: 'tech-lead', reportsTo: null, skills: ['x'],
+          metadata: {
+            boundary: { can: ['ler'], cannot: [] }, capabilities: {},
+            persona: { display_name: 'N', icon: '🧪' },
+          },
+        },
+        body: '',
+      },
+      ...agentsExtra,
+    ],
+    skills: [], teams: [], tasks: [], warnings: [],
+  };
+}
+
+const codigosEstrutura = (pkg) => validateStructure(pkg).map((e) => e.code);
+
+test('E21: on_runtime fora do vocabulário fechado reprova', () => {
+  const pkg = pacoteComProtocolo({
+    statuses: [{ id: 'done', on_runtime: 'faz_magica' }],
+  });
+  assert.ok(codigosEstrutura(pkg).includes('E21'));
+});
+
+test('E21: escalate_to_role sem escalate_to reprova', () => {
+  const pkg = pacoteComProtocolo({
+    statuses: [{ id: 'failed', on_runtime: 'escalate_to_role' }],
+  });
+  assert.ok(codigosEstrutura(pkg).includes('E21'));
+});
+
+test('E21: escalate_to que não é papel do pacote reprova', () => {
+  const pkg = pacoteComProtocolo({
+    statuses: [{ id: 'failed', on_runtime: 'escalate_to_role', escalate_to: 'fantasma' }],
+  });
+  assert.ok(codigosEstrutura(pkg).includes('E21'));
+});
+
+test('E21: escalate_to que É papel do pacote passa', () => {
+  const pkg = pacoteComProtocolo({
+    statuses: [{ id: 'failed', on_runtime: 'escalate_to_role', escalate_to: 'tech-lead' }],
+  });
+  assert.ok(!codigosEstrutura(pkg).includes('E21'));
+});
+
+test('E21: statuses que não é lista reprova', () => {
+  const pkg = pacoteComProtocolo({ statuses: 'oops' });
+  assert.ok(codigosEstrutura(pkg).includes('E21'));
+});
+
+test('E21: entrada de statuses sem id reprova', () => {
+  const pkg = pacoteComProtocolo({ statuses: [{ on_runtime: 'wake_blocked' }] });
+  assert.ok(codigosEstrutura(pkg).includes('E21'));
+});
+
+test('sem task_protocol não reprova nada (opcional e aditivo)', () => {
+  const pkg = pacoteComProtocolo(undefined);
+  assert.ok(!codigosEstrutura(pkg).includes('E21'));
+});
+
+test('task_protocol com mapa de status válido passa limpo', () => {
+  const pkg = pacoteComProtocolo({
+    statuses: [
+      { id: 'done', on_runtime: 'wake_blocked' },
+      { id: 'partial', on_runtime: 'create_followup_issue' },
+      { id: 'blocked', on_runtime: 'wake_on_unblock' },
+      { id: 'needs_clarification', on_runtime: 'notify_assignee_chain' },
+      { id: 'failed', on_runtime: 'escalate_to_role', escalate_to: 'tech-lead' },
+    ],
+  });
+  assert.ok(!codigosEstrutura(pkg).includes('E21'));
+});
