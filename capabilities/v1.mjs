@@ -28,6 +28,14 @@ export const VOCABULARY = Object.freeze({
   memory_scope: Object.freeze(['none', 'session', 'project', 'org']),
   memory_retention: Object.freeze(['none', 'session', 'project', 'org']),
   context_kind: Object.freeze(['repo_file', 'package_doc', 'url', 'path']),
+  // TAREFA DE 2026-11-01: vocabulário fechado dos mecanismos que um status
+  // de Delivery Report pode disparar no runtime. Não é verbo de
+  // capabilities.read/write — é semântica de PROTOCOLO, por isso lista
+  // própria, não item novo dentro de read/write.
+  task_protocol_on_runtime: Object.freeze([
+    'wake_blocked', 'create_followup_issue', 'wake_on_unblock',
+    'notify_assignee_chain', 'escalate_to_role',
+  ]),
 });
 
 // Alias pt-BR → chave canônica. Aceito na leitura, nunca emitido na escrita.
@@ -46,4 +54,5 @@ export const ALIASES = Object.freeze({
   memoria: 'memory',
   contexto: 'context',
   vocabulario_de_capacidades: 'capability_vocabulary',
+  protocolo_de_tarefa: 'task_protocol',
 });

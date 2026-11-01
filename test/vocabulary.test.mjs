@@ -28,6 +28,7 @@ test('todo alias pt-BR aponta para chave canônica conhecida', () => {
     'persona', 'boundary', 'capabilities', 'memory', 'context',
     'budget', 'human_gates', 'can', 'cannot', 'currency',
     'monthly_cap', 'alert_at', 'alert_to', 'capability_vocabulary',
+    'task_protocol',
   ]);
   for (const [alias, canonico] of Object.entries(ALIASES)) {
     assert.ok(canonicos.has(canonico), `alias ${alias} → ${canonico} desconhecido`);
@@ -49,4 +50,16 @@ test('os CONTÊINERES VOCABULARY e ALIASES também são congelados', () => {
   assert.ok(Object.isFrozen(ALIASES), 'ALIASES congelado');
   assert.throws(() => { VOCABULARY.novoVerbo = []; });
   assert.throws(() => { ALIASES.novoAlias = 'x'; });
+});
+
+test('task_protocol_on_runtime declara os cinco mecanismos de status', () => {
+  assert.deepEqual(VOCABULARY.task_protocol_on_runtime, [
+    'wake_blocked', 'create_followup_issue', 'wake_on_unblock',
+    'notify_assignee_chain', 'escalate_to_role',
+  ]);
+  assert.throws(() => { VOCABULARY.task_protocol_on_runtime.push('x'); });
+});
+
+test('protocolo_de_tarefa está entre os aliases', () => {
+  assert.equal(ALIASES.protocolo_de_tarefa, 'task_protocol');
 });
