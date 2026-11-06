@@ -729,3 +729,64 @@ sobre ele automaticamente — no caso do Paperclip, que a API de issues
 resolve o próprio ciclo de vida a partir de `metadata.task_protocol`, não
 que um agente LEIA o campo e chame a API manualmente. Essa medição não foi
 feita; a célula entra com `inferido: true` até que seja.
+
+## 10. Skill por papel e por stack, nunca por framework
+
+`skills:` no `AGENTS.md` anexa dois eixos independentes a um papel — o que
+ele *é* (comportamento, critério, protocolo: `criterio-de-verificacao`,
+`task-envelope`) e o que ele *implementa com* (`stack-java`, `stack-python`)
+— e nenhum dos dois é a tecnologia específica que o papel vai tocar num
+projeto. Não existe `stack-spring-boot` nem `desenvolvimento-java`: o papel
+é `desenvolvimento-backend`, a stack é `stack-java` anexada por `skills:`, e
+o framework dentro da stack é julgamento do agente em tempo de execução, não
+arquivo no acervo.
+
+A alternativa mais comum — uma skill por framework — foi testada, não
+hipotética: é o desenho do pacote de agentes que o cliente Jacto
+(`sdlc-ai-centric`) construiu por conta própria antes de qualquer contato
+com este acervo. Compará-lo mostra por que a divisão por papel/stack vale
+o esforço extra de desenho.
+
+**Uma skill por framework multiplica, uma skill por stack soma.** O
+`sdlc-ai-centric` tem `backend-spring-boot` e `backend-quarkus` como duas
+skills — mesma linguagem (Java 21), dois arquivos que divergem a cada nova
+versão de cada framework. Generalizando para `n` frameworks por linguagem e
+`m` linguagens, o acervo de skills de stack cresce em `n × m`. Neste acervo,
+`stack-java` é um arquivo só: framework é parágrafo dentro dele, não
+fronteira entre arquivos. É a mesma aritmética que já decidiu não existir
+`desenvolvimento-java` ao lado de `desenvolvimento-backend` — 3 papéis × 5
+stacks teria virado 15 arquivos divergindo; 5 frameworks por stack teria
+virado 25.
+
+**Skill de framework ensina a tecnologia; skill de stack ensina a
+armadilha.** `backend-spring-boot` do cliente abre com "Camadas e
+transações", documenta `@RestControllerAdvice`/`ProblemDetail` e termina
+num `OrderController` inteiro como modelo de referência — é material para
+quem ainda não sabe Spring. `stack-java` deste acervo abre dizendo o
+oposto: "não ensina a linguagem — pressupõe que você já sabe escrever Java
+e precisa saber como este ecossistema espera que o trabalho seja feito", e
+o corpo é convenção (Maven vs Gradle, JUnit 5 vs 4) e armadilha (injeção
+por reflexão escondendo ciclo, exception engolida, `equals`/`hashCode`
+desalinhado) — sem bloco de código de referência. A skill de framework
+responde "como construir isto certo"; a skill de stack responde "onde este
+ecossistema te corta", e as duas perguntas não encolhem juntas quando o
+framework muda.
+
+**Framework é estado de projeto, não propriedade de agente.** Um papel de
+`desenvolvimento-backend` com `stack-java` atende o mesmo cliente que hoje
+está em Spring Boot e migra para Quarkus no ano seguinte sem o acervo
+mudar uma linha — o agente lê o `pom.xml`/`build.gradle` do repositório-alvo
+e se ajusta, do mesmo jeito que já decide sozinho entre Maven e Gradle. No
+desenho por framework, a mesma migração troca a skill que o papel carrega,
+e um cliente com dois serviços em dois frameworks precisa de dois papéis
+"backend" diferentes — ou de um papel carregando skills que se contradizem.
+
+**Transversal é a regra, não a exceção isolada.** O `sdlc-ai-centric` tem
+uma única skill que não é amarrada a tecnologia — `task-envelope`, que o
+§9 generalizou para o acervo inteiro. As outras 24 skills do pacote do cliente
+são 100% específicas de framework. Neste acervo, toda empresa tem pelo
+menos duas skills comportamentais além de `task-envelope` (`software-house`:
+`criterio-de-verificacao`, `revisao-adversarial`; `fabrica-de-testes`:
+`evidencia-replayavel`, `suite-que-nao-falha-sozinha`, entre outras) — o
+transversal não é a skill que sobrou depois de esgotar a lista de
+frameworks, é metade do desenho.
