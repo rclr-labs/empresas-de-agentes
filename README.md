@@ -1,5 +1,10 @@
 # Empresas de Agentes
 
+> **Repositório arquivado em 2026-11-08.** O conteúdo deste repo foi consolidado em
+> [`rclr-labs/agent-studio`](https://github.com/rclr-labs/agent-studio), na pasta `acervo/`,
+> com histórico completo preservado. Issues e PRs existentes aqui seguem consultáveis,
+> mas o desenvolvimento novo acontece lá.
+
 Organogramas de agentes de IA prontos para operar, no formato aberto
 `agentcompanies/v1`. Cada pacote traz papéis, hierarquia de delegação,
 fronteira de permissão por papel, política de orçamento e gates de
